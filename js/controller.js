@@ -5,6 +5,10 @@ const Controller = {
   // ── Run ──
   startRun() {
     const m = GameState.meta;
+    GameState._shopReturnToMap = false;
+    GameState._restDone = null;
+    GameState._relicDone = null;
+    RelicHooks.invalidate();
     GameState.run = {
       gold: 0,
       totalScore: 0,
@@ -84,19 +88,25 @@ const Controller = {
   _pickRandom(pool, count, floorIdx) {
     const remaining = [...pool];
     const picks = [];
+    const fi = Math.min(floorIdx ?? GameState.run?.floorIdx ?? 0, 2);
+    const synergyLvl = GameState.meta?.upgrades?.synergy || 0;
     for (let i = 0; i < Math.min(count, remaining.length); i++) {
-      const fi = Math.min(floorIdx ?? GameState.run?.floorIdx ?? 0, 2);
       const weights = remaining.map(r => {
         const w = RARITY_WEIGHTS[r.rarity];
-        return w ? w[fi] : 30;
+        let base = w ? w[fi] : 30;
+        if (synergyLvl > 0 && (r.rarity === 'epic' || r.rarity === 'legendary')) {
+          base += synergyLvl * 10;
+        }
+        return base;
       });
       const total = weights.reduce((s, w) => s + w, 0);
       let roll = Math.random() * total;
       let idx = 0;
-      for (; idx < weights.length - 1; idx++) {
+      for (; idx < weights.length; idx++) {
         roll -= weights[idx];
         if (roll <= 0) break;
       }
+      idx = Math.min(idx, remaining.length - 1);
       picks.push(remaining.splice(idx, 1)[0]);
     }
     return picks;
@@ -109,7 +119,7 @@ const Controller = {
 
   _grantRelic(relic) {
     GameState.run.relics.push(relic);
-    // Fire onRunStart hook for relics that need init (e.g. Phoenix sets _phoenixReady)
+    RelicHooks.invalidate();
     if (relic.hooks?.onRunStart) relic.hooks.onRunStart({}, GameState.run, GameState);
   },
 
@@ -363,11 +373,11 @@ const Controller = {
     RelicHooks.fire('onAfterMove', moveCtx);
     gs.movesLeft += moveCtx.addMove;
 
-    // Gold calculation with relic hooks
+    // Gold: base from score, then relic hooks, then meta bonus
     let gold = Math.floor(result.score / 100);
-    gold += (gs.meta.upgrades.goldBonus || 0) * 2 * (result.merges.length > 0 ? 1 : 0);
     const goldCtx = { gold, merges: result.merges, type: gs.room.data.type, floorIdx: gs.room.floorIdx };
     RelicHooks.fire('onGoldCalc', goldCtx);
+    goldCtx.gold += (gs.meta.upgrades.goldBonus || 0) * 2 * (result.merges.length > 0 ? 1 : 0);
     gs.run.gold += goldCtx.gold;
 
     // Singularity meta upgrade
@@ -469,7 +479,7 @@ const Controller = {
     }
   },
 
-  _relicCount() { return 3 + (GameState.meta.upgrades.relicSlots || 0) + (GameState.meta.upgrades.synergy || 0); },
+  _relicCount() { return 3 + (GameState.meta.upgrades.relicSlots || 0); },
 
   // ── Relic offer ──
   _offerRelics(count, onDone, customPool) {

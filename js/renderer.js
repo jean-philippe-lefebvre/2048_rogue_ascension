@@ -32,12 +32,19 @@ const Renderer = {
   getTileGeometry() {
     if (this._geoCache) return this._geoCache;
     const grid = document.getElementById('gameGrid');
-    const w = grid.offsetWidth;
-    const cellSize = (w - GRID_PAD * 2 - GRID_GAP * (GRID_SIZE - 1)) / GRID_SIZE;
+    const firstCell = grid.querySelector('.gcell');
+    if (!firstCell) return null;
+    // Read actual rendered position from first cell
+    const gridRect = grid.parentElement.getBoundingClientRect();
+    const cellRect = firstCell.getBoundingClientRect();
+    const cellSize = cellRect.width;
+    const originX = cellRect.left - gridRect.left;
+    const originY = cellRect.top - gridRect.top;
+    const gap = GRID_SIZE > 1 ? (grid.querySelector('.gcell:nth-child(2)').getBoundingClientRect().left - cellRect.right) : GRID_GAP;
     this._geoCache = {
       cellSize,
-      left: (c) => GRID_PAD + c * (cellSize + GRID_GAP),
-      top:  (r) => GRID_PAD + r * (cellSize + GRID_GAP),
+      left: (c) => originX + c * (cellSize + gap),
+      top:  (r) => originY + r * (cellSize + gap),
     };
     return this._geoCache;
   },

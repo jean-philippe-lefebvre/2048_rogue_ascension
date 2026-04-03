@@ -53,12 +53,22 @@ const OBJECTIVES = {
 
 // ── Relic Hook System ──
 const RelicHooks = {
+  _cache: null,
+  invalidate() { this._cache = null; },
   fire(hookName, ctx) {
     const run = GameState.run;
     if (!run) return ctx;
-    for (const relic of run.relics) {
-      if (relic.hooks?.[hookName]) relic.hooks[hookName](ctx, run, GameState);
+    // Build cache on first call per run
+    if (!this._cache) {
+      this._cache = {};
+      for (const relic of run.relics) {
+        for (const h of Object.keys(relic.hooks || {})) {
+          (this._cache[h] ??= []).push(relic);
+        }
+      }
     }
+    const handlers = this._cache[hookName];
+    if (handlers) for (const relic of handlers) relic.hooks[hookName](ctx, run, GameState);
     return ctx;
   }
 };
@@ -86,7 +96,7 @@ const RELICS = [
   { id:'magnet',    icon:'🧲', name:'Aimant',         rarity:'rare', desc:'+3 coups au début de chaque salle.',               effect:'+3 coups/salle',
     hooks: { onMovesCalc: ctx => { ctx.bonus += 3; } } },
   { id:'tide',      icon:'🌊', name:'Marée',          rarity:'rare', desc:'1×/salle : le premier coup sans fusion est gratuit.', effect:'1 coup gratuit/salle',
-    hooks: { onAfterMove: (ctx, run, gs) => { const rs=gs.room.relicState; if(!rs._tideUsed && ctx.result.merges.length===0) { rs._tideUsed=true; ctx.freeMove=true; } } } },
+    hooks: { onAfterMove: (ctx, run, gs) => { const rs=gs.room?.relicState; if(rs && !rs._tideUsed && ctx.result.merges.length===0) { rs._tideUsed=true; ctx.freeMove=true; } } } },
   { id:'blade',     icon:'🗡', name:'Lame double',    rarity:'rare', desc:'Les fusions 2+2 donnent 8 au lieu de 4.',          effect:'2+2 → 8',
     hooks: { onAfterMove: ctx => { for(const m of ctx.result.merges) { if(m.val===4) { ctx.board[m.r][m.c]=8; m.val=8; } } } } },
   { id:'focus',     icon:'🎯', name:'Focus',          rarity:'rare', desc:'+20% de coups dans les salles élite.',              effect:'+20% coups élite',
@@ -102,7 +112,7 @@ const RELICS = [
   { id:'hourglass', icon:'⏳', name:'Sablier',        rarity:'epic', desc:'+1 coup chaque fois que tu fusionnes une tuile ≥ 64.', effect:'+1 coup si fusion ≥ 64',
     hooks: { onAfterMove: ctx => { if(ctx.result.merges.some(m=>m.val>=64)) ctx.addMove+=1; } } },
   { id:'vortex',    icon:'🌀', name:'Vortex',         rarity:'epic', desc:'1×/salle : quand tu atteins 0 coups, gagne +5 coups.', effect:'+5 coups de survie',
-    hooks: { onMovesExhausted: (ctx, run, gs) => { const rs=gs.room.relicState; if(!rs._vortexUsed) { rs._vortexUsed=true; ctx.movesLeft=5; ctx.consumed=true; ctx.overlayIcon='🌀'; ctx.overlayTitle='VORTEX !'; ctx.overlaySub='+5 coups !'; } } } },
+    hooks: { onMovesExhausted: (ctx, run, gs) => { const rs=gs.room?.relicState; if(rs && !rs._vortexUsed) { rs._vortexUsed=true; ctx.movesLeft=5; ctx.consumed=true; ctx.overlayIcon='🌀'; ctx.overlayTitle='VORTEX !'; ctx.overlaySub='+5 coups !'; } } } },
   { id:'crown',     icon:'👑', name:'Couronne',       rarity:'epic', desc:'Les salles boss donnent le double d\'or.',           effect:'×2 or boss',
     hooks: { onRoomEnd: ctx => { if(ctx.won && ctx.type==='boss') ctx.goldMultiplier*=2; } } },
   { id:'dupli',     icon:'🧬', name:'Duplication',    rarity:'epic', desc:'Début de salle : la tuile la plus basse est dupliquée.', effect:'Copie tuile min',
@@ -136,7 +146,7 @@ const RELICS = [
     hooks: { onGoldCalc: ctx => { ctx.gold = Math.floor(ctx.gold * 0.8); } } },
 ];
 
-const ASCENSION_COSTS = [150, 300, 500];
+const ASCENSION_COSTS = [200, 500, 1000];
 const MAX_ASCENSION   = ASCENSION_COSTS.length;
 
 const META_DEFS = [
@@ -148,16 +158,16 @@ const META_DEFS = [
   { id:'startRelic',  icon:'🌟', name:'Bénédiction',     maxLvl:1, costs:[80],          ascReq:0, desc:'1 relique commune gratuite au départ.',   getEffect: _  => '1 relique gratuite' },
 
   // ── Ascension 1 ──
-  { id:'forgedEntropy', icon:'🔥', name:'Entropie Forgée', maxLvl:3, costs:[40,80,150], ascReq:1, desc:'Les tuiles générées commencent plus haut.', getEffect: l => `Tuiles de base : ${[4,8,16][l-1]}` },
-  { id:'synergy',       icon:'🔗', name:'Synergie',        maxLvl:2, costs:[60,120],    ascReq:1, desc:'Plus de reliques proposées par étage.',     getEffect: l => `+${l} choix de reliques` },
+  { id:'forgedEntropy', icon:'🔥', name:'Entropie Forgée', maxLvl:3, costs:[80,160,300], ascReq:1, desc:'Les tuiles générées commencent plus haut.', getEffect: l => `Tuiles de base : ${[4,8,16][l-1]}` },
+  { id:'synergy',       icon:'🔗', name:'Synergie',        maxLvl:2, costs:[120,250],   ascReq:1, desc:'Les reliques proposées sont de meilleure rareté.', getEffect: l => `+${l*10} rareté` },
 
   // ── Ascension 2 ──
-  { id:'deepForge',  icon:'⚗️', name:'Forge Profonde', maxLvl:3, costs:[50,100,180], ascReq:2, desc:'Chance de super-fusion (résultat ×2).', getEffect: l => `${l*10}% chance super-fusion` },
-  { id:'destiny',    icon:'🌠', name:'Destinée',       maxLvl:1, costs:[100],        ascReq:2, desc:'Choisis 1 relique rare au début de chaque run.', getEffect: _ => '1 relique rare au départ' },
+  { id:'deepForge',  icon:'⚗️', name:'Forge Profonde', maxLvl:3, costs:[100,200,400], ascReq:2, desc:'Chance de super-fusion (résultat ×2).', getEffect: l => `${l*10}% chance super-fusion` },
+  { id:'destiny',    icon:'🌠', name:'Destinée',       maxLvl:1, costs:[250],        ascReq:2, desc:'Choisis 1 relique rare au début de chaque run.', getEffect: _ => '1 relique rare au départ' },
 
   // ── Ascension 3 ──
-  { id:'singularity', icon:'💫', name:'Singularité', maxLvl:1, costs:[200],       ascReq:3, desc:'1×/run : quand une tuile atteint 128+, tout le board double.', getEffect: _ => 'Doublement total à 128+' },
-  { id:'mastery',     icon:'👁', name:'Maîtrise',    maxLvl:3, costs:[80,150,250], ascReq:3, desc:'Coups bonus dans les salles boss.',                           getEffect: l => `+${l*10}% coups boss` },
+  { id:'singularity', icon:'💫', name:'Singularité', maxLvl:1, costs:[500],        ascReq:3, desc:'1×/run : quand une tuile atteint 128+, tout le board double.', getEffect: _ => 'Doublement total à 128+' },
+  { id:'mastery',     icon:'👁', name:'Maîtrise',    maxLvl:3, costs:[150,300,500], ascReq:3, desc:'Coups bonus dans les salles boss.',                           getEffect: l => `+${l*10}% coups boss` },
 ];
 
 const BOSS_OBJECTIVES = [
