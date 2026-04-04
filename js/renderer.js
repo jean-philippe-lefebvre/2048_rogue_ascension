@@ -16,6 +16,7 @@ const Renderer = {
   // ── Grid ──
   buildGrid() {
     this._geoCache = null;
+    this._prevBoard = null;
     const grid = document.getElementById('gameGrid');
     grid.innerHTML = '';
     for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
@@ -49,12 +50,30 @@ const Renderer = {
     return this._geoCache;
   },
 
+  _prevBoard: null,
+
   renderTiles(newPositions = new Set(), mergedPositions = new Set()) {
     const container = document.getElementById('gameTiles');
     container.innerHTML = '';
     const geo = this.getTileGeometry();
+    if (!geo) return;
 
-    GameState.board.forEach((row, r) => {
+    const board = GameState.board;
+    const prev = this._prevBoard;
+
+    // Build reverse map: for each value, where was it in prev board?
+    // Used to animate tiles sliding from old position to new position
+    const prevPositions = {};
+    if (prev) {
+      for (let r = 0; r < GRID_SIZE; r++)
+        for (let c = 0; c < GRID_SIZE; c++)
+          if (prev[r][c] !== 0) {
+            const v = prev[r][c];
+            (prevPositions[v] ??= []).push([r, c]);
+          }
+    }
+
+    board.forEach((row, r) => {
       row.forEach((val, c) => {
         if (val === 0) return;
 
@@ -65,9 +84,8 @@ const Renderer = {
         let cls = 'tile ';
         let label = String(val);
 
-        if      (val === TILE.OBSTACLE) {
+        if (val === TILE.OBSTACLE) {
           cls += 't-obstacle';
-          // Transmutation countdown
           const age = GameState.obstacleAge?.[`${r},${c}`];
           label = age !== undefined ? `${3 - age}` : '🧱';
         }
@@ -77,7 +95,7 @@ const Renderer = {
           label = timer !== undefined ? `💣${timer}` : '💣';
           if (timer !== undefined && timer <= 3) cls += ' bomb-imminent';
         }
-        else                            { cls += `t${val}`; }
+        else { cls += `t${val}`; }
 
         if (newPositions.has(key))    cls += ' is-new';
         if (mergedPositions.has(key)) cls += ' is-merged';
@@ -86,12 +104,34 @@ const Renderer = {
                  : val >= 128  ? cellSize * 0.34
                  :               cellSize * 0.42;
 
+        // Find previous position for slide animation
+        let startLeft = left(c), startTop = top(r);
+        if (prev && !newPositions.has(key)) {
+          const sources = prevPositions[val];
+          if (sources && sources.length) {
+            const [pr, pc] = sources.shift();
+            startLeft = left(pc);
+            startTop = top(pr);
+          }
+        }
+
         tile.className = cls.trim();
-        tile.style.cssText = `width:${cellSize}px;height:${cellSize}px;left:${left(c)}px;top:${top(r)}px;font-size:${fs}px;`;
+        tile.style.cssText = `width:${cellSize}px;height:${cellSize}px;left:${startLeft}px;top:${startTop}px;font-size:${fs}px;`;
         tile.textContent = label;
         container.appendChild(tile);
+
+        // Animate to final position
+        if (startLeft !== left(c) || startTop !== top(r)) {
+          requestAnimationFrame(() => {
+            tile.style.left = left(c) + 'px';
+            tile.style.top = top(r) + 'px';
+          });
+        }
       });
     });
+
+    // Save board snapshot for next render
+    this._prevBoard = board.map(row => [...row]);
   },
 
   // ── HUD ──
