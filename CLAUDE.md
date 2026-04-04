@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 2048 Rogue Ascension — a roguelike variant of 2048 built as a static vanilla JS game (no build tools, no framework, no bundler). French UI. Part of a portfolio project.
 
+## Versioning
+
+**CRITICAL**: After every commit, bump the version in `index.html` (`.version-tag` in the title screen).
+
+- **Fix** (bug fix, cleanup) → bump patch: `v1.0.0` → `v1.0.1`
+- **Feature** (new mechanic, new relics, UI change) → bump minor: `v1.0.0` → `v1.1.0`
+- **Major** (user-requested big upgrade) → bump major: `v1.0.0` → `v2.0.0`
+
+Current version: **v1.0.0** (`index.html` title screen, bottom)
+
 ## Development
 
 Open `index.html` directly in a browser — no server or build step required. For live reload during development, use any static file server (e.g. `python3 -m http.server`). Validate syntax with `node -c js/<file>.js`.
