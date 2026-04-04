@@ -37,6 +37,10 @@ const Input = {
       const dir = codeMap[e.keyCode] || keyMap[e.key];
       if (dir) {
         e.preventDefault();
+        // Blur focused buttons — browsers use ArrowUp/Down for button navigation
+        if (document.activeElement && document.activeElement !== document.body) {
+          document.activeElement.blur();
+        }
         Controller.move(dir);
       }
     }, { capture: true });
