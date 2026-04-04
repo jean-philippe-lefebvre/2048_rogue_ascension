@@ -328,10 +328,11 @@ const Controller = {
     const floor = GameState.run.floors[fi];
     const node  = floor[rowIdx][nodeIdx];
     node.completed = true;
+    node.available = false;
 
-    // Disable other available nodes on same row (you chose your path)
+    // Disable other nodes on same row (you chose your path)
     floor[rowIdx].forEach((n, i) => {
-      if (i !== nodeIdx && !n.completed) n.available = false;
+      if (i !== nodeIdx) n.available = false;
     });
 
     if (node.type === 'boss') {
