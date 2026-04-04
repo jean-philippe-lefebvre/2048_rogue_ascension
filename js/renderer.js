@@ -115,26 +115,26 @@ const Renderer = {
           }
         }
 
+        const finalLeft = left(c);
+        const finalTop = top(r);
+        const dx = startLeft - finalLeft;
+        const dy = startTop - finalTop;
+
         tile.className = cls.trim();
-        tile.style.cssText = `width:${cellSize}px;height:${cellSize}px;left:${startLeft}px;top:${startTop}px;font-size:${fs}px;`;
+        // Place at final position, offset to old position via transform
+        tile.style.cssText = `width:${cellSize}px;height:${cellSize}px;left:${finalLeft}px;top:${finalTop}px;font-size:${fs}px;`
+          + (dx || dy ? `transform:translate(${dx}px,${dy}px);` : '');
         tile.textContent = label;
-        tile._finalLeft = left(c);
-        tile._finalTop = top(r);
-        tile._needsAnim = (startLeft !== left(c) || startTop !== top(r));
         container.appendChild(tile);
       });
     });
 
-    // Force reflow so browser registers start positions, then animate
-    container.offsetHeight; // eslint-disable-line no-unused-expressions
+    // Force reflow, then remove transforms → transition animates to final position
+    container.offsetHeight;
     for (const tile of container.children) {
-      if (tile._needsAnim) {
-        tile.style.left = tile._finalLeft + 'px';
-        tile.style.top = tile._finalTop + 'px';
-      }
+      if (tile.style.transform) tile.style.transform = '';
     }
 
-    // Save board snapshot for next render
     this._prevBoard = board.map(row => [...row]);
   },
 
