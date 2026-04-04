@@ -71,7 +71,12 @@ const Renderer = {
           const age = GameState.obstacleAge?.[`${r},${c}`];
           label = age !== undefined ? `${3 - age}` : '🧱';
         }
-        else if (val === TILE.BOMB)     { cls += 't-bomb';     label = '💣'; }
+        else if (val === TILE.BOMB) {
+          cls += 't-bomb';
+          const timer = GameState.bombTimers?.[key];
+          label = timer !== undefined ? `💣${timer}` : '💣';
+          if (timer !== undefined && timer <= 3) cls += ' bomb-imminent';
+        }
         else                            { cls += `t${val}`; }
 
         if (newPositions.has(key))    cls += ' is-new';

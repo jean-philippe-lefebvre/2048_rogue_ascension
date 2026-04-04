@@ -181,13 +181,18 @@ const Controller = {
     // Build board
     GameState.board = Board.empty();
     GameState.obstacleAge = {};
+    GameState.bombTimers = {};
     if (type === 'elite') {
       Board.placeValue(GameState.board, TILE.OBSTACLE);
       if (floorIdx >= 2) Board.placeValue(GameState.board, TILE.OBSTACLE);
     }
     if (type === 'boss') {
       Board.placeValue(GameState.board, TILE.OBSTACLE);
-      if (floorIdx >= 1) Board.placeValue(GameState.board, TILE.BOMB);
+      if (floorIdx >= 1) {
+        Board.placeValue(GameState.board, TILE.BOMB);
+        // Init bomb timer: random 10-20 moves
+        Board._initBombTimers(GameState.board, GameState.bombTimers);
+      }
       if (floorIdx >= 2) Board.placeValue(GameState.board, TILE.OBSTACLE);
     }
 
@@ -387,6 +392,11 @@ const Controller = {
       for (let r = 0; r < GRID_SIZE; r++)
         for (let c = 0; c < GRID_SIZE; c++)
           if (gs.board[r][c] > 0) gs.board[r][c] *= 2;
+    }
+
+    // Bomb timers — tick and explode
+    if (gs.bombTimers && Object.keys(gs.bombTimers).length > 0) {
+      Board.tickBombs(gs.board, gs.bombTimers);
     }
 
     // Transmutation hook

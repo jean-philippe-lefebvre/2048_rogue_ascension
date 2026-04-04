@@ -278,8 +278,9 @@ body::before {
 @keyframes tile-gold { 0%,100%{box-shadow:0 0 20px rgba(212,168,67,0.3)} 50%{box-shadow:0 0 50px rgba(212,168,67,0.6)} }
 
 .t-obstacle {background:#1a0808;color:#5a2a2a;border:2px solid rgba(100,40,40,0.6)}
-.t-bomb     {background:#220c0a;color:#e04030;border:2px solid rgba(220,64,48,0.5);animation:tile-bomb 1s ease-in-out infinite}
-@keyframes tile-bomb { 0%,100%{box-shadow:0 0 8px rgba(196,74,58,0.4)} 50%{box-shadow:0 0 20px rgba(196,74,58,0.8)} }
+.t-bomb     {background:#220c0a;color:#e04030;border:2px solid rgba(220,64,48,0.5);font-size:14px !important}
+.t-bomb.bomb-imminent {animation:tile-bomb 0.5s ease-in-out infinite;border-color:rgba(255,40,20,0.8)}
+@keyframes tile-bomb { 0%,100%{box-shadow:0 0 8px rgba(196,74,58,0.4)} 50%{box-shadow:0 0 20px rgba(255,40,20,0.9)} }
 
 /* ─── ROOM OVERLAY ─── */
 .room-overlay {
