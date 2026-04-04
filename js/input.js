@@ -22,14 +22,19 @@ const Input = {
       else                             Controller.move(dy > 0 ? 'down'  : 'up');
     }, { passive: true });
 
-    // Keyboard — use keyCode as primary (physical key, always reliable)
+    // Keyboard — keyCode (physical) + key (logical) for max compatibility
     const codeMap = {
-      37:'left', 38:'up', 39:'right', 40:'down',       // Arrow keys
-      65:'left', 68:'right', 87:'up', 83:'down',        // WASD
-      81:'left', 90:'up',                               // AZERTY Q/Z
+      37:'left', 38:'up', 39:'right', 40:'down',
+      65:'left', 68:'right', 87:'up', 83:'down',
+      81:'left', 90:'up',
+    };
+    const keyMap = {
+      ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down',
+      a:'left', d:'right', w:'up', s:'down',
+      q:'left', z:'up',
     };
     window.addEventListener('keydown', e => {
-      const dir = codeMap[e.keyCode];
+      const dir = codeMap[e.keyCode] || keyMap[e.key];
       if (dir) {
         e.preventDefault();
         Controller.move(dir);
