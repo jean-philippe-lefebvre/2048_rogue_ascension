@@ -372,35 +372,6 @@ body::before {
 .level-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--surface2); border: 1px solid var(--border); }
 .level-dot.on { background: var(--gold); border-color: var(--gold); }
 
-/* ─── D-PAD ─── */
-.dpad {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  margin-top: 12px;
-  padding: 0 16px;
-}
-.dpad-btn {
-  width: 60px; height: 60px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  color: var(--text-dim);
-  font-size: 20px;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: background 0.1s, border-color 0.1s, transform 0.08s;
-  -webkit-tap-highlight-color: transparent;
-  flex-shrink: 0;
-}
-.dpad-btn:active {
-  background: var(--surface);
-  border-color: var(--gold-dim);
-  color: var(--gold);
-  transform: scale(0.9);
-}
 
 /* ─── MODALS ─── */
 .modal-backdrop {

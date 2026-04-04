@@ -81,12 +81,6 @@ function bindButtons() {
     Renderer.renderTitle();
   });
 
-  // D-pad
-  document.getElementById('dpadUp').addEventListener('click',    () => Controller.move('up'));
-  document.getElementById('dpadDown').addEventListener('click',  () => Controller.move('down'));
-  document.getElementById('dpadLeft').addEventListener('click',  () => Controller.move('left'));
-  document.getElementById('dpadRight').addEventListener('click', () => Controller.move('right'));
-
   // Meta — return to map if opened from rest room, otherwise title
   document.getElementById('btnMetaBack').addEventListener('click', () => {
     if (GameState._shopReturnToMap) {
