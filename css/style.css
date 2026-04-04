@@ -21,6 +21,10 @@
 /* ─── RESET ─── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
+html, body {
+  overflow: hidden;
+  height: 100dvh;
+}
 body {
   background: var(--bg);
   color: var(--text);
@@ -29,7 +33,6 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  overflow-x: hidden;
 }
 
 body::before {
@@ -49,6 +52,7 @@ body::before {
   padding: 20px 16px;
   position: relative; z-index: 1;
   flex-direction: column; align-items: center;
+  overflow-y: auto; max-height: 100dvh;
 }
 .screen.active { display: flex; }
 
