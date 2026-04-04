@@ -4,10 +4,10 @@ const Input = {
   touchStart: null,
 
   init() {
-    // Swipe
+    // Swipe — detect on entire game screen, not just grid
     document.addEventListener('touchstart', e => {
-      const grid = document.getElementById('gameGrid');
-      if (grid && grid.contains(e.target)) {
+      const screen = document.getElementById('gameScreen');
+      if (screen && screen.classList.contains('active')) {
         this.touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       }
     }, { passive: true });
@@ -22,15 +22,19 @@ const Input = {
       else                             Controller.move(dy > 0 ? 'down'  : 'up');
     }, { passive: true });
 
-    // Keyboard
-    document.addEventListener('keydown', e => {
-      const map = {
-        ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down',
-        a:'left', d:'right', w:'up', s:'down',
-        q:'left', z:'up',
-      };
-      if (map[e.key]) { e.preventDefault(); Controller.move(map[e.key]); }
-    });
+    // Keyboard — prevent arrow keys from scrolling the page
+    const keyMap = {
+      ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down',
+      a:'left', d:'right', w:'up', s:'down',
+      q:'left', z:'up',
+    };
+    window.addEventListener('keydown', e => {
+      if (keyMap[e.key]) {
+        e.preventDefault();
+        e.stopPropagation();
+        Controller.move(keyMap[e.key]);
+      }
+    }, { capture: true });
 
     // Resize — re-render tiles
     window.addEventListener('resize', () => {
