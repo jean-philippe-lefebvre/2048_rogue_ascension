@@ -118,17 +118,21 @@ const Renderer = {
         tile.className = cls.trim();
         tile.style.cssText = `width:${cellSize}px;height:${cellSize}px;left:${startLeft}px;top:${startTop}px;font-size:${fs}px;`;
         tile.textContent = label;
+        tile._finalLeft = left(c);
+        tile._finalTop = top(r);
+        tile._needsAnim = (startLeft !== left(c) || startTop !== top(r));
         container.appendChild(tile);
-
-        // Animate to final position
-        if (startLeft !== left(c) || startTop !== top(r)) {
-          requestAnimationFrame(() => {
-            tile.style.left = left(c) + 'px';
-            tile.style.top = top(r) + 'px';
-          });
-        }
       });
     });
+
+    // Force reflow so browser registers start positions, then animate
+    container.offsetHeight; // eslint-disable-line no-unused-expressions
+    for (const tile of container.children) {
+      if (tile._needsAnim) {
+        tile.style.left = tile._finalLeft + 'px';
+        tile.style.top = tile._finalTop + 'px';
+      }
+    }
 
     // Save board snapshot for next render
     this._prevBoard = board.map(row => [...row]);
