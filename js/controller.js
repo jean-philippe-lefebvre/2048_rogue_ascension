@@ -367,7 +367,26 @@ const Controller = {
       deepForgeChance: (gs.meta.upgrades.deepForge || 0) * 0.1,
     };
     const result = Board.applyMove(gs.board, dir, mods);
-    if (!result) return;
+    if (!result) {
+      // Board full and no valid move in any direction → game over
+      if (!Board.canMove(gs.board)) {
+        const exhCtx = { movesLeft: 0, consumed: false, overlayIcon: '', overlayTitle: '', overlaySub: '' };
+        RelicHooks.fire('onMovesExhausted', exhCtx);
+        if (exhCtx.consumed) {
+          gs.movesLeft = exhCtx.movesLeft;
+          Renderer.showRoomOverlay('phoenix', exhCtx.overlaySub);
+          document.getElementById('overlayIcon').textContent = exhCtx.overlayIcon;
+          document.getElementById('overlayTitle').textContent = exhCtx.overlayTitle;
+          setTimeout(() => Renderer.hideRoomOverlay(), 2400);
+          Renderer.updateHUD();
+          return;
+        }
+        gs.roomFinished = true;
+        gs.overlayMode = 'failure';
+        Renderer.showRoomOverlay('failure', 'Grille bloquée !');
+      }
+      return;
+    }
 
     gs.score      += result.score;
     gs.mergeCount += result.merges.length;

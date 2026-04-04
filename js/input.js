@@ -82,6 +82,11 @@ function bindButtons() {
     Controller.abandonRun();
   });
 
+  // Game — abandon from game screen
+  document.getElementById('btnGameAbandon').addEventListener('click', () => {
+    document.getElementById('abandonModal').classList.add('show');
+  });
+
   // Game overlay
   document.getElementById('overlayBtn').addEventListener('click', () => Controller.overlayAction());
 
