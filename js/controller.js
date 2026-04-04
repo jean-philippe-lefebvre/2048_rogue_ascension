@@ -431,7 +431,7 @@ const Controller = {
       reward = Math.floor((reward + endCtx.goldBonus) * endCtx.goldMultiplier);
       gs.run.gold += reward + (gs.meta.upgrades.goldBonus || 0) * 2;
       this._completeCurrentRoom();
-      this._renderAfterMove(result);
+      this._renderAfterMove(result, dir);
       Renderer.showRoomOverlay('success', `+${reward} or`);
       gs.overlayMode = 'success';
       return;
@@ -439,7 +439,7 @@ const Controller = {
 
     if (!moveCtx.freeMove) gs.movesLeft--;
 
-    this._renderAfterMove(result);
+    this._renderAfterMove(result, dir);
     Renderer.updateHUD();
 
     if (gs.movesLeft <= 0 || !Board.canMove(gs.board)) {
@@ -461,10 +461,10 @@ const Controller = {
     }
   },
 
-  _renderAfterMove(result) {
+  _renderAfterMove(result, dir) {
     const newSet    = new Set(result.newTilePos ? [`${result.newTilePos[0]},${result.newTilePos[1]}`] : []);
     const mergedSet = new Set(result.merges.map(m => `${m.r},${m.c}`));
-    Renderer.renderTiles(newSet, mergedSet);
+    Renderer.renderTiles(newSet, mergedSet, dir);
     Renderer.updateHUD();
   },
 

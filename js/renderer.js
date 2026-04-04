@@ -52,7 +52,10 @@ const Renderer = {
 
   _prevBoard: null,
 
-  renderTiles(newPositions = new Set(), mergedPositions = new Set()) {
+  // Direction search offsets: to find where a tile came from, search opposite to move
+  _searchDir: { left:[0,1], right:[0,-1], up:[1,0], down:[-1,0] },
+
+  renderTiles(newPositions = new Set(), mergedPositions = new Set(), dir = null) {
     const container = document.getElementById('gameTiles');
     container.innerHTML = '';
     const geo = this.getTileGeometry();
@@ -60,18 +63,9 @@ const Renderer = {
 
     const board = GameState.board;
     const prev = this._prevBoard;
-
-    // Build reverse map: for each value, where was it in prev board?
-    // Used to animate tiles sliding from old position to new position
-    const prevPositions = {};
-    if (prev) {
-      for (let r = 0; r < GRID_SIZE; r++)
-        for (let c = 0; c < GRID_SIZE; c++)
-          if (prev[r][c] !== 0) {
-            const v = prev[r][c];
-            (prevPositions[v] ??= []).push([r, c]);
-          }
-    }
+    // Working copy of prev board to "consume" sources
+    const srcBoard = prev ? prev.map(row => [...row]) : null;
+    const searchOffset = dir ? this._searchDir[dir] : null;
 
     board.forEach((row, r) => {
       row.forEach((val, c) => {
@@ -104,24 +98,30 @@ const Renderer = {
                  : val >= 128  ? cellSize * 0.34
                  :               cellSize * 0.42;
 
-        // Find previous position for slide animation
-        let startLeft = left(c), startTop = top(r);
-        if (prev && !newPositions.has(key)) {
-          const sources = prevPositions[val];
-          if (sources && sources.length) {
-            const [pr, pc] = sources.shift();
-            startLeft = left(pc);
-            startTop = top(pr);
+        // Find source position: search in opposite direction of move
+        let srcR = r, srcC = c;
+        if (srcBoard && searchOffset && !newPositions.has(key) && val !== TILE.OBSTACLE) {
+          const [dr, dc] = searchOffset;
+          for (let step = 0; step < GRID_SIZE; step++) {
+            const sr = r + dr * step;
+            const sc = c + dc * step;
+            if (sr < 0 || sr >= GRID_SIZE || sc < 0 || sc >= GRID_SIZE) break;
+            if (srcBoard[sr][sc] === TILE.OBSTACLE) break; // can't cross obstacles
+            if (srcBoard[sr][sc] !== 0) {
+              srcR = sr;
+              srcC = sc;
+              srcBoard[sr][sc] = 0; // consume this source
+              break;
+            }
           }
         }
 
         const finalLeft = left(c);
         const finalTop = top(r);
-        const dx = startLeft - finalLeft;
-        const dy = startTop - finalTop;
+        const dx = left(srcC) - finalLeft;
+        const dy = top(srcR) - finalTop;
 
         tile.className = cls.trim();
-        // Place at final position, offset to old position via transform
         tile.style.cssText = `width:${cellSize}px;height:${cellSize}px;left:${finalLeft}px;top:${finalTop}px;font-size:${fs}px;`
           + (dx || dy ? `transform:translate(${dx}px,${dy}px);` : '');
         tile.textContent = label;
@@ -129,7 +129,7 @@ const Renderer = {
       });
     });
 
-    // Force reflow, then remove transforms → transition animates to final position
+    // Force reflow, then remove transforms → CSS transition animates slide
     container.offsetHeight;
     for (const tile of container.children) {
       if (tile.style.transform) tile.style.transform = '';
