@@ -561,13 +561,16 @@ const Controller = {
   },
 
   // ── Meta ──
-  buyUpgrade(id) {
+  buyUpgrade(id, cardEl) {
     const m   = GameState.meta;
     const def = META_DEFS.find(u => u.id === id);
     const lvl = m.upgrades[id] || 0;
     if (lvl >= def.maxLvl) return;
     const cost = def.costs[lvl];
-    if (m.permanentGold < cost) return;
+    if (m.permanentGold < cost) {
+      if (cardEl) { cardEl.classList.remove('shake'); void cardEl.offsetWidth; cardEl.classList.add('shake'); }
+      return;
+    }
     m.permanentGold -= cost;
     m.upgrades[id]   = lvl + 1;
     Storage.save(m);

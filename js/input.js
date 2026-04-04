@@ -46,12 +46,16 @@ const Input = {
       }
     }, { capture: true });
 
-    // Resize — re-render tiles
+    // Resize — re-render tiles (debounced)
+    let _resizeTimer;
     window.addEventListener('resize', () => {
-      Renderer.invalidateGeoCache();
-      if (document.getElementById('gameScreen').classList.contains('active')) {
-        Renderer.renderTiles();
-      }
+      clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(() => {
+        Renderer.invalidateGeoCache();
+        if (document.getElementById('gameScreen').classList.contains('active')) {
+          Renderer.renderTiles();
+        }
+      }, 150);
     });
   },
 };
@@ -66,8 +70,17 @@ function bindButtons() {
   document.getElementById('btnStartRun').addEventListener('click',  () => Controller.startRun());
   document.getElementById('btnShowMeta').addEventListener('click',  () => { Renderer.renderMeta(); showScreen('metaScreen'); });
 
-  // Map
-  document.getElementById('btnAbandon').addEventListener('click', () => Controller.abandonRun());
+  // Map — abandon with confirmation
+  document.getElementById('btnAbandon').addEventListener('click', () => {
+    document.getElementById('abandonModal').classList.add('show');
+  });
+  document.getElementById('btnAbandonCancel').addEventListener('click', () => {
+    document.getElementById('abandonModal').classList.remove('show');
+  });
+  document.getElementById('btnAbandonConfirm').addEventListener('click', () => {
+    document.getElementById('abandonModal').classList.remove('show');
+    Controller.abandonRun();
+  });
 
   // Game overlay
   document.getElementById('overlayBtn').addEventListener('click', () => Controller.overlayAction());

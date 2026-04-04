@@ -17,6 +17,9 @@ const Renderer = {
   buildGrid() {
     this._geoCache = null;
     this._prevBoard = null;
+    this._tilePool = [];
+    this._tilePoolIdx = 0;
+    document.getElementById('gameTiles').innerHTML = '';
     const grid = document.getElementById('gameGrid');
     grid.innerHTML = '';
     for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
@@ -55,15 +58,32 @@ const Renderer = {
   // Direction search offsets: to find where a tile came from, search opposite to move
   _searchDir: { left:[0,1], right:[0,-1], up:[1,0], down:[-1,0] },
 
+  // Tile pool: reuse DOM elements instead of rebuilding each move
+  _tilePool: [],
+  _tilePoolIdx: 0,
+
+  _getTile(container) {
+    if (this._tilePoolIdx < this._tilePool.length) {
+      const tile = this._tilePool[this._tilePoolIdx++];
+      tile.style.display = '';
+      return tile;
+    }
+    const tile = document.createElement('div');
+    container.appendChild(tile);
+    this._tilePool.push(tile);
+    this._tilePoolIdx++;
+    return tile;
+  },
+
   renderTiles(newPositions = new Set(), mergedPositions = new Set(), dir = null) {
     const container = document.getElementById('gameTiles');
-    container.innerHTML = '';
     const geo = this.getTileGeometry();
     if (!geo) return;
 
+    this._tilePoolIdx = 0;
+
     const board = GameState.board;
     const prev = this._prevBoard;
-    // Working copy of prev board to "consume" sources
     const srcBoard = prev ? prev.map(row => [...row]) : null;
     const searchOffset = dir ? this._searchDir[dir] : null;
 
@@ -73,7 +93,7 @@ const Renderer = {
 
         const key = `${r},${c}`;
         const { cellSize, left, top } = geo;
-        const tile = document.createElement('div');
+        const tile = this._getTile(container);
 
         let cls = 'tile ';
         let label = String(val);
@@ -106,11 +126,11 @@ const Renderer = {
             const sr = r + dr * step;
             const sc = c + dc * step;
             if (sr < 0 || sr >= GRID_SIZE || sc < 0 || sc >= GRID_SIZE) break;
-            if (srcBoard[sr][sc] === TILE.OBSTACLE) break; // can't cross obstacles
+            if (srcBoard[sr][sc] === TILE.OBSTACLE) break;
             if (srcBoard[sr][sc] !== 0) {
               srcR = sr;
               srcC = sc;
-              srcBoard[sr][sc] = 0; // consume this source
+              srcBoard[sr][sc] = 0;
               break;
             }
           }
@@ -125,13 +145,18 @@ const Renderer = {
         tile.style.cssText = `width:${cellSize}px;height:${cellSize}px;left:${finalLeft}px;top:${finalTop}px;font-size:${fs}px;`
           + (dx || dy ? `transform:translate(${dx}px,${dy}px);` : '');
         tile.textContent = label;
-        container.appendChild(tile);
       });
     });
 
+    // Hide unused pool tiles
+    for (let i = this._tilePoolIdx; i < this._tilePool.length; i++) {
+      this._tilePool[i].style.display = 'none';
+    }
+
     // Force reflow, then remove transforms → CSS transition animates slide
     container.offsetHeight;
-    for (const tile of container.children) {
+    for (let i = 0; i < this._tilePoolIdx; i++) {
+      const tile = this._tilePool[i];
       if (tile.style.transform) tile.style.transform = '';
     }
 
@@ -358,7 +383,7 @@ const Renderer = {
         </div>
         <div class="meta-cost${maxed ? ' maxed' : ''}">${maxed ? 'MAX' : `◈${cost}`}</div>`;
 
-      if (!maxed && !locked) card.addEventListener('click', () => Controller.buyUpgrade(u.id));
+      if (!maxed) card.addEventListener('click', () => Controller.buyUpgrade(u.id, card));
       list.appendChild(card);
     });
 
@@ -382,7 +407,7 @@ const Renderer = {
     container.innerHTML = '';
     choices.forEach(relic => {
       const card = document.createElement('div');
-      card.className = 'relic-card';
+      card.className = `relic-card rarity-${relic.rarity}`;
       card.innerHTML = `
         <div class="relic-card-header">
           <div class="relic-icon">${relic.icon}</div>

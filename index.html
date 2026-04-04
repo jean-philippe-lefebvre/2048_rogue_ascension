@@ -18,7 +18,7 @@
   <div class="divider" style="margin-bottom:32px"></div>
   <div class="stats-grid">
     <div class="stat-box"><div class="stat-box-val" id="s-runs">0</div><div class="stat-box-label">Runs</div></div>
-    <div class="stat-box"><div class="stat-box-val" id="s-best">0</div><div class="stat-box-label">Meilleur</div></div>
+    <div class="stat-box"><div class="stat-box-val" id="s-best">0</div><div class="stat-box-label">Étage max</div></div>
     <div class="stat-box"><div class="stat-box-val" id="s-gold">0</div><div class="stat-box-label">Or total</div></div>
   </div>
   <div class="passive-info" id="passiveInfo"></div>
@@ -26,7 +26,7 @@
     <button class="btn btn-primary" id="btnContinueRun" style="display:none">▶ Continuer la run</button>
     <button class="btn" id="btnStartRun">⚔ Nouvelle Run</button>
     <button class="btn" id="btnShowMeta">🏰 Améliorations</button>
-    <button class="btn-ghost" id="btnResetSave" style="margin-top:4px;color:var(--text-muted)">↺ Réinitialiser la sauvegarde</button>
+    <button class="btn-ghost" id="btnResetSave" style="margin-top:4px;color:var(--text-muted)">↺ Tout effacer</button>
   </div>
   <div class="version-tag">v1.1.9</div>
 </div>
@@ -65,7 +65,7 @@
   <div class="grid-wrap w-full">
     <div id="gameGrid"></div>
     <div id="gameTiles"></div>
-    <div class="room-overlay" id="roomOverlay">
+    <div class="room-overlay" id="roomOverlay" role="alertdialog" aria-labelledby="overlayTitle">
       <div class="overlay-icon" id="overlayIcon"></div>
       <div class="overlay-title" id="overlayTitle"></div>
       <div class="overlay-sub" id="overlaySub"></div>
@@ -83,7 +83,7 @@
     <div class="relic-gold-info" id="relicGoldInfo"></div>
   </div>
   <div class="relic-choices" id="relicChoices"></div>
-  <button class="btn-ghost" id="btnSkipRelic">Passer sans relique →</button>
+  <button class="btn-ghost" id="btnSkipRelic">Passer</button>
 </div>
 
 <!-- END -->
@@ -116,18 +116,18 @@
 
 <!-- RESET MODAL -->
 <div class="modal-backdrop" id="resetModal">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="resetModalTitle">
     <div class="modal-icon">⚠️</div>
-    <div class="modal-title" style="color:var(--red)">Réinitialiser ?</div>
-    <div class="modal-sub">L'or et les améliorations seront effacés.<br>Les statistiques (runs, meilleur étage) sont conservées.</div>
+    <div class="modal-title" id="resetModalTitle" style="color:var(--red)">Tout effacer ?</div>
+    <div class="modal-sub">Ton or et tes améliorations seront effacés.<br>Les statistiques (runs, étage max) sont conservées.</div>
     <div class="flex flex-col gap-2 w-full" style="margin-top:4px">
-      <button class="btn btn-primary" id="btnResetConfirm" style="background:linear-gradient(135deg,#a03020,#6a1a10);border-color:#a03020">Confirmer le reset</button>
+      <button class="btn btn-danger" id="btnResetConfirm">Tout effacer</button>
       <button class="btn" id="btnResetCancel">Annuler</button>
     </div>
   </div>
 </div>
 <div class="modal-backdrop" id="mysteryModal">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mysteryTitle">
     <div class="modal-icon" id="mysteryIcon"></div>
     <div class="modal-title" id="mysteryTitle"></div>
     <div class="modal-sub" id="mysterySub"></div>
@@ -137,21 +137,34 @@
 
 <!-- RELIC TOOLTIP MODAL -->
 <div class="relic-tooltip-backdrop" id="relicTooltip">
-  <div class="relic-tooltip-card">
+  <div class="relic-tooltip-card" role="dialog" aria-modal="true" aria-labelledby="relicTTName">
     <div class="relic-tt-icon" id="relicTTIcon"></div>
     <div class="relic-tt-name" id="relicTTName"></div>
     <div class="relic-tt-desc" id="relicTTDesc"></div>
   </div>
 </div>
 
+<!-- ABANDON MODAL -->
+<div class="modal-backdrop" id="abandonModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="abandonModalTitle">
+    <div class="modal-icon">🏳️</div>
+    <div class="modal-title" id="abandonModalTitle" style="color:var(--red)">Abandonner la run ?</div>
+    <div class="modal-sub">Tu conserveras l'or gagné, mais la progression sera perdue.</div>
+    <div class="flex flex-col gap-2 w-full" style="margin-top:4px">
+      <button class="btn btn-danger" id="btnAbandonConfirm">Abandonner</button>
+      <button class="btn" id="btnAbandonCancel">Annuler</button>
+    </div>
+  </div>
+</div>
+
 <!-- ASCENSION MODAL -->
 <div class="modal-backdrop" id="ascendModal">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ascendModalTitle">
     <div class="modal-icon">✦</div>
-    <div class="modal-title" style="color:var(--purple)">Ascension</div>
+    <div class="modal-title" id="ascendModalTitle" style="color:var(--purple)">Ascension</div>
     <div class="modal-sub" id="ascendModalSub"></div>
     <div class="flex flex-col gap-2 w-full" style="margin-top:4px">
-      <button class="btn btn-primary" id="btnAscendConfirm" style="background:linear-gradient(135deg,#9a4ac4,#5a1a8a);border-color:#9a4ac4">Transcender</button>
+      <button class="btn btn-ascend-confirm" id="btnAscendConfirm">Transcender</button>
       <button class="btn" id="btnAscendCancel">Annuler</button>
     </div>
   </div>
