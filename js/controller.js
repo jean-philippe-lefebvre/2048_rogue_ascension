@@ -209,7 +209,7 @@ const Controller = {
 
     // Render room UI
     const def = ROOM_DEFS[type];
-    document.getElementById('roomName').textContent = `${def.icon} ${I18n.t('room.' + roomData.type)}`;
+    document.getElementById('roomName').textContent = `${def.icon} ${I18n.t('room.' + type)}`;
     document.getElementById('roomObjectiveText').textContent = I18n.t('objective.' + obj.id, { n: obj.target });
     Renderer.hideRoomOverlay();
     Renderer.updateHUD();
