@@ -45,59 +45,70 @@ const Board = {
 
   // Slide a single row left, returns { row, score, mergedAt[] }
   // deepForgeChance: 0-1 probability of super-merge (result ×2)
-  slideRow(row, deepForgeChance = 0) {
-    // Obstacles (TILE.OBSTACLE) are fixed in place
-    // Bombs (TILE.BOMB) slide with normal tiles but never merge
-    const fixedAt = {};
-    for (let i = 0; i < GRID_SIZE; i++) {
-      if (row[i] === TILE.OBSTACLE) fixedAt[i] = row[i];
-    }
-
-    // Extract movable tiles: positives + bombs, preserving order
-    const movables = row.filter(v => v > 0 || v === TILE.BOMB);
-
-    // Slide & merge (bombs act as unmergeable blockers)
+  // Slide a segment (no obstacles) left. Bombs move but don't merge.
+  _slideSegment(seg, deepForgeChance) {
     const merged = [];
     const isMerged = new Set();
-    let addedScore = 0;
+    let score = 0;
     let lastMergeIdx = -1;
 
-    for (let i = 0; i < movables.length; i++) {
-      const val = movables[i];
-      // Bombs never merge — just push
+    for (const val of seg) {
+      if (val === 0) continue;
       if (val === TILE.BOMB) {
         merged.push(val);
-        lastMergeIdx = -1; // reset merge chain
+        lastMergeIdx = -1;
         continue;
       }
-      // Normal tile: try merge with previous non-bomb tile
       if (merged.length && merged[merged.length - 1] === val && merged[merged.length - 1] > 0 && lastMergeIdx !== merged.length - 1) {
         let v = val * 2;
         if (deepForgeChance > 0 && Math.random() < deepForgeChance) v *= 2;
         merged[merged.length - 1] = v;
-        addedScore += v;
+        score += v;
         lastMergeIdx = merged.length - 1;
         isMerged.add(merged.length - 1);
       } else {
         merged.push(val);
       }
     }
+    while (merged.length < seg.length) merged.push(0);
+    return { merged, isMerged, score };
+  },
 
-    // Place merged tiles into result, skipping fixed obstacle positions
-    const result = Array(GRID_SIZE).fill(0);
-    for (const [idx, val] of Object.entries(fixedAt)) result[Number(idx)] = val;
+  slideRow(row, deepForgeChance = 0) {
+    // Split row into segments separated by obstacles
+    const segments = [];
+    let current = [];
+    for (let i = 0; i < GRID_SIZE; i++) {
+      if (row[i] === TILE.OBSTACLE) {
+        segments.push({ type: 'seg', cells: current });
+        segments.push({ type: 'obs', idx: i });
+        current = [];
+      } else {
+        current.push(row[i]);
+      }
+    }
+    segments.push({ type: 'seg', cells: current });
 
-    let mi = 0;
+    // Slide each segment independently, reassemble
+    const result = [];
     const mergedAt = [];
-    for (let i = 0; i < GRID_SIZE && mi < merged.length; i++) {
-      if (result[i] === 0) {
-        result[i] = merged[mi];
-        if (isMerged.has(mi)) mergedAt.push(i);
-        mi++;
+    let totalScore = 0;
+
+    for (const part of segments) {
+      if (part.type === 'obs') {
+        result.push(TILE.OBSTACLE);
+      } else {
+        const { merged, isMerged, score } = this._slideSegment(part.cells, deepForgeChance);
+        totalScore += score;
+        const baseIdx = result.length;
+        for (let i = 0; i < merged.length; i++) {
+          if (isMerged.has(i)) mergedAt.push(baseIdx + i);
+          result.push(merged[i]);
+        }
       }
     }
 
-    return { row: result, score: addedScore, mergedAt };
+    return { row: result, score: totalScore, mergedAt };
   },
 
   // Apply a move direction, returns { moved, score, merges:[{r,c,val}], newTilePos }
