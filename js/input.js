@@ -130,8 +130,7 @@ function bindButtons() {
     document.getElementById('ascendModal').classList.add('show');
     const cost = ASCENSION_COSTS[GameState.meta.ascensionLevel];
     const nextLvl = GameState.meta.ascensionLevel + 1;
-    document.getElementById('ascendModalSub').innerHTML =
-      `Toutes tes améliorations seront réinitialisées.<br>Tu gagnes l'accès aux passifs d'Ascension ${nextLvl}.<br><br>Coût : <strong class="text-gold">◈${cost}</strong>`;
+    document.getElementById('ascendModalSub').innerHTML = I18n.t('modal.ascendSub', { n: nextLvl, cost });
   });
   document.getElementById('btnAscendCancel').addEventListener('click', () => {
     document.getElementById('ascendModal').classList.remove('show');
@@ -149,5 +148,6 @@ function bindButtons() {
 
   Input.init();
   bindButtons();
+  I18n.applyDOM();
   Renderer.renderTitle();
 })();

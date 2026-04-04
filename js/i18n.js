@@ -1,0 +1,569 @@
+'use strict';
+
+const I18n = {
+  _lang: 'fr',
+  _strings: {},
+
+  _data: {
+    fr: {
+      // UI static
+      'ui.byline': 'Un jeu de',
+      'ui.subtitle': 'Rogue Ascension',
+      'ui.stat.runs': 'Runs',
+      'ui.stat.maxFloor': 'Étage max',
+      'ui.stat.totalGold': 'Or total',
+      'ui.btn.continueRun': '▶ Continuer la run',
+      'ui.btn.newRun': '⚔ Nouvelle Run',
+      'ui.btn.upgrades': '🏰 Améliorations',
+      'ui.btn.resetSave': '↺ Tout effacer',
+      'ui.btn.abandon': '✕ Abandonner',
+      'ui.btn.continue': 'Continuer',
+      'ui.btn.skip': 'Passer',
+      'ui.btn.replay': '⚔ Rejouer',
+      'ui.btn.spendGold': '🏰 Dépenser l\'or',
+      'ui.btn.menu': '← Menu',
+      'ui.btn.back': '← Retour',
+      'ui.btn.cancel': 'Annuler',
+
+      // Map
+      'map.floor': 'Étage {n} / 3',
+      'map.activeRelics': 'Reliques actives',
+      'map.noRelics': 'Aucune relique',
+
+      // HUD
+      'hud.score': 'Score',
+      'hud.gold': '◈ Or',
+      'hud.movesLeft': 'Coups restants',
+
+      // Relic screen
+      'relic.chooseTitle': 'Choisir une relique',
+      'relic.reward': 'Récompense',
+
+      // End screen
+      'end.victory': 'VICTOIRE',
+      'end.defeat': 'DÉFAITE',
+      'end.abandon': 'ABANDON',
+      'end.goldGained': '◈ Or gagné',
+      'end.totalScore': 'Score total',
+      'end.floorReached': 'Étage atteint',
+      'end.relics': 'Reliques',
+      'end.collectedRelics': 'Reliques collectées',
+      'end.noRelics': 'Aucune',
+
+      // Meta
+      'meta.title': '🏰 Forge du Destin',
+      'meta.availableGold': 'Or disponible : ',
+      'meta.max': 'MAX',
+      'meta.ascension': 'Ascension {n}',
+
+      // Modals
+      'modal.resetTitle': 'Tout effacer ?',
+      'modal.resetSub': 'Ton or et tes améliorations seront effacés.<br>Les statistiques (runs, étage max) sont conservées.',
+      'modal.resetConfirm': 'Tout effacer',
+      'modal.abandonTitle': 'Abandonner la run ?',
+      'modal.abandonSub': 'Tu conserveras l\'or gagné, mais la progression sera perdue.',
+      'modal.abandonConfirm': 'Abandonner',
+      'modal.ascensionTitle': 'Ascension',
+      'modal.ascendConfirm': 'Transcender',
+      'modal.ascendSub': 'Toutes tes améliorations seront réinitialisées.<br>Tu gagnes l\'accès aux passifs d\'Ascension {n}.<br><br>Coût : <strong class="text-gold">◈{cost}</strong>',
+
+      // Overlays
+      'overlay.victory': 'VICTOIRE !',
+      'overlay.defeat': 'DÉFAITE',
+      'overlay.phoenix': 'PHÉNIX !',
+      'overlay.gridLocked': 'Grille bloquée !',
+      'overlay.noMoves': 'Plus de coups disponibles',
+
+      // Title screen
+      'title.activePassives': 'Passifs actifs :',
+      'title.noUpgrades': 'Aucune amélioration. Complète ta première run pour gagner de l\'or.',
+
+      // Rest room
+      'rest.goldBonus': '+5 or gagné',
+      'rest.shopName': 'Forge du Destin',
+      'rest.shopRarity': 'boutique',
+      'rest.shopDesc': 'Acheter des améliorations permanentes avec ton or.',
+      'rest.shopGold': '→ ◈{n} or disponible',
+
+      // Room types
+      'room.normal': 'Combat',
+      'room.elite': 'Élite',
+      'room.rest': 'Repos',
+      'room.mystery': 'Mystère',
+      'room.boss': 'BOSS',
+
+      // Objectives
+      'objective.reach': 'Atteindre {n}',
+      'objective.merges': '{n} fusions',
+      'objective.score': 'Score : {n}',
+
+      // Mystery events
+      'mystery.goldSmall.title': 'Carte ancienne',
+      'mystery.goldSmall.sub': '+5 or gagné',
+      'mystery.goldMedium.title': 'Coffre trouvé !',
+      'mystery.goldMedium.sub': '+10 or gagné',
+      'mystery.goldLarge.title': 'Trésor antique',
+      'mystery.goldLarge.sub': '+20 or gagné',
+      'mystery.relicCommon.title': 'Objet mystérieux',
+      'mystery.relicCommon.sub': 'Une relique commune obtenue !',
+      'mystery.relicCommonFail.title': 'Coffre poussiéreux',
+      'mystery.relicCommonFail.sub': '+8 or gagné',
+      'mystery.relicRare.title': 'Artefact oublié',
+      'mystery.relicRare.sub': 'Une relique rare obtenue !',
+      'mystery.relicRareFail.title': 'Butin enfoui',
+      'mystery.relicRareFail.sub': '+15 or gagné',
+      'mystery.haste.title': 'Bénédiction rapide',
+      'mystery.haste.sub': 'Relique Hâte obtenue ! +5 coups/salle',
+      'mystery.hasteFail.title': 'Énergie résiduelle',
+      'mystery.hasteFail.sub': '+10 or gagné',
+      'mystery.trap.title': 'Piège !',
+      'mystery.trap.sub': '-{n} or perdu',
+      'mystery.double.title': 'Double ou rien',
+      'mystery.double.lucky': 'Chance ! +25 or gagné',
+      'mystery.double.unlucky': 'Malchance... -{n} or perdu',
+      'mystery.curse.title': 'Malédiction !',
+      'mystery.curseFail.title': 'Rien de spécial',
+      'mystery.curseFail.sub': '+5 or gagné',
+      'mystery.ambush.title': 'Embuscade !',
+      'mystery.ambush.sub': 'Un ennemi surgit de l\'ombre...',
+
+      // Relics — names & descriptions
+      'relic.entropy.name': 'Entropie',
+      'relic.entropy.desc': 'Les nouvelles tuiles sont toujours 4.',
+      'relic.entropy.effect': '+50% valeur tuile',
+      'relic.greed.name': 'Avarice',
+      'relic.greed.desc': 'Chaque fusion donne +1 or.',
+      'relic.greed.effect': '+1 or par fusion',
+      'relic.haste.name': 'Hâte',
+      'relic.haste.desc': '+5 coups dans toutes les salles.',
+      'relic.haste.effect': '+5 coups max',
+      'relic.shield.name': 'Bouclier',
+      'relic.shield.desc': 'Les bombes sont neutralisées au début de la salle.',
+      'relic.shield.effect': 'Bombes désactivées',
+      'relic.sprout.name': 'Germe',
+      'relic.sprout.desc': '+1 tuile initiale par salle.',
+      'relic.sprout.effect': '3 tuiles initiales',
+      'relic.collector.name': 'Collectionneur',
+      'relic.collector.desc': '+3 or par salle complétée.',
+      'relic.collector.effect': '+3 or/salle',
+      'relic.compass.name': 'Compas',
+      'relic.compass.desc': 'Les tuiles apparaissent toujours sur les bords.',
+      'relic.compass.effect': 'Spawn sur bords',
+      'relic.echo.name': 'Écho',
+      'relic.echo.desc': 'Après chaque fusion, une tuile apparaît aléatoirement.',
+      'relic.echo.effect': 'Bonus tuile par fusion',
+      'relic.magnet.name': 'Aimant',
+      'relic.magnet.desc': '+3 coups au début de chaque salle.',
+      'relic.magnet.effect': '+3 coups/salle',
+      'relic.tide.name': 'Marée',
+      'relic.tide.desc': '1×/salle : le premier coup sans fusion est gratuit.',
+      'relic.tide.effect': '1 coup gratuit/salle',
+      'relic.blade.name': 'Double Lame',
+      'relic.blade.desc': '2+2 fusions donnent 8 au lieu de 4.',
+      'relic.blade.effect': '2+2 → 8',
+      'relic.focus.name': 'Foyer',
+      'relic.focus.desc': '+20% coups dans les salles élites.',
+      'relic.focus.effect': '+20% coups élites',
+      'relic.recycle.name': 'Recyclage',
+      'relic.recycle.desc': 'Si tu échoues une salle, récupère la moitié de l\'or.',
+      'relic.recycle.effect': '50% or en cas d\'échec',
+      'relic.crystal.name': 'Cristal',
+      'relic.crystal.desc': 'Début de salle : la tuile la plus élevée double.',
+      'relic.crystal.effect': '×2 tuile max au démarrage',
+      'relic.mirror.name': 'Miroir',
+      'relic.mirror.desc': 'Chaque salle commence avec une copie de la dernière tuile créée.',
+      'relic.mirror.effect': 'Bonus tuile au démarrage',
+      'relic.hourglass.name': 'Sablier',
+      'relic.hourglass.desc': '+1 coup chaque fois que tu fusiennes une tuile ≥ 64.',
+      'relic.hourglass.effect': '+1 coup si fusion ≥ 64',
+      'relic.vortex.name': 'Vortex',
+      'relic.vortex.desc': '1×/salle : quand tu atteins 0 coups, gagne +5 coups.',
+      'relic.vortex.effect': '+5 coups survie',
+      'relic.crown.name': 'Couronne',
+      'relic.crown.desc': 'Les salles boss donnent double or.',
+      'relic.crown.effect': '×2 or boss',
+      'relic.dupli.name': 'Duplication',
+      'relic.dupli.desc': 'Début de salle : la tuile la plus basse est dupliquée.',
+      'relic.dupli.effect': 'Copie tuile min',
+      'relic.phoenix.name': 'Phénix',
+      'relic.phoenix.desc': '1×/run : si tu échoues une salle, rejeux-la avec +10 coups.',
+      'relic.phoenix.effect': '1 deuxième vie',
+      'relic.phoenix.message': 'Le Phénix te sauve ! +10 coups',
+      'relic.transmute.name': 'Transmutation',
+      'relic.transmute.desc': 'Les obstacles se transforment en tuile 4 après 3 coups.',
+      'relic.transmute.effect': 'Obstacles → tuile 4',
+      'relic.darkpact.name': 'Pacte Sombre',
+      'relic.darkpact.desc': '-10 coups max, mais chaque fusion donne +2 or.',
+      'relic.darkpact.effect': '-10 coups, +2 or/fusion',
+      'relic.eclipse.name': 'Éclipse',
+      'relic.eclipse.desc': 'Les tuiles 2, 8, 32, 128, 512 sont doublées à l\'apparition.',
+      'relic.eclipse.effect': 'Tuiles impaires ×2',
+      'relic.berserker.name': 'Berserk',
+      'relic.berserker.desc': '+15 coups max, mais les fusions ne donnent pas d\'or.',
+      'relic.berserker.effect': '+15 coups, 0 or',
+      'relic.web.name': 'Toile',
+      'relic.web.desc': '-3 coups dans toutes les salles.',
+      'relic.web.effect': '-3 coups max',
+      'relic.fragile.name': 'Fragilité',
+      'relic.fragile.desc': 'Les obstacles apparaissent aussi dans les salles normales.',
+      'relic.fragile.effect': 'Obstacles partout',
+      'relic.sealed.name': 'Scellé',
+      'relic.sealed.desc': 'Les salles de repos n\'offrent plus de reliques.',
+      'relic.sealed.effect': 'Repos = boutique seulement',
+      'relic.cursed.name': 'Maudit',
+      'relic.cursed.desc': '1 obstacle indestructible apparaît dans chaque salle.',
+      'relic.cursed.effect': '+1 obstacle permanent',
+      'relic.slow.name': 'Lenteur',
+      'relic.slow.desc': 'Les tuiles générées baissent d\'un niveau.',
+      'relic.slow.effect': 'Tuiles -1 niveau',
+      'relic.tax.name': 'Taxe',
+      'relic.tax.desc': '-20% d\'or gagné par salle.',
+      'relic.tax.effect': '-20% or',
+
+      // Meta upgrades — names & descriptions & effects
+      'meta.extraMoves.name': 'Élan',
+      'meta.extraMoves.desc': 'Augmente les coups de base dans toutes les salles.',
+      'meta.extraMoves.effect': '+{n} coups de base',
+      'meta.startTile.name': 'Tuile de démarrage',
+      'meta.startTile.desc': 'Commence chaque salle avec une tuile plus grande.',
+      'meta.startTile.effect': 'Tuile {n} au démarrage',
+      'meta.goldBonus.name': 'Alchimie',
+      'meta.goldBonus.desc': 'Gagne plus d\'or à la fin de chaque salle.',
+      'meta.goldBonus.effect': '+{n} or/salle',
+      'meta.relicSlots.name': 'Besace',
+      'meta.relicSlots.desc': 'Augmente le nombre de reliques proposées.',
+      'meta.relicSlots.effect': '{n} reliques proposées',
+      'meta.startRelic.name': 'Bénédiction',
+      'meta.startRelic.desc': 'Commence chaque run avec une relique gratuite.',
+      'meta.startRelic.effect': '1 relique gratuite',
+      'meta.forgedEntropy.name': 'Entropie Forgée',
+      'meta.forgedEntropy.desc': 'Change le niveau de base des tuiles générées.',
+      'meta.forgedEntropy.effect': 'Tuiles de base : {n}',
+      'meta.synergy.name': 'Synergie',
+      'meta.synergy.desc': 'Augmente la rareté des reliques proposées.',
+      'meta.synergy.effect': '+{n} rareté',
+      'meta.deepForge.name': 'Forge Profonde',
+      'meta.deepForge.desc': 'Chance que les fusions créent des tuiles plus grandes.',
+      'meta.deepForge.effect': '{n}% chance super-fusion',
+      'meta.destiny.name': 'Destinée',
+      'meta.destiny.desc': 'Commence chaque run avec une relique rare.',
+      'meta.destiny.effect': '1 relique rare au démarrage',
+      'meta.singularity.name': 'Singularité',
+      'meta.singularity.desc': 'À partir de 128, si le tableau est plein, il double.',
+      'meta.singularity.effect': 'Tableau plein double à 128+',
+      'meta.mastery.name': 'Maîtrise',
+      'meta.mastery.desc': 'Augmente les coups dans les salles boss.',
+      'meta.mastery.effect': '+{n}% coups boss',
+    },
+
+    en: {
+      // UI static
+      'ui.byline': 'A game of',
+      'ui.subtitle': 'Rogue Ascension',
+      'ui.stat.runs': 'Runs',
+      'ui.stat.maxFloor': 'Best floor',
+      'ui.stat.totalGold': 'Total gold',
+      'ui.btn.continueRun': '▶ Continue run',
+      'ui.btn.newRun': '⚔ New Run',
+      'ui.btn.upgrades': '🏰 Upgrades',
+      'ui.btn.resetSave': '↺ Reset all',
+      'ui.btn.abandon': '✕ Abandon',
+      'ui.btn.continue': 'Continue',
+      'ui.btn.skip': 'Skip',
+      'ui.btn.replay': '⚔ Play again',
+      'ui.btn.spendGold': '🏰 Spend gold',
+      'ui.btn.menu': '← Menu',
+      'ui.btn.back': '← Back',
+      'ui.btn.cancel': 'Cancel',
+
+      // Map
+      'map.floor': 'Floor {n} / 3',
+      'map.activeRelics': 'Active relics',
+      'map.noRelics': 'No relics',
+
+      // HUD
+      'hud.score': 'Score',
+      'hud.gold': '◈ Gold',
+      'hud.movesLeft': 'Moves left',
+
+      // Relic screen
+      'relic.chooseTitle': 'Choose a relic',
+      'relic.reward': 'Reward',
+
+      // End screen
+      'end.victory': 'VICTORY',
+      'end.defeat': 'DEFEAT',
+      'end.abandon': 'ABANDON',
+      'end.goldGained': '◈ Gold gained',
+      'end.totalScore': 'Total score',
+      'end.floorReached': 'Floor reached',
+      'end.relics': 'Relics',
+      'end.collectedRelics': 'Collected relics',
+      'end.noRelics': 'None',
+
+      // Meta
+      'meta.title': '🏰 Forge of Fate',
+      'meta.availableGold': 'Available gold: ',
+      'meta.max': 'MAX',
+      'meta.ascension': 'Ascension {n}',
+
+      // Modals
+      'modal.resetTitle': 'Reset all?',
+      'modal.resetSub': 'Your gold and upgrades will be erased.<br>Statistics (runs, best floor) are kept.',
+      'modal.resetConfirm': 'Reset all',
+      'modal.abandonTitle': 'Abandon run?',
+      'modal.abandonSub': 'You\'ll keep earned gold, but progress will be lost.',
+      'modal.abandonConfirm': 'Abandon',
+      'modal.ascensionTitle': 'Ascension',
+      'modal.ascendConfirm': 'Transcend',
+      'modal.ascendSub': 'All your upgrades will be reset.<br>You gain access to Ascension {n} passives.<br><br>Cost: <strong class="text-gold">◈{cost}</strong>',
+
+      // Overlays
+      'overlay.victory': 'VICTORY!',
+      'overlay.defeat': 'DEFEAT',
+      'overlay.phoenix': 'PHOENIX!',
+      'overlay.gridLocked': 'Grid locked!',
+      'overlay.noMoves': 'No moves left',
+
+      // Title screen
+      'title.activePassives': 'Active passives:',
+      'title.noUpgrades': 'No upgrades yet. Complete your first run to earn gold.',
+
+      // Rest room
+      'rest.goldBonus': '+5 gold earned',
+      'rest.shopName': 'Forge of Fate',
+      'rest.shopRarity': 'shop',
+      'rest.shopDesc': 'Buy permanent upgrades with your gold.',
+      'rest.shopGold': '→ ◈{n} gold available',
+
+      // Room types
+      'room.normal': 'Battle',
+      'room.elite': 'Elite',
+      'room.rest': 'Rest',
+      'room.mystery': 'Mystery',
+      'room.boss': 'BOSS',
+
+      // Objectives
+      'objective.reach': 'Reach {n}',
+      'objective.merges': '{n} merges',
+      'objective.score': 'Score: {n}',
+
+      // Mystery events
+      'mystery.goldSmall.title': 'Ancient map',
+      'mystery.goldSmall.sub': '+5 gold earned',
+      'mystery.goldMedium.title': 'Chest found!',
+      'mystery.goldMedium.sub': '+10 gold earned',
+      'mystery.goldLarge.title': 'Ancient treasure',
+      'mystery.goldLarge.sub': '+20 gold earned',
+      'mystery.relicCommon.title': 'Mysterious object',
+      'mystery.relicCommon.sub': 'A common relic obtained!',
+      'mystery.relicCommonFail.title': 'Dusty chest',
+      'mystery.relicCommonFail.sub': '+8 gold earned',
+      'mystery.relicRare.title': 'Forgotten artifact',
+      'mystery.relicRare.sub': 'A rare relic obtained!',
+      'mystery.relicRareFail.title': 'Buried loot',
+      'mystery.relicRareFail.sub': '+15 gold earned',
+      'mystery.haste.title': 'Swift blessing',
+      'mystery.haste.sub': 'Haste relic obtained! +5 moves/room',
+      'mystery.hasteFail.title': 'Residual energy',
+      'mystery.hasteFail.sub': '+10 gold earned',
+      'mystery.trap.title': 'Trap!',
+      'mystery.trap.sub': '-{n} gold lost',
+      'mystery.double.title': 'Double or nothing',
+      'mystery.double.lucky': 'Lucky! +25 gold earned',
+      'mystery.double.unlucky': 'Unlucky... -{n} gold lost',
+      'mystery.curse.title': 'Curse!',
+      'mystery.curseFail.title': 'Nothing special',
+      'mystery.curseFail.sub': '+5 gold earned',
+      'mystery.ambush.title': 'Ambush!',
+      'mystery.ambush.sub': 'An enemy emerges from the shadows...',
+
+      // Relics — names & descriptions
+      'relic.entropy.name': 'Entropy',
+      'relic.entropy.desc': 'New tiles are always 4.',
+      'relic.entropy.effect': '+50% tile value',
+      'relic.greed.name': 'Greed',
+      'relic.greed.desc': 'Each merge gives +1 gold.',
+      'relic.greed.effect': '+1 gold per merge',
+      'relic.haste.name': 'Haste',
+      'relic.haste.desc': '+5 moves in all rooms.',
+      'relic.haste.effect': '+5 max moves',
+      'relic.shield.name': 'Shield',
+      'relic.shield.desc': 'Bombs are neutralized at room start.',
+      'relic.shield.effect': 'Bombs disabled',
+      'relic.sprout.name': 'Sprout',
+      'relic.sprout.desc': '+1 starting tile per room.',
+      'relic.sprout.effect': '3 starting tiles',
+      'relic.collector.name': 'Collector',
+      'relic.collector.desc': '+3 gold per completed room.',
+      'relic.collector.effect': '+3 gold/room',
+      'relic.compass.name': 'Compass',
+      'relic.compass.desc': 'Tiles always spawn on edges.',
+      'relic.compass.effect': 'Edge spawns',
+      'relic.echo.name': 'Echo',
+      'relic.echo.desc': 'After each merge, a tile appears randomly.',
+      'relic.echo.effect': 'Bonus tile per merge',
+      'relic.magnet.name': 'Magnet',
+      'relic.magnet.desc': '+3 moves at the start of each room.',
+      'relic.magnet.effect': '+3 moves/room',
+      'relic.tide.name': 'Tide',
+      'relic.tide.desc': '1×/room: first move without merge is free.',
+      'relic.tide.effect': '1 free move/room',
+      'relic.blade.name': 'Double Blade',
+      'relic.blade.desc': '2+2 merges give 8 instead of 4.',
+      'relic.blade.effect': '2+2 → 8',
+      'relic.focus.name': 'Focus',
+      'relic.focus.desc': '+20% moves in elite rooms.',
+      'relic.focus.effect': '+20% elite moves',
+      'relic.recycle.name': 'Recycle',
+      'relic.recycle.desc': 'When you fail a room, recover half the gold.',
+      'relic.recycle.effect': '50% gold on defeat',
+      'relic.crystal.name': 'Crystal',
+      'relic.crystal.desc': 'Room start: highest tile doubles.',
+      'relic.crystal.effect': '×2 max tile at start',
+      'relic.mirror.name': 'Mirror',
+      'relic.mirror.desc': 'Each room starts with a copy of the last created tile.',
+      'relic.mirror.effect': 'Bonus tile at start',
+      'relic.hourglass.name': 'Hourglass',
+      'relic.hourglass.desc': '+1 move each time you merge a tile ≥ 64.',
+      'relic.hourglass.effect': '+1 move if merge ≥ 64',
+      'relic.vortex.name': 'Vortex',
+      'relic.vortex.desc': '1×/room: when you reach 0 moves, gain +5 moves.',
+      'relic.vortex.effect': '+5 survival moves',
+      'relic.crown.name': 'Crown',
+      'relic.crown.desc': 'Boss rooms give double gold.',
+      'relic.crown.effect': '×2 boss gold',
+      'relic.dupli.name': 'Duplication',
+      'relic.dupli.desc': 'Room start: the lowest tile is duplicated.',
+      'relic.dupli.effect': 'Copy min tile',
+      'relic.phoenix.name': 'Phoenix',
+      'relic.phoenix.desc': '1×/run: if you fail a room, replay it with +10 moves.',
+      'relic.phoenix.effect': '1 second life',
+      'relic.phoenix.message': 'Phoenix saves you! +10 moves',
+      'relic.transmute.name': 'Transmutation',
+      'relic.transmute.desc': 'Obstacles turn into tile 4 after 3 moves.',
+      'relic.transmute.effect': 'Obstacles → tile 4',
+      'relic.darkpact.name': 'Dark Pact',
+      'relic.darkpact.desc': '-10 max moves, but each merge gives +2 gold.',
+      'relic.darkpact.effect': '-10 moves, +2 gold/merge',
+      'relic.eclipse.name': 'Eclipse',
+      'relic.eclipse.desc': 'Tiles 2, 8, 32, 128, 512 are doubled on spawn.',
+      'relic.eclipse.effect': 'Odd tiles ×2',
+      'relic.berserker.name': 'Berserker',
+      'relic.berserker.desc': '+15 max moves, but merges give no gold.',
+      'relic.berserker.effect': '+15 moves, 0 gold',
+      'relic.web.name': 'Web',
+      'relic.web.desc': '-3 moves in all rooms.',
+      'relic.web.effect': '-3 max moves',
+      'relic.fragile.name': 'Fragility',
+      'relic.fragile.desc': 'Obstacles also appear in normal rooms.',
+      'relic.fragile.effect': 'Obstacles everywhere',
+      'relic.sealed.name': 'Sealed',
+      'relic.sealed.desc': 'Rest rooms no longer offer relics.',
+      'relic.sealed.effect': 'Rest = shop only',
+      'relic.cursed.name': 'Cursed',
+      'relic.cursed.desc': '1 indestructible obstacle appears in each room.',
+      'relic.cursed.effect': '+1 permanent obstacle',
+      'relic.slow.name': 'Slowness',
+      'relic.slow.desc': 'Generated tiles go down one level.',
+      'relic.slow.effect': 'Tiles -1 level',
+      'relic.tax.name': 'Tax',
+      'relic.tax.desc': '-20% gold earned per room.',
+      'relic.tax.effect': '-20% gold',
+
+      // Meta upgrades — names & descriptions & effects
+      'meta.extraMoves.name': 'Momentum',
+      'meta.extraMoves.desc': 'Increases base moves in all rooms.',
+      'meta.extraMoves.effect': '+{n} base moves',
+      'meta.startTile.name': 'Start Tile',
+      'meta.startTile.desc': 'Start each room with a larger tile.',
+      'meta.startTile.effect': 'Tile {n} at start',
+      'meta.goldBonus.name': 'Alchemy',
+      'meta.goldBonus.desc': 'Earn more gold at the end of each room.',
+      'meta.goldBonus.effect': '+{n} gold/room',
+      'meta.relicSlots.name': 'Satchel',
+      'meta.relicSlots.desc': 'Increases the number of relics offered.',
+      'meta.relicSlots.effect': '{n} relics offered',
+      'meta.startRelic.name': 'Blessing',
+      'meta.startRelic.desc': 'Start each run with a free relic.',
+      'meta.startRelic.effect': '1 free relic',
+      'meta.forgedEntropy.name': 'Forged Entropy',
+      'meta.forgedEntropy.desc': 'Changes the base level of generated tiles.',
+      'meta.forgedEntropy.effect': 'Base tiles: {n}',
+      'meta.synergy.name': 'Synergy',
+      'meta.synergy.desc': 'Increases the rarity of offered relics.',
+      'meta.synergy.effect': '+{n} rarity',
+      'meta.deepForge.name': 'Deep Forge',
+      'meta.deepForge.desc': 'Chance that merges create larger tiles.',
+      'meta.deepForge.effect': '{n}% super-merge chance',
+      'meta.destiny.name': 'Destiny',
+      'meta.destiny.desc': 'Start each run with a rare relic.',
+      'meta.destiny.effect': '1 rare relic at start',
+      'meta.singularity.name': 'Singularity',
+      'meta.singularity.desc': 'From 128 onwards, if the board is full, it doubles.',
+      'meta.singularity.effect': 'Full board double at 128+',
+      'meta.mastery.name': 'Mastery',
+      'meta.mastery.desc': 'Increases moves in boss rooms.',
+      'meta.mastery.effect': '+{n}% boss moves',
+    },
+  },
+
+  init(lang) {
+    this._lang = lang || localStorage.getItem('2048rogue_lang') || 'fr';
+    this._strings = this._data[this._lang] || this._data.fr;
+  },
+
+  setLang(lang) {
+    this._lang = lang;
+    this._strings = this._data[lang] || this._data.fr;
+    localStorage.setItem('2048rogue_lang', lang);
+    this.applyDOM();
+    // Re-render the title screen (language toggle is on title)
+    if (typeof Renderer !== 'undefined') Renderer.renderTitle();
+  },
+
+  t(key, params) {
+    let s = this._strings[key] || this._data.fr[key] || key;
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        s = s.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+      }
+    }
+    return s;
+  },
+
+  applyDOM() {
+    const elements = document.querySelectorAll('[data-i18n]');
+    for (const el of elements) {
+      const key = el.getAttribute('data-i18n');
+      const text = this.t(key);
+      if (text.includes('<')) {
+        el.innerHTML = text;
+      } else {
+        el.textContent = text;
+      }
+    }
+    this.renderLangToggle();
+  },
+
+  renderLangToggle() {
+    const toggle = document.getElementById('langToggle');
+    if (!toggle) return;
+
+    toggle.innerHTML = '';
+    for (const lang of this.langs) {
+      const btn = document.createElement('button');
+      btn.className = `lang-btn ${lang.code === this._lang ? 'active' : ''}`;
+      btn.textContent = lang.label;
+      btn.addEventListener('click', () => this.setLang(lang.code));
+      toggle.appendChild(btn);
+    }
+  },
+
+  langs: [
+    { code: 'fr', label: 'Français' },
+    { code: 'en', label: 'English' },
+  ],
+};
+
+I18n.init();

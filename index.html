@@ -11,23 +11,24 @@
 
 <!-- TITLE -->
 <div id="titleScreen" class="screen active">
-  <div class="title-eyebrow">Un jeu de</div>
+  <div class="title-eyebrow" data-i18n="ui.byline">Un jeu de</div>
   <div class="title-logo">2048</div>
-  <div class="title-sub">Rogue Ascension</div>
+  <div class="title-sub" data-i18n="ui.subtitle">Rogue Ascension</div>
   <div class="ascension-badge" id="ascensionBadge" style="display:none"></div>
   <div class="divider" style="margin-bottom:32px"></div>
   <div class="stats-grid">
-    <div class="stat-box"><div class="stat-box-val" id="s-runs">0</div><div class="stat-box-label">Runs</div></div>
-    <div class="stat-box"><div class="stat-box-val" id="s-best">0</div><div class="stat-box-label">Étage max</div></div>
-    <div class="stat-box"><div class="stat-box-val" id="s-gold">0</div><div class="stat-box-label">Or total</div></div>
+    <div class="stat-box"><div class="stat-box-val" id="s-runs">0</div><div class="stat-box-label" data-i18n="ui.stat.runs">Runs</div></div>
+    <div class="stat-box"><div class="stat-box-val" id="s-best">0</div><div class="stat-box-label" data-i18n="ui.stat.maxFloor">Étage max</div></div>
+    <div class="stat-box"><div class="stat-box-val" id="s-gold">0</div><div class="stat-box-label" data-i18n="ui.stat.totalGold">Or total</div></div>
   </div>
   <div class="passive-info" id="passiveInfo"></div>
   <div class="flex flex-col gap-2 w-full">
-    <button class="btn btn-primary" id="btnContinueRun" style="display:none">▶ Continuer la run</button>
-    <button class="btn" id="btnStartRun">⚔ Nouvelle Run</button>
-    <button class="btn" id="btnShowMeta">🏰 Améliorations</button>
-    <button class="btn-ghost" id="btnResetSave" style="margin-top:4px;color:var(--text-muted)">↺ Tout effacer</button>
+    <button class="btn btn-primary" id="btnContinueRun" style="display:none" data-i18n="ui.btn.continueRun">▶ Continuer la run</button>
+    <button class="btn" id="btnStartRun" data-i18n="ui.btn.newRun">⚔ Nouvelle Run</button>
+    <button class="btn" id="btnShowMeta" data-i18n="ui.btn.upgrades">🏰 Améliorations</button>
+    <button class="btn-ghost" id="btnResetSave" style="margin-top:4px;color:var(--text-muted)" data-i18n="ui.btn.resetSave">↺ Tout effacer</button>
   </div>
+  <div class="lang-toggle" id="langToggle"></div>
   <div class="version-tag">v1.2.0</div>
 </div>
 
@@ -38,11 +39,11 @@
     <div class="map-gold" id="mapGold">0</div>
   </div>
   <div class="relics-bar card w-full">
-    <div class="text-xs text-dim">Reliques actives</div>
+    <div class="text-xs text-dim" data-i18n="map.activeRelics">Reliques actives</div>
     <div class="relics-list" id="mapRelics"></div>
   </div>
   <div class="floor-map w-full" id="floorMap"></div>
-  <button class="btn mt-2" id="btnAbandon">✕ Abandonner</button>
+  <button class="btn mt-2" id="btnAbandon" data-i18n="ui.btn.abandon">✕ Abandonner</button>
 </div>
 
 <!-- GAME -->
@@ -53,16 +54,16 @@
       <div class="room-objective-text" id="roomObjectiveText">—</div>
     </div>
     <div class="hud-pills">
-      <div class="hud-pill"><div class="hud-pill-val" id="hudScore">0</div><div class="hud-pill-label">Score</div></div>
-      <div class="hud-pill"><div class="hud-pill-val" id="hudGold">0</div><div class="hud-pill-label">◈ Or</div></div>
+      <div class="hud-pill"><div class="hud-pill-val" id="hudScore">0</div><div class="hud-pill-label" data-i18n="hud.score">Score</div></div>
+      <div class="hud-pill"><div class="hud-pill-val" id="hudGold">0</div><div class="hud-pill-label" data-i18n="hud.gold">◈ Or</div></div>
     </div>
   </div>
   <div class="moves-wrap w-full">
-    <div class="moves-label"><span>Coups restants</span><span id="movesText">0/0</span></div>
+    <div class="moves-label"><span data-i18n="hud.movesLeft">Coups restants</span><span id="movesText">0/0</span></div>
     <div class="moves-track"><div class="moves-fill" id="movesFill" style="width:100%"></div></div>
   </div>
   <div class="active-relics" id="activeRelics"></div>
-  <button class="btn-ghost" id="btnGameAbandon" style="align-self:flex-end;padding:4px 8px">✕ Abandonner</button>
+  <button class="btn-ghost" id="btnGameAbandon" style="align-self:flex-end;padding:4px 8px" data-i18n="ui.btn.abandon">✕ Abandonner</button>
   <div class="grid-wrap w-full">
     <div id="gameGrid"></div>
     <div id="gameTiles"></div>
@@ -70,7 +71,7 @@
       <div class="overlay-icon" id="overlayIcon"></div>
       <div class="overlay-title" id="overlayTitle"></div>
       <div class="overlay-sub" id="overlaySub"></div>
-      <button class="btn btn-primary" id="overlayBtn">Continuer</button>
+      <button class="btn btn-primary" id="overlayBtn" data-i18n="ui.btn.continue">Continuer</button>
     </div>
   </div>
 
@@ -79,12 +80,12 @@
 <!-- RELIC CHOICE -->
 <div id="relicScreen" class="screen">
   <div class="relic-header">
-    <div class="text-xs text-dim">Choisir une relique</div>
-    <div class="relic-screen-title">Récompense</div>
+    <div class="text-xs text-dim" data-i18n="relic.chooseTitle">Choisir une relique</div>
+    <div class="relic-screen-title" data-i18n="relic.reward">Récompense</div>
     <div class="relic-gold-info" id="relicGoldInfo"></div>
   </div>
   <div class="relic-choices" id="relicChoices"></div>
-  <button class="btn-ghost" id="btnSkipRelic">Passer</button>
+  <button class="btn-ghost" id="btnSkipRelic" data-i18n="ui.btn.skip">Passer</button>
 </div>
 
 <!-- END -->
@@ -93,37 +94,37 @@
   <div class="end-title" id="endTitle"></div>
   <div class="end-stats" id="endStats"></div>
   <div class="card w-full">
-    <div class="text-xs text-dim" style="margin-bottom:10px">Reliques collectées</div>
+    <div class="text-xs text-dim" style="margin-bottom:10px" data-i18n="end.collectedRelics">Reliques collectées</div>
     <div class="relics-list" id="endRelics"></div>
   </div>
   <div class="flex flex-col gap-2 w-full">
-    <button class="btn btn-primary" id="btnReplay">⚔ Rejouer</button>
-    <button class="btn" id="btnEndToMeta">🏰 Dépenser l'or</button>
-    <button class="btn" id="btnEndToTitle">← Menu</button>
+    <button class="btn btn-primary" id="btnReplay" data-i18n="ui.btn.replay">⚔ Rejouer</button>
+    <button class="btn" id="btnEndToMeta" data-i18n="ui.btn.spendGold">🏰 Dépenser l'or</button>
+    <button class="btn" id="btnEndToTitle" data-i18n="ui.btn.menu">← Menu</button>
   </div>
 </div>
 
 <!-- META -->
 <div id="metaScreen" class="screen">
   <div class="text-center w-full" style="margin-bottom:8px">
-    <div class="meta-title">🏰 Forge du Destin</div>
+    <div class="meta-title" data-i18n="meta.title">🏰 Forge du Destin</div>
     <div class="meta-asc-info" id="metaAscInfo" style="display:none"></div>
-    <div class="text-sm text-dim">Or disponible : <span class="text-gold" id="metaGold">0</span></div>
+    <div class="text-sm text-dim"><span data-i18n="meta.availableGold">Or disponible : </span><span class="text-gold" id="metaGold">0</span></div>
   </div>
   <div class="flex flex-col gap-2 w-full" id="metaList"></div>
   <button class="btn btn-ascend mt-2" id="btnAscend" style="display:none"></button>
-  <button class="btn mt-2" id="btnMetaBack">← Retour</button>
+  <button class="btn mt-2" id="btnMetaBack" data-i18n="ui.btn.back">← Retour</button>
 </div>
 
 <!-- RESET MODAL -->
 <div class="modal-backdrop" id="resetModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="resetModalTitle">
     <div class="modal-icon">⚠️</div>
-    <div class="modal-title" id="resetModalTitle" style="color:var(--red)">Tout effacer ?</div>
-    <div class="modal-sub">Ton or et tes améliorations seront effacés.<br>Les statistiques (runs, étage max) sont conservées.</div>
+    <div class="modal-title" id="resetModalTitle" style="color:var(--red)" data-i18n="modal.resetTitle">Tout effacer ?</div>
+    <div class="modal-sub" data-i18n="modal.resetSub">Ton or et tes améliorations seront effacés.<br>Les statistiques (runs, étage max) sont conservées.</div>
     <div class="flex flex-col gap-2 w-full" style="margin-top:4px">
-      <button class="btn btn-danger" id="btnResetConfirm">Tout effacer</button>
-      <button class="btn" id="btnResetCancel">Annuler</button>
+      <button class="btn btn-danger" id="btnResetConfirm" data-i18n="modal.resetConfirm">Tout effacer</button>
+      <button class="btn" id="btnResetCancel" data-i18n="ui.btn.cancel">Annuler</button>
     </div>
   </div>
 </div>
@@ -132,7 +133,7 @@
     <div class="modal-icon" id="mysteryIcon"></div>
     <div class="modal-title" id="mysteryTitle"></div>
     <div class="modal-sub" id="mysterySub"></div>
-    <button class="btn btn-primary" id="btnMysteryClose" style="max-width:200px">Continuer</button>
+    <button class="btn btn-primary" id="btnMysteryClose" style="max-width:200px" data-i18n="ui.btn.continue">Continuer</button>
   </div>
 </div>
 
@@ -149,11 +150,11 @@
 <div class="modal-backdrop" id="abandonModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="abandonModalTitle">
     <div class="modal-icon">🏳️</div>
-    <div class="modal-title" id="abandonModalTitle" style="color:var(--red)">Abandonner la run ?</div>
-    <div class="modal-sub">Tu conserveras l'or gagné, mais la progression sera perdue.</div>
+    <div class="modal-title" id="abandonModalTitle" style="color:var(--red)" data-i18n="modal.abandonTitle">Abandonner la run ?</div>
+    <div class="modal-sub" data-i18n="modal.abandonSub">Tu conserveras l'or gagné, mais la progression sera perdue.</div>
     <div class="flex flex-col gap-2 w-full" style="margin-top:4px">
-      <button class="btn btn-danger" id="btnAbandonConfirm">Abandonner</button>
-      <button class="btn" id="btnAbandonCancel">Annuler</button>
+      <button class="btn btn-danger" id="btnAbandonConfirm" data-i18n="modal.abandonConfirm">Abandonner</button>
+      <button class="btn" id="btnAbandonCancel" data-i18n="ui.btn.cancel">Annuler</button>
     </div>
   </div>
 </div>
@@ -162,16 +163,17 @@
 <div class="modal-backdrop" id="ascendModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ascendModalTitle">
     <div class="modal-icon">✦</div>
-    <div class="modal-title" id="ascendModalTitle" style="color:var(--purple)">Ascension</div>
+    <div class="modal-title" id="ascendModalTitle" style="color:var(--purple)" data-i18n="modal.ascensionTitle">Ascension</div>
     <div class="modal-sub" id="ascendModalSub"></div>
     <div class="flex flex-col gap-2 w-full" style="margin-top:4px">
-      <button class="btn btn-ascend-confirm" id="btnAscendConfirm">Transcender</button>
-      <button class="btn" id="btnAscendCancel">Annuler</button>
+      <button class="btn btn-ascend-confirm" id="btnAscendConfirm" data-i18n="modal.ascendConfirm">Transcender</button>
+      <button class="btn" id="btnAscendCancel" data-i18n="ui.btn.cancel">Annuler</button>
     </div>
   </div>
 </div>
 
-<!-- JS — order matters: constants → storage → state → board → renderer → controller → input (boot) -->
+<!-- JS — order matters: i18n → constants → storage → state → board → renderer → controller → input (boot) -->
+<script src="js/i18n.js"></script>
 <script src="js/constants.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/state.js"></script>

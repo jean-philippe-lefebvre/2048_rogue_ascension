@@ -209,8 +209,8 @@ const Controller = {
 
     // Render room UI
     const def = ROOM_DEFS[type];
-    document.getElementById('roomName').textContent = `${def.icon} ${def.label}`;
-    document.getElementById('roomObjectiveText').textContent = obj.label;
+    document.getElementById('roomName').textContent = `${def.icon} ${I18n.t('room.' + roomData.type)}`;
+    document.getElementById('roomObjectiveText').textContent = I18n.t('objective.' + obj.id, { n: obj.target });
     Renderer.hideRoomOverlay();
     Renderer.updateHUD();
     Renderer.updateActiveRelics();
@@ -258,38 +258,38 @@ const Controller = {
     // Weighted events: [weight, handler]
     const events = [
       // ── Or ──
-      [20, () => { run.gold += 5;  return { icon:'💰', title:'Carte ancienne',  sub:'+5 or gagné' }; }],
-      [20, () => { run.gold += 10; return { icon:'💰', title:'Coffre trouvé !',  sub:'+10 or gagné' }; }],
-      [10, () => { run.gold += 20; return { icon:'💰', title:'Trésor antique',   sub:'+20 or gagné' }; }],
+      [20, () => { run.gold += 5;  return { icon:'💰', title:I18n.t('mystery.goldSmall.title'),  sub:I18n.t('mystery.goldSmall.sub') }; }],
+      [20, () => { run.gold += 10; return { icon:'💰', title:I18n.t('mystery.goldMedium.title'),  sub:I18n.t('mystery.goldMedium.sub') }; }],
+      [10, () => { run.gold += 20; return { icon:'💰', title:I18n.t('mystery.goldLarge.title'),   sub:I18n.t('mystery.goldLarge.sub') }; }],
       // ── Reliques ──
       [15, () => {
         const picks = this._pickRandom(this._getUnownedRelics().filter(r => r.rarity === 'common'), 1);
-        if (picks.length) { this._grantRelic(picks[0]); return { icon:'🎁', title:'Objet mystérieux', sub:'Une relique commune obtenue !' }; }
-        run.gold += 8; return { icon:'💰', title:'Coffre poussiéreux', sub:'+8 or gagné' };
+        if (picks.length) { this._grantRelic(picks[0]); return { icon:'🎁', title:I18n.t('mystery.relicCommon.title'), sub:I18n.t('mystery.relicCommon.sub') }; }
+        run.gold += 8; return { icon:'💰', title:I18n.t('mystery.relicCommonFail.title'), sub:I18n.t('mystery.relicCommonFail.sub') };
       }],
       [5, () => {
         const picks = this._pickRandom(this._getUnownedRelics().filter(r => r.rarity === 'rare' || r.rarity === 'epic'), 1);
-        if (picks.length) { this._grantRelic(picks[0]); return { icon:'✨', title:'Artefact oublié', sub:'Une relique rare obtenue !' }; }
-        run.gold += 15; return { icon:'💰', title:'Butin enfoui', sub:'+15 or gagné' };
+        if (picks.length) { this._grantRelic(picks[0]); return { icon:'✨', title:I18n.t('mystery.relicRare.title'), sub:I18n.t('mystery.relicRare.sub') }; }
+        run.gold += 15; return { icon:'💰', title:I18n.t('mystery.relicRareFail.title'), sub:I18n.t('mystery.relicRareFail.sub') };
       }],
       // ── Bonus coups ──
       [10, () => {
         const haste = RELICS.find(r => r.id === 'haste');
-        if (haste && !run.relics.find(r => r.id === 'haste')) { this._grantRelic(haste); return { icon:'⚡', title:'Bénédiction rapide', sub:'Relique Hâte obtenue ! +5 coups/salle' }; }
-        run.gold += 10; return { icon:'💰', title:'Énergie résiduelle', sub:'+10 or gagné' };
+        if (haste && !run.relics.find(r => r.id === 'haste')) { this._grantRelic(haste); return { icon:'⚡', title:I18n.t('mystery.haste.title'), sub:I18n.t('mystery.haste.sub') }; }
+        run.gold += 10; return { icon:'💰', title:I18n.t('mystery.hasteFail.title'), sub:I18n.t('mystery.hasteFail.sub') };
       }],
-      // ── Perte d'or (malédiction) ──
-      [8, () => { const lost = Math.min(run.gold, 10); run.gold -= lost; return { icon:'💀', title:'Piège !', sub:`-${lost} or perdu` }; }],
+      // ── Perte d'or ──
+      [8, () => { const lost = Math.min(run.gold, 10); run.gold -= lost; return { icon:'💀', title:I18n.t('mystery.trap.title'), sub:I18n.t('mystery.trap.sub', { n: lost }) }; }],
       // ── Double ou rien ──
       [7, () => {
-        if (Math.random() < 0.5) { run.gold += 25; return { icon:'🎰', title:'Double ou rien', sub:'Chance ! +25 or gagné' }; }
-        const lost = Math.min(run.gold, 15); run.gold -= lost; return { icon:'🎰', title:'Double ou rien', sub:`Malchance... -${lost} or perdu` };
+        if (Math.random() < 0.5) { run.gold += 25; return { icon:'🎰', title:I18n.t('mystery.double.title'), sub:I18n.t('mystery.double.lucky') }; }
+        const lost = Math.min(run.gold, 15); run.gold -= lost; return { icon:'🎰', title:I18n.t('mystery.double.title'), sub:I18n.t('mystery.double.unlucky', { n: lost }) };
       }],
       // ── Curse (malus) ──
       [8, () => {
         const curses = RELICS.filter(r => r.isCurse && !run.relics.find(x => x.id === r.id));
-        if (curses.length) { const c = curses[Math.floor(Math.random() * curses.length)]; this._grantRelic(c); return { icon:c.icon, title:'Malédiction !', sub:`${c.name} : ${c.desc}` }; }
-        run.gold += 5; return { icon:'💰', title:'Rien de spécial', sub:'+5 or gagné' };
+        if (curses.length) { const c = curses[Math.floor(Math.random() * curses.length)]; this._grantRelic(c); return { icon:c.icon, title:I18n.t('mystery.curse.title'), sub:`${I18n.t('relic.' + c.id + '.name')} : ${I18n.t('relic.' + c.id + '.desc')}` }; }
+        run.gold += 5; return { icon:'💰', title:I18n.t('mystery.curseFail.title'), sub:I18n.t('mystery.curseFail.sub') };
       }],
       // ── Combat piège (rare) ──
       [5, () => 'AMBUSH'],
@@ -311,7 +311,7 @@ const Controller = {
     if (result === 'AMBUSH') {
       this._completeCurrentRoom();
       // Show ambush warning, then start battle
-      Renderer.showMysteryModal('⚔', 'Embuscade !', 'Un ennemi surgit de l\'ombre...', () => {
+      Renderer.showMysteryModal('⚔', I18n.t('mystery.ambush.title'), I18n.t('mystery.ambush.sub'), () => {
         this._startBattleRoom(fi >= 1 ? 'elite' : 'normal', fi);
       });
       return;
@@ -383,7 +383,7 @@ const Controller = {
         }
         gs.roomFinished = true;
         gs.overlayMode = 'failure';
-        Renderer.showRoomOverlay('failure', 'Grille bloquée !');
+        Renderer.showRoomOverlay('failure', I18n.t('overlay.gridLocked'));
       }
       return;
     }
@@ -476,7 +476,7 @@ const Controller = {
       }
       gs.roomFinished = true;
       gs.overlayMode = 'failure';
-      Renderer.showRoomOverlay('failure', 'Plus de coups disponibles');
+      Renderer.showRoomOverlay('failure', I18n.t('overlay.noMoves'));
     }
   },
 
