@@ -5,7 +5,7 @@ A roguelike variant of 2048 with meta-progression, relics, and an ascension syst
 <p align="center">
   <img src="screenshots/title.png" width="280" alt="Title screen" />
   <img src="screenshots/map.png" width="280" alt="Floor map" />
-  <img src="screenshots/gameplay.png" width="280" alt="Gameplay" />
+  <img src="screenshots/gameplay-v2.png" width="280" alt="Gameplay" />
 </p>
 
 ## How to Play
