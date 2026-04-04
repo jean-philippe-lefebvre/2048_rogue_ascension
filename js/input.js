@@ -35,13 +35,14 @@ const Input = {
     };
     window.addEventListener('keydown', e => {
       const dir = codeMap[e.keyCode] || keyMap[e.key];
+      if (document.activeElement && document.activeElement.tagName === 'BUTTON') {
+        document.activeElement.blur();
+      }
       if (dir) {
         e.preventDefault();
-        // Blur focused buttons — browsers use ArrowUp/Down for button navigation
-        if (document.activeElement && document.activeElement !== document.body) {
-          document.activeElement.blur();
-        }
+        e.stopImmediatePropagation();
         Controller.move(dir);
+        return false;
       }
     }, { capture: true });
 
