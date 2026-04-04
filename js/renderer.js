@@ -142,7 +142,8 @@ const Renderer = {
         const dy = top(srcR) - finalTop;
 
         tile.className = cls.trim();
-        tile.style.cssText = `width:${cellSize}px;height:${cellSize}px;left:${finalLeft}px;top:${finalTop}px;font-size:${fs}px;`
+        // transition:none prevents the reused pool tile from animating the initial offset
+        tile.style.cssText = `width:${cellSize}px;height:${cellSize}px;left:${finalLeft}px;top:${finalTop}px;font-size:${fs}px;transition:none;`
           + (dx || dy ? `transform:translate(${dx}px,${dy}px);` : '');
         tile.textContent = label;
       });
@@ -153,10 +154,12 @@ const Renderer = {
       this._tilePool[i].style.display = 'none';
     }
 
-    // Force reflow, then remove transforms → CSS transition animates slide
+    // Force reflow so the browser commits the offset positions with transition:none
     container.offsetHeight;
+    // Re-enable transition and remove transforms → CSS transition animates the slide
     for (let i = 0; i < this._tilePoolIdx; i++) {
       const tile = this._tilePool[i];
+      tile.style.transition = '';
       if (tile.style.transform) tile.style.transform = '';
     }
 
