@@ -22,21 +22,19 @@ const Input = {
       else                             Controller.move(dy > 0 ? 'down'  : 'up');
     }, { passive: true });
 
-    // Keyboard
-    const keyMap = {
-      ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down',
-      a:'left', d:'right', w:'up', s:'down',
-      q:'left', z:'up',
+    // Keyboard — use keyCode as primary (physical key, always reliable)
+    const codeMap = {
+      37:'left', 38:'up', 39:'right', 40:'down',       // Arrow keys
+      65:'left', 68:'right', 87:'up', 83:'down',        // WASD
+      81:'left', 90:'up',                               // AZERTY Q/Z
     };
-    // Block ALL arrow key default behavior at document level (scroll, focus nav)
-    document.addEventListener('keydown', e => {
-      if (e.key.startsWith('Arrow')) e.preventDefault();
-    }, { capture: true, passive: false });
-    // Handle game input
     window.addEventListener('keydown', e => {
-      const dir = keyMap[e.key] || keyMap[e.code];
-      if (dir) Controller.move(dir);
-    });
+      const dir = codeMap[e.keyCode];
+      if (dir) {
+        e.preventDefault();
+        Controller.move(dir);
+      }
+    }, { capture: true });
 
     // Resize — re-render tiles
     window.addEventListener('resize', () => {
