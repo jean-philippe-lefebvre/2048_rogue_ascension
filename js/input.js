@@ -29,12 +29,12 @@ const Input = {
       q:'left', z:'up',
     };
     window.addEventListener('keydown', e => {
-      if (keyMap[e.key]) {
+      const dir = keyMap[e.key];
+      if (dir) {
         e.preventDefault();
-        e.stopPropagation();
-        Controller.move(keyMap[e.key]);
+        Controller.move(dir);
       }
-    }, { capture: true });
+    });
 
     // Resize — re-render tiles
     window.addEventListener('resize', () => {
