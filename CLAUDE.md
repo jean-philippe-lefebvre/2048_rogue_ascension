@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Feature** (new mechanic, new relics, UI change) → bump minor: `v1.0.0` → `v1.1.0`
 - **Major** (user-requested big upgrade) → bump major: `v1.0.0` → `v2.0.0`
 
-Current version: **v1.0.0** (`index.html` title screen, bottom)
+Current version: **v1.4.0** (`index.html` title screen, bottom)
 
 ## Development
 

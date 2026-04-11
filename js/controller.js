@@ -383,6 +383,7 @@ const Controller = {
         }
         gs.roomFinished = true;
         gs.overlayMode = 'failure';
+        Haptics.trigger('buzz');
         Renderer.showRoomOverlay('failure', I18n.t('overlay.gridLocked'));
       }
       return;
@@ -391,7 +392,10 @@ const Controller = {
     gs.score      += result.score;
     gs.mergeCount += result.merges.length;
     gs.run.totalScore += result.score;
-    if (result.merges.length) gs.run.lastTileVal = result.merges[result.merges.length - 1].val;
+    if (result.merges.length) {
+      gs.run.lastTileVal = result.merges[result.merges.length - 1].val;
+      Haptics.trigger('success');
+    }
 
     // Relic hooks: post-move effects (echo, sablier, marée, lame double)
     const moveCtx = { result, board: gs.board, movesLeft: gs.movesLeft, addMove: 0, freeMove: false };
@@ -453,6 +457,7 @@ const Controller = {
       this._renderAfterMove(result, dir);
       Renderer.showRoomOverlay('success', `+${reward} or`);
       gs.overlayMode = 'success';
+      Haptics.trigger('buzz');
       return;
     }
 
@@ -476,6 +481,7 @@ const Controller = {
       }
       gs.roomFinished = true;
       gs.overlayMode = 'failure';
+      Haptics.trigger('buzz');
       Renderer.showRoomOverlay('failure', I18n.t('overlay.noMoves'));
     }
   },
