@@ -358,9 +358,10 @@ const Controller = {
   },
 
   // ── Move ──
+  /** @returns {'success'|'buzz'|null} haptic to fire */
   move(dir) {
     const gs = GameState;
-    if (gs.roomFinished || gs.movesLeft <= 0) return;
+    if (gs.roomFinished || gs.movesLeft <= 0) return null;
 
     const mods = {
       forgedEntropyLvl: gs.meta.upgrades.forgedEntropy || 0,
@@ -383,18 +384,18 @@ const Controller = {
         }
         gs.roomFinished = true;
         gs.overlayMode = 'failure';
-        Haptics.trigger('buzz');
         Renderer.showRoomOverlay('failure', I18n.t('overlay.gridLocked'));
       }
-      return;
+      return 'buzz';
     }
 
     gs.score      += result.score;
     gs.mergeCount += result.merges.length;
     gs.run.totalScore += result.score;
+    let _haptic = null;
     if (result.merges.length) {
       gs.run.lastTileVal = result.merges[result.merges.length - 1].val;
-      Haptics.trigger('success');
+      _haptic = 'success';
     }
 
     // Relic hooks: post-move effects (echo, sablier, marée, lame double)
@@ -457,8 +458,7 @@ const Controller = {
       this._renderAfterMove(result, dir);
       Renderer.showRoomOverlay('success', `+${reward} or`);
       gs.overlayMode = 'success';
-      Haptics.trigger('buzz');
-      return;
+      return 'buzz';
     }
 
     if (!moveCtx.freeMove) gs.movesLeft--;
@@ -481,9 +481,10 @@ const Controller = {
       }
       gs.roomFinished = true;
       gs.overlayMode = 'failure';
-      Haptics.trigger('buzz');
       Renderer.showRoomOverlay('failure', I18n.t('overlay.noMoves'));
+      return 'buzz';
     }
+    return _haptic;
   },
 
   _renderAfterMove(result, dir) {

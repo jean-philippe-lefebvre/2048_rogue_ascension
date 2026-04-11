@@ -77,17 +77,12 @@ const Haptics = (() => {
     _label.setAttribute('for', id);
     _label.textContent = 'Haptic feedback';
     _label.style.position = 'fixed';
-    _label.style.bottom = '10px';
-    _label.style.left = '10px';
-    _label.style.padding = '5px 10px';
-    _label.style.backgroundColor = 'rgba(0,0,0,0.7)';
-    _label.style.color = 'white';
-    _label.style.fontFamily = 'sans-serif';
-    _label.style.fontSize = '14px';
-    _label.style.borderRadius = '4px';
-    _label.style.zIndex = '9999';
+    _label.style.top = '-9999px';
+    _label.style.left = '-9999px';
+    _label.style.opacity = '0';
+    _label.style.pointerEvents = 'none';
+    _label.style.zIndex = '-1';
     _label.style.userSelect = 'none';
-    _label.style.display = 'none';
 
     const cb = document.createElement('input');
     cb.type = 'checkbox';
@@ -95,7 +90,9 @@ const Haptics = (() => {
     cb.id = id;
     cb.style.all = 'initial';
     cb.style.appearance = 'auto';
-    cb.style.display = 'none';
+    cb.style.position = 'fixed';
+    cb.style.top = '-9999px';
+    cb.style.opacity = '0';
 
     _label.appendChild(cb);
     document.body.appendChild(_label);

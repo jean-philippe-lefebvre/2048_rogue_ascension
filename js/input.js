@@ -18,8 +18,11 @@ const Input = {
       const dy = e.changedTouches[0].clientY - this.touchStart.y;
       this.touchStart = null;
       if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
-      if (Math.abs(dx) > Math.abs(dy)) Controller.move(dx > 0 ? 'right' : 'left');
-      else                             Controller.move(dy > 0 ? 'down'  : 'up');
+      const dir = Math.abs(dx) > Math.abs(dy)
+        ? (dx > 0 ? 'right' : 'left')
+        : (dy > 0 ? 'down'  : 'up');
+      const haptic = Controller.move(dir);
+      if (haptic) Haptics.trigger(haptic);
     }, { passive: true });
 
     // Keyboard — keyCode (physical) + key (logical) for max compatibility
@@ -41,7 +44,8 @@ const Input = {
       if (dir) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        Controller.move(dir);
+        const haptic = Controller.move(dir);
+        if (haptic) Haptics.trigger(haptic);
         return false;
       }
     }, { capture: true });
