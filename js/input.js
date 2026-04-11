@@ -150,4 +150,9 @@ function bindButtons() {
   bindButtons();
   I18n.applyDOM();
   Renderer.renderTitle();
+
+  // Haptic nudge on every button tap
+  document.addEventListener('click', e => {
+    if (e.target.closest('button')) Haptics.trigger('nudge');
+  });
 })();

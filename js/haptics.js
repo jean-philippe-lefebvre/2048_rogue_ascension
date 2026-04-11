@@ -1,88 +1,186 @@
-/* web-haptics v0.2.0 — vendored minimal build for vanilla JS
- * Source: https://github.com/lochie/web-haptics
- * License: MIT
+/* web-haptics v0.2.0 — vendored for vanilla JS (no bundler)
+ * Source: https://github.com/lochie/web-haptics  — MIT License
  *
- * Two paths: navigator.vibrate() on Android,
- * hidden <input switch> click trick for iOS Taptic Engine.
+ * iOS: hidden <input type="checkbox" switch> toggled via label.click()
+ *      triggers native Taptic Engine feedback.
+ * Android: navigator.vibrate() patterns.
+ *
  * Exposes global `Haptics` singleton.
  */
 
 const Haptics = (() => {
   'use strict';
 
-  /* ── Patterns (vibrate-style: on/off/on ms) ── */
-  const PATTERNS = {
-    success: [30, 60, 40],
-    buzz:    [1000],
-    error:   [40, 40, 40, 40, 40, 40, 50],
+  /* ── Preset patterns ── */
+  const PRESETS = {
+    success: { pattern: [{ duration: 30, intensity: 0.5 }, { delay: 60, duration: 40, intensity: 1 }] },
+    nudge:   { pattern: [{ duration: 80, intensity: 0.8 }, { delay: 80, duration: 50, intensity: 0.3 }] },
+    buzz:    { pattern: [{ duration: 1000, intensity: 1 }] },
+    error:   { pattern: [{ duration: 40, intensity: 0.7 }, { delay: 40, duration: 40, intensity: 0.7 }, { delay: 40, duration: 40, intensity: 0.9 }, { delay: 40, duration: 50, intensity: 0.6 }] },
   };
+
+  const PWM_CYCLE = 20;
 
   const canVibrate = typeof navigator !== 'undefined'
     && typeof navigator.vibrate === 'function';
 
-  /* ── iOS fallback: hidden <input type="checkbox" switch> ── */
-  let iosLabel = null;
+  /* ── Convert preset vibrations → flat navigator.vibrate() array ── */
+  function toVibrateArray(vibrations) {
+    const result = [];
+    for (const vib of vibrations) {
+      const delay = vib.delay || 0;
+      if (delay > 0) {
+        if (result.length > 0 && result.length % 2 === 0) {
+          result[result.length - 1] += delay;
+        } else {
+          if (result.length === 0) result.push(0);
+          result.push(delay);
+        }
+      }
+      const intensity = Math.max(0, Math.min(1, vib.intensity ?? 0.5));
+      if (intensity >= 1) {
+        result.push(vib.duration);
+      } else if (intensity > 0) {
+        const onTime = Math.max(1, Math.round(PWM_CYCLE * intensity));
+        const offTime = PWM_CYCLE - onTime;
+        let remaining = vib.duration;
+        while (remaining >= PWM_CYCLE) {
+          result.push(onTime);
+          result.push(offTime);
+          remaining -= PWM_CYCLE;
+        }
+        if (remaining > 0) {
+          result.push(Math.max(1, Math.round(remaining * intensity)));
+          const remOff = remaining - Math.max(1, Math.round(remaining * intensity));
+          if (remOff > 0) result.push(remOff);
+        }
+      }
+    }
+    return result;
+  }
 
-  function ensureIOSdom() {
-    if (iosLabel) return;
-    iosLabel = document.createElement('label');
-    iosLabel.style.position = 'fixed';
-    iosLabel.style.top = '-9999px';
-    iosLabel.style.left = '-9999px';
-    iosLabel.style.opacity = '0';
-    iosLabel.style.pointerEvents = 'none';
+  /* ── iOS fallback: hidden <input switch> checkbox ── */
+  let _label = null;
+  let _domReady = false;
+  let _rafId = null;
+  let _resolve = null;
+
+  const TOGGLE_MIN = 16;
+  const TOGGLE_MAX = 184;
+
+  function _ensureDOM() {
+    if (_domReady) return;
+    if (typeof document === 'undefined') return;
+
+    const id = 'web-haptics-1';
+    _label = document.createElement('label');
+    _label.setAttribute('for', id);
+    _label.textContent = 'Haptic feedback';
+    _label.style.position = 'fixed';
+    _label.style.bottom = '10px';
+    _label.style.left = '10px';
+    _label.style.padding = '5px 10px';
+    _label.style.backgroundColor = 'rgba(0,0,0,0.7)';
+    _label.style.color = 'white';
+    _label.style.fontFamily = 'sans-serif';
+    _label.style.fontSize = '14px';
+    _label.style.borderRadius = '4px';
+    _label.style.zIndex = '9999';
+    _label.style.userSelect = 'none';
+    _label.style.display = 'none';
 
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.setAttribute('switch', '');
+    cb.id = id;
     cb.style.all = 'initial';
     cb.style.appearance = 'auto';
-    cb.style.position = 'fixed';
-    cb.style.top = '-9999px';
+    cb.style.display = 'none';
 
-    iosLabel.appendChild(cb);
-    document.body.appendChild(iosLabel);
+    _label.appendChild(cb);
+    document.body.appendChild(_label);
+    _domReady = true;
   }
 
-  /** Click the hidden switch N times with delays to simulate a pattern. */
-  function iosTap(count, interval) {
-    ensureIOSdom();
-    iosLabel.click();
-    if (count <= 1) return;
-    let i = 1;
-    const id = setInterval(() => {
-      iosLabel.click();
-      if (++i >= count) clearInterval(id);
-    }, interval);
+  function _stopPattern() {
+    if (_rafId !== null) { cancelAnimationFrame(_rafId); _rafId = null; }
+    if (_resolve) { _resolve(); _resolve = null; }
+  }
+
+  /** Replay the pattern via label.click() — mirrors web-haptics runPattern */
+  function _runIOSPattern(vibrations) {
+    _ensureDOM();
+    if (!_label) return;
+    _stopPattern();
+
+    // First click synchronously (user gesture context)
+    const firstDelay = vibrations[0]?.delay ?? 0;
+    if (firstDelay === 0) _label.click();
+
+    // Build phase timeline
+    const phases = [];
+    let cumulative = 0;
+    for (const vib of vibrations) {
+      const delay = vib.delay ?? 0;
+      const intensity = Math.max(0, Math.min(1, vib.intensity ?? 0.5));
+      if (delay > 0) { cumulative += delay; phases.push({ end: cumulative, isOn: false, intensity: 0 }); }
+      cumulative += vib.duration;
+      phases.push({ end: cumulative, isOn: true, intensity });
+    }
+    const totalDuration = cumulative;
+
+    let startTime = 0;
+    let lastToggleTime = -1;
+    let firstClickFired = firstDelay === 0;
+
+    _resolve = null;
+    return new Promise(resolve => {
+      _resolve = resolve;
+      const loop = (time) => {
+        if (startTime === 0) startTime = time;
+        const elapsed = time - startTime;
+        if (elapsed >= totalDuration) { _rafId = null; _resolve = null; resolve(); return; }
+
+        let phase = phases[0];
+        for (const p of phases) { if (elapsed < p.end) { phase = p; break; } }
+
+        if (phase.isOn) {
+          const toggleInterval = TOGGLE_MIN + (1 - phase.intensity) * TOGGLE_MAX;
+          if (lastToggleTime === -1) {
+            lastToggleTime = time;
+            if (!firstClickFired) { _label.click(); firstClickFired = true; }
+          } else if (time - lastToggleTime >= toggleInterval) {
+            _label.click();
+            lastToggleTime = time;
+          }
+        }
+        _rafId = requestAnimationFrame(loop);
+      };
+      _rafId = requestAnimationFrame(loop);
+    });
   }
 
   /* ── Public API ── */
 
   function trigger(input) {
     if (typeof input === 'string') {
-      const p = PATTERNS[input];
-      if (!p) { console.warn('[haptics] Unknown preset:', input); return; }
-
+      const preset = PRESETS[input];
+      if (!preset) { console.warn('[haptics] Unknown preset:', input); return; }
       if (canVibrate) {
-        navigator.vibrate(p);
-        return;
+        navigator.vibrate(toVibrateArray(preset.pattern));
+      } else {
+        _runIOSPattern(preset.pattern);
       }
-      // iOS fallback — approximate the pattern
-      if (input === 'success') iosTap(2, 90);
-      else if (input === 'buzz')  iosTap(6, 80);
-      else if (input === 'error') iosTap(4, 60);
-      else iosTap(1, 0);
       return;
     }
-
-    if (canVibrate) {
-      navigator.vibrate(typeof input === 'number' ? input : input);
-    } else {
-      iosTap(1, 0);
+    if (typeof input === 'number') {
+      if (canVibrate) navigator.vibrate(input);
+      else _runIOSPattern([{ duration: input, intensity: 1 }]);
     }
   }
 
   function cancel() {
+    _stopPattern();
     if (canVibrate) navigator.vibrate(0);
   }
 
