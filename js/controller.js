@@ -5,11 +5,16 @@ const Controller = {
   // ── Run ──
   startRun() {
     const m = GameState.meta;
+    const seed = new Uint32Array(1);
+    if (globalThis.crypto?.getRandomValues) crypto.getRandomValues(seed);
+    else seed[0] = (Date.now() ^ Math.floor(Rng.next() * 0x100000000)) >>> 0;
+    Rng.seed(seed[0]);
     GameState._shopReturnToMap = false;
     GameState._restDone = null;
     GameState._relicDone = null;
     RelicHooks.invalidate();
     GameState.run = {
+      seed: Rng.getSeed(),
       gold: 0,
       totalScore: 0,
       relics: [],
@@ -21,7 +26,7 @@ const Controller = {
 
     if (m.upgrades.startRelic) {
       const commons = RELICS.filter(r => r.rarity === 'common');
-      this._grantRelic(commons[Math.floor(Math.random() * commons.length)]);
+      this._grantRelic(commons[Rng.int(commons.length)]);
     }
 
     m.totalRuns++;
@@ -44,9 +49,24 @@ const Controller = {
 
     return Array.from({ length: 3 }, () => {
       // 5 rows of 3 nodes
-      const rows = Array.from({ length: ROWS }, (_, r) =>
-        Array.from({ length: COLS }, () => ({
-          type: POOL[Math.floor(Math.random() * POOL.length)],
+      const rows = [];
+      for (let r = 0; r < ROWS; r++) rows.push(
+        Array.from({ length: COLS }, (_, col) => ({
+          type: (() => {
+            if (r === 0) return 'normal';
+            if (r === ROWS - 1) return 'rest';
+            let type;
+            for (let tries = 0; tries < 5; tries++) {
+              type = Rng.pick(POOL);
+              if ((r === 1 && type === 'elite') || (r === ROWS - 2 && type === 'rest')) continue;
+              if ((type === 'elite' || type === 'rest') && rows[r - 1][col].type === type) continue;
+              break;
+            }
+            if (r === 1 && type === 'elite') type = 'normal';
+            if (r === ROWS - 2 && type === 'rest') type = 'normal';
+            if ((type === 'elite' || type === 'rest') && rows[r - 1][col].type === type) type = 'normal';
+            return type;
+          })(),
           available: false,
           completed: false,
           connections: [],
@@ -59,8 +79,8 @@ const Controller = {
         rows[r].forEach((node, col) => {
           node.connections.push(col); // always straight ahead
           incoming.add(col);
-          if (col > 0 && Math.random() < 0.35) { node.connections.push(col - 1); incoming.add(col - 1); }
-          if (col < COLS - 1 && Math.random() < 0.35) { node.connections.push(col + 1); incoming.add(col + 1); }
+          if (col > 0 && Rng.next() < 0.35) { node.connections.push(col - 1); incoming.add(col - 1); }
+          if (col < COLS - 1 && Rng.next() < 0.35) { node.connections.push(col + 1); incoming.add(col + 1); }
           node.connections = [...new Set(node.connections)].sort();
         });
         // Ensure every next-row node has at least one incoming connection
@@ -71,6 +91,14 @@ const Controller = {
           }
         }
       }
+      // No elite→elite or rest→rest along any connection, diagonals included
+      for (let r = 1; r < ROWS - 1; r++) {
+        rows[r].forEach((node, col) => {
+          if (node.type !== 'elite' && node.type !== 'rest') return;
+          if (rows[r - 1].some(p => p.type === node.type && p.connections.includes(col))) node.type = 'normal';
+        });
+      }
+
       // Last row connects to boss (index 0 in boss row)
       rows[ROWS - 1].forEach(node => { node.connections = [0]; });
 
@@ -90,7 +118,8 @@ const Controller = {
     const picks = [];
     const fi = Math.min(floorIdx ?? GameState.run?.floorIdx ?? 0, 2);
     const synergyLvl = GameState.meta?.upgrades?.synergy || 0;
-    for (let i = 0; i < Math.min(count, remaining.length); i++) {
+    const n = Math.min(count, remaining.length);
+    for (let i = 0; i < n; i++) {
       const weights = remaining.map(r => {
         const w = RARITY_WEIGHTS[r.rarity];
         let base = w ? w[fi] : 30;
@@ -100,7 +129,7 @@ const Controller = {
         return base;
       });
       const total = weights.reduce((s, w) => s + w, 0);
-      let roll = Math.random() * total;
+      let roll = Rng.next() * total;
       let idx = 0;
       for (; idx < weights.length; idx++) {
         roll -= weights[idx];
@@ -156,7 +185,7 @@ const Controller = {
     } else {
       pool = OBJECTIVES[floorIdx]?.[type] ?? OBJECTIVES[floorIdx]?.normal ?? OBJECTIVES[0].normal;
     }
-    const obj  = pool[Math.floor(Math.random() * pool.length)];
+    const obj  = pool[Rng.int(pool.length)];
     GameState.room.objective = obj;
 
     // Moves — all room types scale by floor
@@ -209,7 +238,8 @@ const Controller = {
 
     // Render room UI
     const def = ROOM_DEFS[type];
-    document.getElementById('roomName').textContent = `${def.icon} ${I18n.t('room.' + type)}`;
+    const roomLabel = type === 'boss' ? I18n.t('boss.name.' + Math.min(floorIdx, 2)) : I18n.t('room.' + type);
+    document.getElementById('roomName').innerHTML = `<span style="color:${def.color}">${Icons.svg(def.icon)}</span> ${roomLabel}`;
     document.getElementById('roomObjectiveText').textContent = I18n.t('objective.' + obj.id, { n: obj.target });
     Renderer.hideRoomOverlay();
     Renderer.updateHUD();
@@ -219,7 +249,7 @@ const Controller = {
     showScreen('gameScreen');
 
     // Defer first render to ensure grid is visible and has correct dimensions
-    requestAnimationFrame(() => Renderer.renderTiles());
+    requestAnimationFrame(() => { Fx.resize(); Renderer.renderTiles(); });
   },
 
   _doRestRoom() {
@@ -258,38 +288,38 @@ const Controller = {
     // Weighted events: [weight, handler]
     const events = [
       // ── Or ──
-      [20, () => { run.gold += 5;  return { icon:'💰', title:I18n.t('mystery.goldSmall.title'),  sub:I18n.t('mystery.goldSmall.sub') }; }],
-      [20, () => { run.gold += 10; return { icon:'💰', title:I18n.t('mystery.goldMedium.title'),  sub:I18n.t('mystery.goldMedium.sub') }; }],
-      [10, () => { run.gold += 20; return { icon:'💰', title:I18n.t('mystery.goldLarge.title'),   sub:I18n.t('mystery.goldLarge.sub') }; }],
+      [20, () => { run.gold += 5;  return { icon:'gold', title:I18n.t('mystery.goldSmall.title'),  sub:I18n.t('mystery.goldSmall.sub') }; }],
+      [20, () => { run.gold += 10; return { icon:'gold', title:I18n.t('mystery.goldMedium.title'),  sub:I18n.t('mystery.goldMedium.sub') }; }],
+      [10, () => { run.gold += 20; return { icon:'gold', title:I18n.t('mystery.goldLarge.title'),   sub:I18n.t('mystery.goldLarge.sub') }; }],
       // ── Reliques ──
       [15, () => {
         const picks = this._pickRandom(this._getUnownedRelics().filter(r => r.rarity === 'common'), 1);
-        if (picks.length) { this._grantRelic(picks[0]); return { icon:'🎁', title:I18n.t('mystery.relicCommon.title'), sub:I18n.t('mystery.relicCommon.sub') }; }
-        run.gold += 8; return { icon:'💰', title:I18n.t('mystery.relicCommonFail.title'), sub:I18n.t('mystery.relicCommonFail.sub') };
+        if (picks.length) { this._grantRelic(picks[0]); return { icon:'gift', title:I18n.t('mystery.relicCommon.title'), sub:I18n.t('mystery.relicCommon.sub') }; }
+        run.gold += 8; return { icon:'gold', title:I18n.t('mystery.relicCommonFail.title'), sub:I18n.t('mystery.relicCommonFail.sub') };
       }],
       [5, () => {
         const picks = this._pickRandom(this._getUnownedRelics().filter(r => r.rarity === 'rare' || r.rarity === 'epic'), 1);
-        if (picks.length) { this._grantRelic(picks[0]); return { icon:'✨', title:I18n.t('mystery.relicRare.title'), sub:I18n.t('mystery.relicRare.sub') }; }
-        run.gold += 15; return { icon:'💰', title:I18n.t('mystery.relicRareFail.title'), sub:I18n.t('mystery.relicRareFail.sub') };
+        if (picks.length) { this._grantRelic(picks[0]); return { icon:'sparkle', title:I18n.t('mystery.relicRare.title'), sub:I18n.t('mystery.relicRare.sub') }; }
+        run.gold += 15; return { icon:'gold', title:I18n.t('mystery.relicRareFail.title'), sub:I18n.t('mystery.relicRareFail.sub') };
       }],
       // ── Bonus coups ──
       [10, () => {
         const haste = RELICS.find(r => r.id === 'haste');
-        if (haste && !run.relics.find(r => r.id === 'haste')) { this._grantRelic(haste); return { icon:'⚡', title:I18n.t('mystery.haste.title'), sub:I18n.t('mystery.haste.sub') }; }
-        run.gold += 10; return { icon:'💰', title:I18n.t('mystery.hasteFail.title'), sub:I18n.t('mystery.hasteFail.sub') };
+        if (haste && !run.relics.find(r => r.id === 'haste')) { this._grantRelic(haste); return { icon:'haste', title:I18n.t('mystery.haste.title'), sub:I18n.t('mystery.haste.sub') }; }
+        run.gold += 10; return { icon:'gold', title:I18n.t('mystery.hasteFail.title'), sub:I18n.t('mystery.hasteFail.sub') };
       }],
       // ── Perte d'or ──
-      [8, () => { const lost = Math.min(run.gold, 10); run.gold -= lost; return { icon:'💀', title:I18n.t('mystery.trap.title'), sub:I18n.t('mystery.trap.sub', { n: lost }) }; }],
+      [8, () => { const lost = Math.min(run.gold, 10); run.gold -= lost; return { icon:'trap', title:I18n.t('mystery.trap.title'), sub:I18n.t('mystery.trap.sub', { n: lost }) }; }],
       // ── Double ou rien ──
       [7, () => {
-        if (Math.random() < 0.5) { run.gold += 25; return { icon:'🎰', title:I18n.t('mystery.double.title'), sub:I18n.t('mystery.double.lucky') }; }
-        const lost = Math.min(run.gold, 15); run.gold -= lost; return { icon:'🎰', title:I18n.t('mystery.double.title'), sub:I18n.t('mystery.double.unlucky', { n: lost }) };
+        if (Rng.next() < 0.5) { run.gold += 25; return { icon:'slots', title:I18n.t('mystery.double.title'), sub:I18n.t('mystery.double.lucky') }; }
+        const lost = Math.min(run.gold, 15); run.gold -= lost; return { icon:'slots', title:I18n.t('mystery.double.title'), sub:I18n.t('mystery.double.unlucky', { n: lost }) };
       }],
       // ── Curse (malus) ──
       [8, () => {
         const curses = RELICS.filter(r => r.isCurse && !run.relics.find(x => x.id === r.id));
-        if (curses.length) { const c = curses[Math.floor(Math.random() * curses.length)]; this._grantRelic(c); return { icon:c.icon, title:I18n.t('mystery.curse.title'), sub:`${I18n.t('relic.' + c.id + '.name')} : ${I18n.t('relic.' + c.id + '.desc')}` }; }
-        run.gold += 5; return { icon:'💰', title:I18n.t('mystery.curseFail.title'), sub:I18n.t('mystery.curseFail.sub') };
+        if (curses.length) { const c = curses[Rng.int(curses.length)]; this._grantRelic(c); return { icon:c.icon, title:I18n.t('mystery.curse.title'), sub:`${I18n.t('relic.' + c.id + '.name')} : ${I18n.t('relic.' + c.id + '.desc')}` }; }
+        run.gold += 5; return { icon:'gold', title:I18n.t('mystery.curseFail.title'), sub:I18n.t('mystery.curseFail.sub') };
       }],
       // ── Combat piège (rare) ──
       [5, () => 'AMBUSH'],
@@ -297,7 +327,7 @@ const Controller = {
 
     // Weighted random pick
     const totalWeight = events.reduce((sum, e) => sum + e[0], 0);
-    let roll = Math.random() * totalWeight;
+    let roll = Rng.next() * totalWeight;
     let picked;
     for (const [weight, handler] of events) {
       roll -= weight;
@@ -311,7 +341,7 @@ const Controller = {
     if (result === 'AMBUSH') {
       this._completeCurrentRoom();
       // Show ambush warning, then start battle
-      Renderer.showMysteryModal('⚔', I18n.t('mystery.ambush.title'), I18n.t('mystery.ambush.sub'), () => {
+      Renderer.showMysteryModal('ambush', I18n.t('mystery.ambush.title'), I18n.t('mystery.ambush.sub'), () => {
         this._startBattleRoom(fi >= 1 ? 'elite' : 'normal', fi);
       });
       return;
@@ -369,6 +399,8 @@ const Controller = {
     };
     const result = Board.applyMove(gs.board, dir, mods);
     if (!result) {
+      Fx.nudge(dir);
+      Audio2.bump();
       // Board full and no valid move in any direction → game over
       if (!Board.canMove(gs.board)) {
         const exhCtx = { movesLeft: 0, consumed: false, overlayIcon: '', overlayTitle: '', overlaySub: '' };
@@ -376,7 +408,7 @@ const Controller = {
         if (exhCtx.consumed) {
           gs.movesLeft = exhCtx.movesLeft;
           Renderer.showRoomOverlay('phoenix', exhCtx.overlaySub);
-          document.getElementById('overlayIcon').textContent = exhCtx.overlayIcon;
+          document.getElementById('overlayIcon').innerHTML = Icons.svg(exhCtx.overlayIcon);
           document.getElementById('overlayTitle').textContent = exhCtx.overlayTitle;
           setTimeout(() => Renderer.hideRoomOverlay(), 2400);
           Renderer.updateHUD();
@@ -385,6 +417,7 @@ const Controller = {
         gs.roomFinished = true;
         gs.overlayMode = 'failure';
         Renderer.showRoomOverlay('failure', I18n.t('overlay.gridLocked'));
+        Audio2.fail();
       }
       return 'buzz';
     }
@@ -456,6 +489,8 @@ const Controller = {
       gs.run.gold += reward + (gs.meta.upgrades.goldBonus || 0) * 2;
       this._completeCurrentRoom();
       this._renderAfterMove(result, dir);
+      Fx.roomSuccess();
+      Audio2.win();
       Renderer.showRoomOverlay('success', `+${reward} or`);
       gs.overlayMode = 'success';
       return 'buzz';
@@ -473,7 +508,7 @@ const Controller = {
         gs.movesLeft = exhCtx.movesLeft;
         Renderer.showRoomOverlay('phoenix', exhCtx.overlaySub);
         // Override overlay display
-        document.getElementById('overlayIcon').textContent = exhCtx.overlayIcon;
+        document.getElementById('overlayIcon').innerHTML = Icons.svg(exhCtx.overlayIcon);
         document.getElementById('overlayTitle').textContent = exhCtx.overlayTitle;
         setTimeout(() => Renderer.hideRoomOverlay(), 2400);
         Renderer.updateHUD();
@@ -482,6 +517,7 @@ const Controller = {
       gs.roomFinished = true;
       gs.overlayMode = 'failure';
       Renderer.showRoomOverlay('failure', I18n.t('overlay.noMoves'));
+      Audio2.fail();
       return 'buzz';
     }
     return _haptic;
@@ -491,6 +527,8 @@ const Controller = {
     const newSet    = new Set(result.newTilePos ? [`${result.newTilePos[0]},${result.newTilePos[1]}`] : []);
     const mergedSet = new Set(result.merges.map(m => `${m.r},${m.c}`));
     Renderer.renderTiles(newSet, mergedSet, dir);
+    Fx.merges(result.merges);
+    Audio2.merges(result.merges);
     Renderer.updateHUD();
   },
 
@@ -532,6 +570,7 @@ const Controller = {
 
   pickRelic(relic) {
     this._grantRelic(relic);
+    Audio2.relic();
     this._finishRelicScreen();
   },
 

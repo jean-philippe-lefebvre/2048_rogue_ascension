@@ -13,27 +13,36 @@ const I18n = {
       'ui.stat.maxFloor': 'Étage max',
       'ui.stat.totalGold': 'Or total',
       'ui.btn.continueRun': '▶ Continuer la run',
-      'ui.btn.newRun': '⚔ Nouvelle Run',
-      'ui.btn.upgrades': '🏰 Améliorations',
+      'ui.btn.newRun': 'Nouvelle Run',
+      'ui.btn.upgrades': 'Améliorations',
       'ui.btn.resetSave': '↺ Tout effacer',
-      'ui.btn.abandon': '✕ Abandonner',
+      'ui.btn.abandon': 'Abandonner',
       'ui.btn.continue': 'Continuer',
       'ui.btn.skip': 'Passer',
-      'ui.btn.replay': '⚔ Rejouer',
-      'ui.btn.spendGold': '🏰 Dépenser l\'or',
+      'ui.btn.replay': 'Rejouer',
+      'ui.btn.spendGold': 'Dépenser l\'or',
       'ui.btn.menu': '← Menu',
       'ui.btn.back': '← Retour',
       'ui.btn.cancel': 'Annuler',
 
       // Map
       'map.floor': 'Étage {n} / 3',
+      'floor.name.0': 'Cryptes',
+      'floor.name.1': 'Forge engloutie',
+      'floor.name.2': 'Abîme',
+      'boss.name.0': 'Le Geôlier',
+      'boss.name.1': 'Le Forgeron déchu',
+      'boss.name.2': 'L\u2019Œil de l\u2019Abîme',
       'map.activeRelics': 'Reliques actives',
       'map.noRelics': 'Aucune relique',
 
       // HUD
       'hud.score': 'Score',
-      'hud.gold': '◈ Or',
+      'hud.gold': 'Or',
       'hud.movesLeft': 'Coups restants',
+      'hud.combo': 'Combo ×{n}',
+      'settings.soundOn': 'Son : oui',
+      'settings.soundOff': 'Son : non',
 
       // Relic screen
       'relic.chooseTitle': 'Choisir une relique',
@@ -43,15 +52,16 @@ const I18n = {
       'end.victory': 'VICTOIRE',
       'end.defeat': 'DÉFAITE',
       'end.abandon': 'ABANDON',
-      'end.goldGained': '◈ Or gagné',
+      'end.goldGained': 'Or gagné',
       'end.totalScore': 'Score total',
       'end.floorReached': 'Étage atteint',
       'end.relics': 'Reliques',
       'end.collectedRelics': 'Reliques collectées',
       'end.noRelics': 'Aucune',
+      'end.seed': 'Graine',
 
       // Meta
-      'meta.title': '🏰 Forge du Destin',
+      'meta.title': 'Forge du Destin',
       'meta.availableGold': 'Or disponible : ',
       'meta.max': 'MAX',
       'meta.ascension': 'Ascension {n}',
@@ -65,7 +75,7 @@ const I18n = {
       'modal.abandonConfirm': 'Abandonner',
       'modal.ascensionTitle': 'Ascension',
       'modal.ascendConfirm': 'Transcender',
-      'modal.ascendSub': 'Toutes tes améliorations seront réinitialisées.<br>Tu gagnes l\'accès aux passifs d\'Ascension {n}.<br><br>Coût : <strong class="text-gold">◈{cost}</strong>',
+      'modal.ascendSub': 'Toutes tes améliorations seront réinitialisées.<br>Tu gagnes l\'accès aux passifs d\'Ascension {n}.<br><br>Coût : <strong class="text-gold">{cost}</strong>',
 
       // Overlays
       'overlay.victory': 'VICTOIRE !',
@@ -83,7 +93,7 @@ const I18n = {
       'rest.shopName': 'Forge du Destin',
       'rest.shopRarity': 'boutique',
       'rest.shopDesc': 'Acheter des améliorations permanentes avec ton or.',
-      'rest.shopGold': '→ ◈{n} or disponible',
+      'rest.shopGold': '→ {n} or disponible',
 
       // Room types
       'room.normal': 'Combat',
@@ -264,27 +274,36 @@ const I18n = {
       'ui.stat.maxFloor': 'Best floor',
       'ui.stat.totalGold': 'Total gold',
       'ui.btn.continueRun': '▶ Continue run',
-      'ui.btn.newRun': '⚔ New Run',
-      'ui.btn.upgrades': '🏰 Upgrades',
+      'ui.btn.newRun': 'New Run',
+      'ui.btn.upgrades': 'Upgrades',
       'ui.btn.resetSave': '↺ Reset all',
-      'ui.btn.abandon': '✕ Abandon',
+      'ui.btn.abandon': 'Abandon',
       'ui.btn.continue': 'Continue',
       'ui.btn.skip': 'Skip',
-      'ui.btn.replay': '⚔ Play again',
-      'ui.btn.spendGold': '🏰 Spend gold',
+      'ui.btn.replay': 'Play again',
+      'ui.btn.spendGold': 'Spend gold',
       'ui.btn.menu': '← Menu',
       'ui.btn.back': '← Back',
       'ui.btn.cancel': 'Cancel',
 
       // Map
       'map.floor': 'Floor {n} / 3',
+      'floor.name.0': 'Crypts',
+      'floor.name.1': 'Sunken Forge',
+      'floor.name.2': 'Abyss',
+      'boss.name.0': 'The Jailer',
+      'boss.name.1': 'The Fallen Smith',
+      'boss.name.2': 'The Eye of the Abyss',
       'map.activeRelics': 'Active relics',
       'map.noRelics': 'No relics',
 
       // HUD
       'hud.score': 'Score',
-      'hud.gold': '◈ Gold',
+      'hud.gold': 'Gold',
       'hud.movesLeft': 'Moves left',
+      'hud.combo': 'Combo ×{n}',
+      'settings.soundOn': 'Sound: on',
+      'settings.soundOff': 'Sound: off',
 
       // Relic screen
       'relic.chooseTitle': 'Choose a relic',
@@ -294,15 +313,16 @@ const I18n = {
       'end.victory': 'VICTORY',
       'end.defeat': 'DEFEAT',
       'end.abandon': 'ABANDON',
-      'end.goldGained': '◈ Gold gained',
+      'end.goldGained': 'Gold gained',
       'end.totalScore': 'Total score',
       'end.floorReached': 'Floor reached',
       'end.relics': 'Relics',
       'end.collectedRelics': 'Collected relics',
       'end.noRelics': 'None',
+      'end.seed': 'Seed',
 
       // Meta
-      'meta.title': '🏰 Forge of Fate',
+      'meta.title': 'Forge of Fate',
       'meta.availableGold': 'Available gold: ',
       'meta.max': 'MAX',
       'meta.ascension': 'Ascension {n}',
@@ -316,7 +336,7 @@ const I18n = {
       'modal.abandonConfirm': 'Abandon',
       'modal.ascensionTitle': 'Ascension',
       'modal.ascendConfirm': 'Transcend',
-      'modal.ascendSub': 'All your upgrades will be reset.<br>You gain access to Ascension {n} passives.<br><br>Cost: <strong class="text-gold">◈{cost}</strong>',
+      'modal.ascendSub': 'All your upgrades will be reset.<br>You gain access to Ascension {n} passives.<br><br>Cost: <strong class="text-gold">{cost}</strong>',
 
       // Overlays
       'overlay.victory': 'VICTORY!',
@@ -334,7 +354,7 @@ const I18n = {
       'rest.shopName': 'Forge of Fate',
       'rest.shopRarity': 'shop',
       'rest.shopDesc': 'Buy permanent upgrades with your gold.',
-      'rest.shopGold': '→ ◈{n} gold available',
+      'rest.shopGold': '→ {n} gold available',
 
       // Room types
       'room.normal': 'Battle',
@@ -542,8 +562,11 @@ const I18n = {
       } else {
         el.textContent = text;
       }
+      const icon = el.getAttribute('data-icon');
+      if (icon) el.insertAdjacentHTML('afterbegin', `${Icons.svg(icon)} `);
     }
     this.renderLangToggle();
+    this.renderSoundToggle();
   },
 
   renderLangToggle() {
@@ -558,6 +581,14 @@ const I18n = {
       btn.addEventListener('click', () => this.setLang(lang.code));
       toggle.appendChild(btn);
     }
+  },
+
+  renderSoundToggle() {
+    const button = document.getElementById('soundToggle');
+    if (!button) return;
+    const on = GameState.meta.settings?.sound !== false;
+    button.textContent = this.t(on ? 'settings.soundOn' : 'settings.soundOff');
+    button.setAttribute('aria-pressed', String(on));
   },
 
   langs: [

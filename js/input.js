@@ -21,6 +21,7 @@ const Input = {
       const dir = Math.abs(dx) > Math.abs(dy)
         ? (dx > 0 ? 'right' : 'left')
         : (dy > 0 ? 'down'  : 'up');
+      Audio2.unlock();
       const haptic = Controller.move(dir);
       if (haptic) Haptics.trigger(haptic);
     }, { passive: true });
@@ -44,6 +45,7 @@ const Input = {
       if (dir) {
         e.preventDefault();
         e.stopImmediatePropagation();
+        Audio2.unlock();
         const haptic = Controller.move(dir);
         if (haptic) Haptics.trigger(haptic);
         return false;
@@ -56,6 +58,7 @@ const Input = {
       clearTimeout(_resizeTimer);
       _resizeTimer = setTimeout(() => {
         Renderer.invalidateGeoCache();
+        Fx.resize();
         if (document.getElementById('gameScreen').classList.contains('active')) {
           Renderer.renderTiles();
         }
@@ -65,6 +68,15 @@ const Input = {
 };
 
 function bindButtons() {
+  document.addEventListener('pointerdown', () => Audio2.unlock(), { passive: true });
+  document.addEventListener('keydown', () => Audio2.unlock(), { passive: true });
+  document.getElementById('soundToggle').addEventListener('click', () => {
+    GameState.meta.settings.sound = !GameState.meta.settings.sound;
+    Storage.save(GameState.meta);
+    Audio2.syncSetting();
+    I18n.renderSoundToggle();
+    Audio2.unlock();
+  });
   // Title
   document.getElementById('btnContinueRun').addEventListener('click', () => {
     if (!GameState.run) return;
@@ -134,7 +146,7 @@ function bindButtons() {
     document.getElementById('ascendModal').classList.add('show');
     const cost = ASCENSION_COSTS[GameState.meta.ascensionLevel];
     const nextLvl = GameState.meta.ascensionLevel + 1;
-    document.getElementById('ascendModalSub').innerHTML = I18n.t('modal.ascendSub', { n: nextLvl, cost });
+    document.getElementById('ascendModalSub').innerHTML = I18n.t('modal.ascendSub', { n: nextLvl, cost: `${Icons.svg('gold')}${cost}` });
   });
   document.getElementById('btnAscendCancel').addEventListener('click', () => {
     document.getElementById('ascendModal').classList.remove('show');
@@ -148,10 +160,11 @@ function bindButtons() {
 // ── BOOT ──
 (function boot() {
   const saved = Storage.load();
-  if (saved) GameState.meta = { ...Storage.defaultMeta(), ...saved };
+  if (saved) GameState.meta = { ...Storage.defaultMeta(), ...saved, settings: { ...Storage.defaultMeta().settings, ...saved.settings } };
 
   Input.init();
   bindButtons();
+  document.querySelectorAll('[data-static-icon]').forEach(el => { el.innerHTML = Icons.svg(el.dataset.staticIcon); });
   I18n.applyDOM();
   Renderer.renderTitle();
 

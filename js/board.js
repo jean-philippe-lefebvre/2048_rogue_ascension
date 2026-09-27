@@ -14,12 +14,12 @@ const Board = {
   addRandom(board, useEntropy = false, forgedEntropyLvl = 0) {
     const empty = this.getEmpty(board);
     if (!empty.length) return null;
-    const position = empty[Math.floor(Math.random() * empty.length)];
+    const position = empty[Rng.int(empty.length)];
     let value;
     if (forgedEntropyLvl >= 1) {
       value = [4, 8, 16][forgedEntropyLvl - 1];
     } else {
-      value = (useEntropy || Math.random() < 0.1) ? 4 : 2;
+      value = (useEntropy || Rng.next() < 0.1) ? 4 : 2;
     }
     // Let relics modify tile value and position
     const ctx = { value, position, board, empty };
@@ -31,7 +31,7 @@ const Board = {
   placeValue(board, val) {
     const empty = this.getEmpty(board);
     if (!empty.length) return;
-    const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+    const [r, c] = empty[Rng.int(empty.length)];
     board[r][c] = val;
   },
 
@@ -61,7 +61,7 @@ const Board = {
       }
       if (merged.length && merged[merged.length - 1] === val && merged[merged.length - 1] > 0 && lastMergeIdx !== merged.length - 1) {
         let v = val * 2;
-        if (deepForgeChance > 0 && Math.random() < deepForgeChance) v *= 2;
+        if (deepForgeChance > 0 && Rng.next() < deepForgeChance) v *= 2;
         merged[merged.length - 1] = v;
         score += v;
         lastMergeIdx = merged.length - 1;
@@ -127,7 +127,11 @@ const Board = {
         totalScore += score;
         row.forEach((v, j) => {
           setCell(i, j, v);
-          if (v > 0 && mergedAt.includes(j)) merges.push({ r: i, c: j, val: v });
+          if (v > 0 && mergedAt.includes(j)) {
+            const r = dir === 'up' ? j : dir === 'down' ? GRID_SIZE - 1 - j : i;
+            const c = dir === 'left' ? j : dir === 'right' ? GRID_SIZE - 1 - j : i;
+            merges.push({ r, c, val: v });
+          }
         });
       }
     };
@@ -159,7 +163,7 @@ const Board = {
     for (let r = 0; r < GRID_SIZE; r++)
       for (let c = 0; c < GRID_SIZE; c++)
         if (board[r][c] === TILE.BOMB) {
-          timers[`${r},${c}`] = 10 + Math.floor(Math.random() * 11); // 10-20 moves
+          timers[`${r},${c}`] = 10 + Rng.int(11); // 10-20 moves
         }
   },
 

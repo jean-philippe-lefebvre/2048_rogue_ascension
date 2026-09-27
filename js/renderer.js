@@ -10,6 +10,10 @@ function showScreen(id) {
   if (!_screens[id]) _screens[id] = document.getElementById(id);
   _screens[id].classList.add('active');
   _screens[id].scrollTop = 0;
+  Scene.forScreen(id);
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    _screens[id].animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}], {duration:220,easing:'cubic-bezier(.2,.8,.2,1)'});
+  }
 }
 
 const Renderer = {
@@ -20,6 +24,7 @@ const Renderer = {
     this._tilePool = [];
     this._tilePoolIdx = 0;
     document.getElementById('gameTiles').innerHTML = '';
+    Fx.clear();
     const grid = document.getElementById('gameGrid');
     grid.innerHTML = '';
     for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
@@ -27,6 +32,7 @@ const Renderer = {
       cell.className = 'gcell';
       grid.appendChild(cell);
     }
+    Fx.resize();
   },
 
   _geoCache: null,
@@ -101,15 +107,15 @@ const Renderer = {
         if (val === TILE.OBSTACLE) {
           cls += 't-obstacle';
           const age = GameState.obstacleAge?.[`${r},${c}`];
-          label = age !== undefined ? `${3 - age}` : '🧱';
+          label = age !== undefined ? `${3 - age}` : Icons.svg('obstacle');
         }
         else if (val === TILE.BOMB) {
           cls += 't-bomb';
           const timer = GameState.bombTimers?.[key];
-          label = timer !== undefined ? `💣${timer}` : '💣';
+          label = `${Icons.svg('bomb')}${timer !== undefined ? timer : ''}`;
           if (timer !== undefined && timer <= 3) cls += ' bomb-imminent';
         }
-        else { cls += `t${val}`; }
+        else { cls += `t${Math.min(val, 2048)}`; }
 
         if (newPositions.has(key))    cls += ' is-new';
         if (mergedPositions.has(key)) cls += ' is-merged';
@@ -142,10 +148,14 @@ const Renderer = {
         const dy = top(srcR) - finalTop;
 
         tile.className = cls.trim();
+        if (!tile.firstElementChild) tile.appendChild(document.createElement('div'));
+        const face = tile.firstElementChild;
+        face.className = 'tile-face';
+        face.innerHTML = val === TILE.BOMB || (val === TILE.OBSTACLE && GameState.obstacleAge?.[key] === undefined) ? label : String(label);
         // transition:none prevents the reused pool tile from animating the initial offset
         tile.style.cssText = `width:${cellSize}px;height:${cellSize}px;left:${finalLeft}px;top:${finalTop}px;font-size:${fs}px;transition:none;`
           + (dx || dy ? `transform:translate(${dx}px,${dy}px);` : '');
-        tile.textContent = label;
+        tile.style.setProperty('--glow', val >= 64 ? `${Math.min(22, Math.log2(val) * 2)}px` : '0px');
       });
     });
 
@@ -181,7 +191,7 @@ const Renderer = {
   updateActiveRelics() {
     const el = document.getElementById('activeRelics');
     el.innerHTML = GameState.run.relics
-      .map(r => `<div class="active-relic-icon" title="${I18n.t('relic.' + r.id + '.name')}: ${I18n.t('relic.' + r.id + '.desc')}">${r.icon}</div>`)
+      .map(r => `<div class="active-relic-icon rarity-${r.rarity}" title="${I18n.t('relic.' + r.id + '.name')}: ${I18n.t('relic.' + r.id + '.desc')}">${Icons.svg(r.icon)}</div>`)
       .join('');
   },
 
@@ -193,13 +203,15 @@ const Renderer = {
     const btn   = document.getElementById('overlayBtn');
 
     if (mode === 'phoenix') {
-      icon.textContent  = '🔥';
+      icon.innerHTML = Icons.svg('flame');
+      icon.style.color = 'var(--red)';
       title.textContent = I18n.t('overlay.phoenix');
       title.style.color = 'var(--red)';
       sub_el.textContent  = sub;
       btn.style.display = 'none';
     } else {
-      icon.textContent  = mode === 'success' ? '✨' : '💀';
+      icon.innerHTML = Icons.svg(mode === 'success' ? 'sparkle' : 'death');
+      icon.style.color = mode === 'success' ? 'var(--gold)' : 'var(--red)';
       title.textContent = mode === 'success' ? I18n.t('overlay.victory') : I18n.t('overlay.defeat');
       title.style.color = mode === 'success' ? 'var(--gold)' : 'var(--red)';
       sub_el.textContent  = sub;
@@ -215,8 +227,8 @@ const Renderer = {
   // ── Map ──
   renderMap() {
     const gs = GameState;
-    document.getElementById('mapFloorLabel').textContent = I18n.t('map.floor', { n: GameState.run.floorIdx + 1 });
-    document.getElementById('mapGold').textContent = gs.run.gold;
+    document.getElementById('mapFloorLabel').textContent = `${I18n.t('map.floor', { n: GameState.run.floorIdx + 1 })} · ${I18n.t('floor.name.' + Math.min(GameState.run.floorIdx, 2))}`;
+    document.getElementById('mapGold').innerHTML = `${Icons.svg('gold')} ${gs.run.gold}`;
 
     // Relics
     const relicsEl = document.getElementById('mapRelics');
@@ -226,11 +238,11 @@ const Renderer = {
       relicsEl.innerHTML = '';
       gs.run.relics.forEach(r => {
         const chip = document.createElement('div');
-        chip.className = 'relic-chip' + (r.isCurse ? ' is-curse' : '');
+        chip.className = 'relic-chip rarity-' + r.rarity + (r.isCurse ? ' is-curse' : '');
         const rName = I18n.t(`relic.${r.id}.name`);
         const rDesc = I18n.t(`relic.${r.id}.desc`);
-        chip.innerHTML = `${r.icon} <span>${rName}</span>`;
-        chip.addEventListener('click', () => this.showRelicTooltip(r.icon, rName, rDesc));
+        chip.innerHTML = `${Icons.svg(r.icon)} <span>${rName}</span>`;
+        chip.addEventListener('click', () => this.showRelicTooltip(r.icon, rName, rDesc, r.rarity));
         relicsEl.appendChild(chip);
       });
     }
@@ -257,7 +269,7 @@ const Renderer = {
       if (!roomData.available && !roomData.completed)          cls.push('locked');
       if (roomData.type === 'boss')                            cls.push('boss');
       node.className = cls.join(' ');
-      node.innerHTML = `<span>${roomData.completed ? '✓' : def.icon}</span><span class="room-label" style="color:${def.color}">${I18n.t('room.' + roomData.type)}</span>`;
+      node.innerHTML = `<span style="color:${def.color}">${roomData.completed ? '✓' : Icons.svg(def.icon)}</span><span class="room-label" style="color:${def.color}">${I18n.t('room.' + roomData.type)}</span>`;
       if (roomData.available) node.addEventListener('click', () => Controller.enterRoom(fi, rowIdx, nodeIdx));
       return node;
     };
@@ -307,6 +319,7 @@ const Renderer = {
     document.getElementById('s-runs').textContent = m.totalRuns;
     document.getElementById('s-best').textContent = m.bestFloor;
     document.getElementById('s-gold').textContent = m.totalGold;
+    I18n.renderSoundToggle();
 
     // Ascension badge
     const ascBadge = document.getElementById('ascensionBadge');
@@ -379,14 +392,14 @@ const Renderer = {
       ).join('');
 
       card.innerHTML = `
-        <div class="meta-icon">${u.icon}</div>
+        <div class="meta-icon">${Icons.svg(u.icon)}</div>
         <div class="meta-info">
           <div class="meta-name">${I18n.t('meta.' + u.id + '.name')}</div>
           <div class="meta-desc">${I18n.t('meta.' + u.id + '.desc')}</div>
           ${lvl > 0 ? `<div class="meta-current">${u.getEffect(lvl)}</div>` : ''}
           <div class="level-dots">${dots}</div>
         </div>
-        <div class="meta-cost${maxed ? ' maxed' : ''}">${maxed ? I18n.t('meta.max') : `◈${cost}`}</div>`;
+        <div class="meta-cost${maxed ? ' maxed' : ''}">${maxed ? I18n.t('meta.max') : `${Icons.svg('gold')}${cost}`}</div>`;
 
       if (!maxed) card.addEventListener('click', () => Controller.buyUpgrade(u.id, card));
       list.appendChild(card);
@@ -398,7 +411,7 @@ const Renderer = {
       const cost = ASCENSION_COSTS[m.ascensionLevel];
       const canAscend = Controller.canAscend();
       ascBtn.style.display = '';
-      ascBtn.textContent = `✦ ${I18n.t('meta.ascension', { n: m.ascensionLevel + 1 })} — ◈${cost}`;
+      ascBtn.innerHTML = `${Icons.svg('ascend')} ${I18n.t('meta.ascension', { n: m.ascensionLevel + 1 })} — ${Icons.svg('gold')}${cost}`;
       ascBtn.className = canAscend ? 'btn btn-ascend' : 'btn btn-ascend is-locked';
       ascBtn.disabled = !canAscend;
     } else {
@@ -410,12 +423,12 @@ const Renderer = {
   renderRelicChoice(choices) {
     const container = document.getElementById('relicChoices');
     container.innerHTML = '';
-    choices.forEach(relic => {
+    choices.forEach((relic, index) => {
       const card = document.createElement('div');
       card.className = `relic-card rarity-${relic.rarity}`;
       card.innerHTML = `
         <div class="relic-card-header">
-          <div class="relic-icon">${relic.icon}</div>
+          <div class="relic-icon">${Icons.svg(relic.icon)}</div>
           <div>
             <div class="relic-name">${I18n.t('relic.' + relic.id + '.name')}</div>
             <div class="relic-rarity rarity-${relic.rarity}">${relic.rarity}</div>
@@ -425,7 +438,19 @@ const Renderer = {
         <div class="relic-effect">→ ${I18n.t('relic.' + relic.id + '.effect')}</div>`;
       card.addEventListener('click', () => Controller.pickRelic(relic));
       container.appendChild(card);
+      this.animateRelicCard(card, index);
     });
+  },
+
+  animateRelicCard(card, index) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    card.animate([{transform:'translateY(24px) scale(.94)',opacity:0},{transform:'none',opacity:1}],
+      {duration:360,delay:index * 70,easing:'cubic-bezier(.34,1.56,.64,1)',fill:'backwards'});
+    if (card.classList.contains('rarity-legendary')) card.animate([
+      {boxShadow:'0 0 0 rgba(212,168,67,0)'},
+      {boxShadow:'0 0 28px rgba(212,168,67,.55)'},
+      {boxShadow:'0 0 12px rgba(212,168,67,.25)'},
+    ], {duration:1200,delay:index * 70});
   },
 
   // ── Rest choice (relics + shop option) ──
@@ -440,16 +465,17 @@ const Renderer = {
     shopCard.className = 'relic-card rest-shop-card';
     shopCard.innerHTML = `
       <div class="relic-card-header">
-        <div class="relic-icon">🏰</div>
+        <div class="relic-icon">${Icons.svg('castle')}</div>
         <div>
           <div class="relic-name">${I18n.t('rest.shopName')}</div>
           <div class="relic-rarity rarity-common">${I18n.t('rest.shopRarity')}</div>
         </div>
       </div>
       <div class="relic-desc">${I18n.t('rest.shopDesc')}</div>
-      <div class="relic-effect">${I18n.t('rest.shopGold', { n: GameState.meta.permanentGold + GameState.run.gold })}</div>`;
+      <div class="relic-effect">${Icons.svg('gold')} ${I18n.t('rest.shopGold', { n: GameState.meta.permanentGold + GameState.run.gold })}</div>`;
     shopCard.addEventListener('click', () => Controller.pickRestShop());
     container.appendChild(shopCard);
+    this.animateRelicCard(shopCard, choices.length);
 
     // Hide skip button for rest (player must choose)
     document.getElementById('btnSkipRelic').style.display = 'none';
@@ -457,7 +483,8 @@ const Renderer = {
 
   // ── End screen ──
   renderEndScreen(win, abandoned) {
-    document.getElementById('endIcon').textContent  = win ? '👑' : abandoned ? '🏳' : '💀';
+    document.getElementById('endIcon').innerHTML = Icons.svg(win ? 'crown' : abandoned ? 'abandon' : 'death');
+    document.getElementById('endIcon').style.color = win ? 'var(--gold)' : 'var(--red)';
     const title = document.getElementById('endTitle');
     title.textContent = win ? I18n.t('end.victory') : abandoned ? I18n.t('end.abandon') : I18n.t('end.defeat');
     title.className = 'end-title ' + (win ? 'win' : '');
@@ -465,20 +492,22 @@ const Renderer = {
     const gs = GameState;
     const r = gs.run || { gold:0, totalScore:0, relics:[], floorIdx:0 };
     document.getElementById('endStats').innerHTML = `
-      <div class="end-stat"><div class="end-stat-val">${r.gold}</div><div class="end-stat-label">${I18n.t('end.goldGained')}</div></div>
+      <div class="end-stat"><div class="end-stat-val">${r.gold}</div><div class="end-stat-label">${Icons.svg('gold')} ${I18n.t('end.goldGained')}</div></div>
       <div class="end-stat"><div class="end-stat-val">${r.totalScore}</div><div class="end-stat-label">${I18n.t('end.totalScore')}</div></div>
       <div class="end-stat"><div class="end-stat-val">${r.floorIdx + 1}/3</div><div class="end-stat-label">${I18n.t('end.floorReached')}</div></div>
       <div class="end-stat"><div class="end-stat-val">${r.relics.length}</div><div class="end-stat-label">${I18n.t('end.relics')}</div></div>`;
+    document.getElementById('endSeed').textContent = r.seed === undefined ? '' : `${I18n.t('end.seed')} : ${r.seed}`;
 
     const rel = document.getElementById('endRelics');
     rel.innerHTML = r.relics.length
-      ? r.relics.map(x => `<div class="relic-chip${x.isCurse ? ' is-curse' : ''}">${x.icon} ${I18n.t('relic.' + x.id + '.name')}</div>`).join('')
+      ? r.relics.map(x => `<div class="relic-chip rarity-${x.rarity}${x.isCurse ? ' is-curse' : ''}">${Icons.svg(x.icon)} ${I18n.t('relic.' + x.id + '.name')}</div>`).join('')
       : `<span class="text-sm text-muted">${I18n.t('end.noRelics')}</span>`;
   },
 
   // ── Relic tooltip ──
-  showRelicTooltip(icon, name, desc) {
-    document.getElementById('relicTTIcon').textContent = icon;
+  showRelicTooltip(icon, name, desc, rarity) {
+    document.getElementById('relicTTIcon').className = `relic-tt-icon rarity-${rarity}`;
+    document.getElementById('relicTTIcon').innerHTML = Icons.svg(icon);
     document.getElementById('relicTTName').textContent = name;
     document.getElementById('relicTTDesc').textContent = desc;
     const el = document.getElementById('relicTooltip');
@@ -488,7 +517,7 @@ const Renderer = {
 
   // ── Mystery modal ──
   showMysteryModal(icon, title, sub, onClose) {
-    document.getElementById('mysteryIcon').textContent  = icon;
+    document.getElementById('mysteryIcon').innerHTML = Icons.svg(icon);
     document.getElementById('mysteryTitle').textContent = title;
     document.getElementById('mysterySub').textContent   = sub;
     // Show map behind modal first so closing lands on correct screen

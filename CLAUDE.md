@@ -14,20 +14,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Feature** (new mechanic, new relics, UI change) → bump minor: `v1.0.0` → `v1.1.0`
 - **Major** (user-requested big upgrade) → bump major: `v1.0.0` → `v2.0.0`
 
-Current version: **v1.4.0** (`index.html` title screen, bottom)
+Current version: **v1.6.0** (`index.html` title screen, bottom)
 
 ## Development
 
-Open `index.html` directly in a browser — no server or build step required. For live reload during development, use any static file server (e.g. `python3 -m http.server`). Validate syntax with `node -c js/<file>.js`.
+Open `index.html` directly in a browser — no server or build step required. For live reload during development, use any static file server (e.g. `python3 -m http.server`). Validate syntax with `node -c js/<file>.js` and run `npm test` for board and map checks.
 
-No tests, no linter, no package.json.
+No linter or dependencies.
 
 ## Architecture
 
 **Single-page app with 7 screens** managed by CSS `.active` class toggling (`showScreen()` in `renderer.js`). Screens: title, map, game (2048 grid), relic choice, end, meta (upgrades shop). Screen refs are cached for performance.
 
 **Script load order matters** (declared in `index.html`):
-`constants → storage → state → board → renderer → controller → input`
+`haptics → i18n → icons → rng → constants → storage → state → board → fx → scene → audio → renderer → controller → input`
 
 Each file exposes a global singleton object. Dependencies flow left-to-right.
 
@@ -35,10 +35,17 @@ Each file exposes a global singleton object. Dependencies flow left-to-right.
 
 | File | Role |
 |---|---|
+| `haptics.js` | Haptic feedback |
+| `i18n.js` | French and English translations |
+| `icons.js` | Hand-authored "Gravure fine" SVG icon set (24px grid, 1.5px round stroke, soft fills); icons are ids, never emojis |
+| `rng.js` | Seeded mulberry32 random stream for game decisions |
 | `constants.js` | Game data: room types, objectives, **RelicHooks system**, relic definitions (29 relics), meta-upgrades, ascension costs, rarity weights, boss objectives |
-| `storage.js` | localStorage wrapper (key: `2048rogue_v2`). Persists meta-progression (gold, upgrades, stats, ascensionLevel) |
+| `storage.js` | localStorage wrapper (key: `2048rogue_v2`). Persists meta-progression and sound setting |
 | `state.js` | `GameState` singleton — holds meta, run, room, board, score, moves |
 | `board.js` | Board logic: slide/merge rows, place tiles, check objectives. Fires `onTileSpawn` hook in `addRandom()` |
+| `fx.js` | Particles, floating merge values, shake, flash, and combo label |
+| `scene.js` | "Brume minimaliste" backdrops: one scene per context (title, map per floor, floors I-III, bosses I-III, shop, rest), crossfaded from `showScreen()` |
+| `audio.js` | Lazy WebAudio sound effects |
 | `renderer.js` | All DOM manipulation. Tile geometry cached (`_geoCache`), invalidated on resize/buildGrid. SVG connection lines for map |
 | `controller.js` | Game flow orchestrator: run lifecycle, room entry, move processing, relic hook fire points, ascension, mystery events |
 | `input.js` | Touch swipe, keyboard (arrows + WASD + ZQSD), d-pad buttons, window resize. Button bindings and boot IIFE |

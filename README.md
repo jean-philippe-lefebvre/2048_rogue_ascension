@@ -25,15 +25,17 @@ Each **run** spans 3 floors. Each floor has a Slay-the-Spire-style node map with
 - **Special tiles** — obstacles (block movement), bombs (timed explosions)
 - **Bilingual** — French and English, switchable from the title screen
 - **Mobile-first** — touch swipe controls, 440px max width, responsive
+- **Sensation** — gem tiles, merge particles, floating values, shake, and screen motion
+- **Procedural sound** — pentatonic merge notes and room cues, with a persistent toggle
+- **Seeded runs** — reproducible maps and tile spawns; the run seed appears on the end screen
+- **Dungeon art direction**: hand-drawn "fine engraving" SVG icons, and a drifting fog backdrop per scene: each floor (Crypts, Sunken Forge, Abyss) and each named boss has its own palette and emblem
 
 ## Tech Stack
 
-Vanilla JS, single CSS file, no dependencies. ~1500 lines of game logic across 8 modules:
+Vanilla JS, single CSS file, no dependencies:
 
 ```
-constants → storage → state → board → renderer → controller → input
-     ↑
-   i18n (loaded first)
+haptics → i18n → rng → constants → storage → state → board → fx → audio → renderer → controller → input
 ```
 
 ## Architecture
@@ -41,10 +43,13 @@ constants → storage → state → board → renderer → controller → input
 | File | Role |
 |---|---|
 | `i18n.js` | Translation system (FR/EN), `I18n.t(key, params)` |
+| `rng.js` | Seeded game randomness |
 | `constants.js` | Game data: relics, upgrades, objectives, hook runner |
 | `storage.js` | localStorage persistence |
 | `state.js` | Runtime game state singleton |
 | `board.js` | 4×4 grid logic: slide, merge, obstacles, bombs |
+| `fx.js` | Canvas particles and DOM feedback |
+| `audio.js` | WebAudio effects |
 | `renderer.js` | All DOM manipulation, tile pool, map SVG |
 | `controller.js` | Game flow: runs, rooms, moves, relics, ascension |
 | `input.js` | Touch, keyboard, button bindings, boot |
