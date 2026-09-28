@@ -10,7 +10,10 @@ const Storage = {
       const meta = JSON.parse(s);
       if (meta.tierUnlocked === undefined)
         meta.tierUnlocked = Math.min(MAX_TIER, Math.max(0, 3 * (meta.ascension ?? meta.ascensionLevel ?? 0)));
-      meta.tierUnlocked = Math.min(MAX_TIER, Math.max(0, meta.tierUnlocked));
+      const oldTier = Math.min(MAX_TIER, Math.max(0, meta.tierUnlocked));
+      meta.tiers = { ...meta.tiers, ...Object.fromEntries(CHARACTERS.map(({id}) => [id,
+        Math.min(MAX_TIER, Math.max(0, meta.tiers?.[id] ?? oldTier))])) };
+      delete meta.tierUnlocked;
       meta.codex ??= { relics:[], enemies:{}, runs:[] };
       meta.codex.relics ??= [];
       meta.codex.enemies ??= {};
@@ -66,7 +69,7 @@ const Storage = {
       (run.floors || []).forEach((floor, i) => {
         const boss = floor?.[floor.length - 1]?.[0];
         if (boss?.type === 'boss') {
-          boss.bossId ??= ['jailer','smith','eye'][i];
+          boss.bossId ??= ['jailer','smith','eye','ascendant'][i];
           floor.bossId = boss.bossId;
         }
       });
@@ -107,6 +110,6 @@ const Storage = {
     } catch { return false; }
   },
   clearRun() { try { localStorage.removeItem(this.RUN_KEY); } catch {} },
-  defaultMeta: () => ({ totalRuns:0, bestFloor:0, totalGold:0, permanentGold:0, upgrades:{}, tierUnlocked:0, daily:null,
+  defaultMeta: () => ({ totalRuns:0, bestFloor:0, totalGold:0, permanentGold:0, upgrades:{}, tiers:Object.fromEntries(CHARACTERS.map(({id}) => [id,0])), daily:null,
     codex:{relics:[],enemies:{},runs:[]}, records:{tile:0,hit:0,gold:0}, progress:{bombs:0,spells:0}, achievements:[], settings:{sound:true,music:true} }),
 };

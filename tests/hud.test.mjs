@@ -7,7 +7,7 @@ const rendererSource = readFileSync(new URL('../js/renderer.js', import.meta.url
 const context = vm.createContext({localStorage:{getItem:()=>null}});
 vm.runInContext(readFileSync(new URL('../js/i18n.js', import.meta.url), 'utf8'), context);
 vm.runInContext(rendererSource, context);
-const hud = vm.runInContext('({ trayVisibleCount: Renderer.trayVisibleCount, relicState: Renderer.relicState, intentHelpParams: Renderer.intentHelpParams, i18n: I18n })', context);
+const hud = vm.runInContext('({ trayVisibleCount: Renderer.trayVisibleCount, relicState: Renderer.relicState, intentHelpParams: Renderer.intentHelpParams, intentVisible: Renderer.intentVisible, i18n: I18n })', context);
 
 test('relic tray reserves room for the overflow count', () => {
   assert.equal(hud.trayVisibleCount(343, 8), 8);
@@ -54,12 +54,18 @@ test('intent help uses live seal, strike and tile values in French', () => {
   assert.match(text('seal',hud.intentHelpParams('seal',{id:'jailer'},0,0,2)), /8 coups.*16/);
   assert.match(text('seal2',hud.intentHelpParams('seal2',{id:'jailer'},0,0,2)), /8 coups/);
   assert.match(text('seal',hud.intentHelpParams('seal',{id:'sentinel'},0,0,2)), /6 coups/);
-  assert.equal(text('strike',hud.intentHelpParams('strike',{id:'eye'},2,9,2)), 'Tu perds 4 coups.');
+  assert.equal(text('strike',hud.intentHelpParams('strike',{id:'eye'},2,9,2)), 'Tu perds 3 coups.');
   assert.match(text('seal',hud.intentHelpParams('seal',{id:'sentinel'},0,0,3)), /24/);
   assert.match(text('freeze',hud.intentHelpParams('freeze',{id:'prophet'},2,0,3)), /12/);
   assert.match(text('devour',hud.intentHelpParams('devour',{id:'glutton'},0,0,3)), /3\./);
   context.Board = {base:()=>3};
   assert.equal(hud.intentHelpParams('freeze',{id:'prophet'},2,0).v,12);
+});
+
+test('A4 fog hides intent until two moves remain', () => {
+  assert.equal(hud.intentVisible({intentIn:4},3),true);
+  assert.equal(hud.intentVisible({intentIn:3},4),false);
+  assert.equal(hud.intentVisible({intentIn:2},4),true);
 });
 
 test('a targeted spell blurs its launch button before rendering targets', () => {
@@ -106,4 +112,28 @@ test('spell card separates the free cast note and targeting hint with a period',
   context.window = {innerHeight:667};
   vm.runInContext('Renderer.openHud = () => {}; Renderer.openSpell(0, null)',context);
   assert.match(pop.innerHTML,/l'ennemi\. Choisis deux tuiles\.<\/small>/);
+});
+
+test('fog chip and its help conceal the intent until two moves remain', () => {
+  const elements = Object.fromEntries(['enemyPanel','enemyEmblem','enemyName','enemyHp','enemyHpFill','enemyHpGhost',
+    'enemyAffix','enemyIntent','enemyPassive','intentPop'].map(id => [id,{innerHTML:'',style:{},offsetHeight:40,
+      classList:{toggle(){}},setAttribute(){},getBoundingClientRect:()=>({bottom:100})}]));
+  const fight = {id:'revenant',hp:90,maxHp:100,block:0,phase:1,affix:'pyro',intentIn:3,
+    pattern:['strike'],patternIndex:0,reviveAvailable:false};
+  context.GameState = {run:{tier:4},room:{combat:fight,enemyDef:{id:'revenant',kind:'elite'},floorIdx:0}};
+  context.Board = {base:()=>2};
+  context.Combat = {intent:()=> 'strike'};
+  context.ROOM_DEFS = {elite:{color:'#f00'}};
+  context.Icons = {svg:id=>`<svg data-id="${id}"></svg>`};
+  context.document = {getElementById:id=>elements[id]};
+  context.window = {innerHeight:600};
+  vm.runInContext('Renderer.openHud = () => {}; Renderer.renderEnemy(); Renderer.openIntent(null)',context);
+  assert.match(elements.enemyIntent.innerHTML,/i-hidden/);
+  assert.match(elements.enemyIntent.innerHTML,/\?\?\?/);
+  assert.doesNotMatch(elements.intentPop.innerHTML,/Tu perds 2 coups/);
+  assert.match(elements.intentPop.innerHTML,/Pyromane|bombe/);
+  fight.intentIn=2;
+  vm.runInContext('Renderer.renderEnemy(); Renderer.openIntent(null)',context);
+  assert.match(elements.enemyIntent.innerHTML,/Frappe/);
+  assert.match(elements.intentPop.innerHTML,/Tu perds 2 coups/);
 });

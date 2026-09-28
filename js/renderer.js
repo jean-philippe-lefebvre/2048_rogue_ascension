@@ -13,7 +13,9 @@ function showScreen(id) {
   _screens[id].scrollTop = 0;
   if (id === 'gameScreen') Renderer.renderRelicTray('combatRelicTray');
   if (id === 'mapScreen') Renderer.renderRelicTray('mapRelics');
-  Scene.forScreen(id);
+  if (typeof GameState !== 'undefined' && GameState.run?.floorIdx === 3 && (id === 'mapScreen' || id === 'gameScreen'))
+    Scene.set(id === 'gameScreen' ? 'b4' : 'f4');
+  else Scene.forScreen(id);
   if (typeof Music !== 'undefined') Music.forScreen(id);
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     _screens[id].animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}], {duration:220,easing:'cubic-bezier(.2,.8,.2,1)'});
@@ -113,10 +115,11 @@ const Renderer = {
   openIntent(trigger) {
     const fight = GameState.room?.combat;
     if (!fight) return;
-    const intent = Combat.intent(fight), base = intent === 'seal2' ? 'seal' : intent;
+    const hidden = !this.intentVisible(fight,GameState.run.tier);
+    const intent = Combat.intent(fight), base = hidden ? 'hidden' : intent === 'seal2' ? 'seal' : intent;
     const params = this.intentHelpParams(intent, fight, GameState.room.floorIdx, GameState.run.tier);
     const pop = document.getElementById('intentPop');
-    pop.innerHTML = `<h3>${Icons.svg('i-'+base)} ${I18n.t('intent.'+intent,params)} · ${I18n.t(fight.intentIn === 1 ? 'hud.inMoves' : 'hud.inMovesPlural',{n:fight.intentIn})}</h3><p>${I18n.t('intent.'+intent+'.help',params)}</p><div class="pop-actions"><button type="button" data-close-hud>${I18n.t('hud.understood')}</button></div>`;
+    pop.innerHTML = `<h3>${Icons.svg('i-'+base)} ${hidden ? '???' : I18n.t('intent.'+intent,params)} · ${I18n.t(fight.intentIn === 1 ? 'hud.inMoves' : 'hud.inMovesPlural',{n:fight.intentIn})}</h3><p>${hidden ? I18n.t('intent.hidden.help') : I18n.t('intent.'+intent+'.help',params)}</p>${fight.affix ? `<p>${I18n.t('affix.'+fight.affix+'.rule',{v:Board.base()*4})}</p>` : ''}<div class="pop-actions"><button type="button" data-close-hud>${I18n.t('hud.understood')}</button></div>`;
     pop.style.top = `${Math.min(window.innerHeight-pop.offsetHeight-16, document.getElementById('enemyPanel').getBoundingClientRect().bottom + 6)}px`;
     this.openHud('intentPop',trigger);
   },
@@ -134,10 +137,11 @@ const Renderer = {
   intentHelpParams(intent, fight, floorIdx, tier, base = Board.base()) {
     const rank = {seal:4,seal2:4,bomb:4,freeze:3,devour:1}[intent] || 1;
     const n = intent === 'seal' || intent === 'seal2' ? (fight.id === 'jailer' ? 8 : 6)
-      : (floorIdx === 2 ? 3 : 2) + (tier >= 9 ? 1 : 0);
+      : (floorIdx >= 2 ? 3 : 2);
     const arrow = fight.intentDirection ? {left:'←',right:'→',up:'↑',down:'↓'}[fight.intentDirection] : '';
     return {n, v:base * 2 ** (rank - 1), arrow};
   },
+  intentVisible(fight, tier) { return tier < 4 || fight.intentIn <= 2; },
   tileClass(value) { return `t${Math.min(2 ** Board.rank(value), 2048)}`; },
   familyChips(relic) {
     return (relic.tags || []).map(tag => `<span class="family-chip">${I18n.t('family.'+tag)}</span>`).join('');
@@ -149,28 +153,32 @@ const Renderer = {
     for(const character of CHARACTERS) {
       const card=document.createElement('button');
       const locked = !Controller.characterUnlocked(character.id);
-      card.className='character-card' + (locked ? ' is-locked' : '');
+      card.className='character-card' + (locked ? ' is-locked' : character.id === (Controller.selectedCharacter || 'alchemist') ? ' is-selected' : '');
       card.disabled = locked;
       card.innerHTML=locked
-        ? `<span class="character-icon">${Icons.svg('lock')}</span><span class="character-name">${I18n.t('character.'+character.id+'.name')}</span><span class="character-detail">${I18n.t('codex.unlock')}${I18n.t('ui.colon')}${I18n.t('achievement.'+UNLOCKS[character.id]+'.name')}</span>`
-        : `<span class="character-icon">${Icons.svg(character.icon)}</span><span class="character-name">${I18n.t('character.'+character.id+'.name')}</span><span class="character-detail">${I18n.t('character.relic')}${I18n.t('ui.colon')}${I18n.t('relic.'+character.relic+'.name')}</span><span class="character-detail">${I18n.t('character.spell')}${I18n.t('ui.colon')}${I18n.t('spell.'+character.spell)}</span><span class="character-detail">${I18n.t('character.'+character.id+'.passive')}</span>`;
-      if (!locked) card.addEventListener('click',()=>Controller.chooseCharacter(character.id));
+        ? `<span class="character-tier-badge">A${characterTier(GameState.meta,character.id)}</span><span class="character-icon">${Icons.svg('lock')}</span><span class="character-name">${I18n.t('character.'+character.id+'.name')}</span><span class="character-detail">${I18n.t('codex.unlock')}${I18n.t('ui.colon')}${I18n.t('achievement.'+UNLOCKS[character.id]+'.name')}</span>`
+        : `<span class="character-tier-badge">A${characterTier(GameState.meta,character.id)}</span><span class="character-icon">${Icons.svg(character.icon)}</span><span class="character-name">${I18n.t('character.'+character.id+'.name')}</span><span class="character-detail">${I18n.t('character.relic')}${I18n.t('ui.colon')}${I18n.t('relic.'+character.relic+'.name')}</span><span class="character-detail">${I18n.t('character.spell')}${I18n.t('ui.colon')}${I18n.t('spell.'+character.spell)}</span><span class="character-detail">${I18n.t('character.'+character.id+'.passive')}</span>`;
+      if (!locked) card.addEventListener('click',()=>Controller.selectCharacter(character.id));
       container.appendChild(card);
     }
     document.getElementById('btnCharacterBack').onclick=()=>showScreen('titleScreen');
+    const confirm = document.getElementById('btnConfirmCharacter');
+    confirm.textContent = I18n.t('character.start');
+    confirm.onclick = () => Controller.chooseCharacter(Controller.selectedCharacter || 'alchemist');
   },
   renderTierSelector() {
     const tier = Controller.selectedTier ?? 0;
     document.getElementById('tierLabel').textContent = I18n.t('tier.label', { n:tier });
     document.getElementById('btnTierDown').disabled = tier <= 0;
-    document.getElementById('btnTierUp').disabled = tier >= Math.min(MAX_TIER, GameState.meta.tierUnlocked || 0);
+    const unlocked = characterTier(GameState.meta,Controller.selectedCharacter || 'alchemist');
+    document.getElementById('btnTierUp').disabled = tier >= Math.min(MAX_TIER, unlocked);
     const options = document.getElementById('tierOptions');
     options.innerHTML = '';
     for (let n = 0; n <= MAX_TIER; n++) {
       const button = document.createElement('button');
       button.className = 'tier-option' + (n === tier ? ' selected' : '');
       button.textContent = `A${n}`;
-      button.disabled = n > (GameState.meta.tierUnlocked || 0);
+      button.disabled = n > unlocked;
       button.setAttribute('aria-label', I18n.t('tier.label', { n }));
       button.onclick = () => Controller.selectTier(n);
       options.appendChild(button);
@@ -179,7 +187,8 @@ const Renderer = {
     rules.innerHTML = '';
     for (let n = tier; n >= 1; n--) {
       const line = document.createElement('div');
-      line.textContent = `A${n} · ${I18n.t('tier.rule.' + n)}`;
+      line.className = [3,6,9,10].includes(n) ? 'tier-milestone' : '';
+      line.textContent = `A${n} ${[3,6,9,10].includes(n) ? '★ ' : '· '}${I18n.t('tier.rule.' + n,{n:2*tier})}`;
       rules.appendChild(line);
     }
   },
@@ -504,12 +513,15 @@ const Renderer = {
     const panel = document.getElementById('enemyPanel');
     panel.classList.toggle('is-boss', def.kind === 'boss');
     panel.classList.toggle('is-phase2', fight.phase === 2);
+    panel.classList.toggle('is-phase3', fight.phase === 3);
     panel.classList.toggle('is-dead', fight.hp <= 0);
     document.getElementById('enemyEmblem').innerHTML = Icons.svg('e-' + def.id);
     document.getElementById('enemyEmblem').style.color = ROOM_DEFS[def.kind].color;
     document.getElementById('enemyName').textContent = I18n.t(def.kind === 'boss' ? 'enemy.' + def.id + '.name' : 'enemy.' + def.id);
     document.getElementById('enemyHp').innerHTML = `${fight.hp} / ${fight.maxHp}` +
       (fight.block ? ` <span class="enemy-block">${Icons.svg('i-shield')} ${fight.block}</span>` : '');
+    document.getElementById('enemyAffix').innerHTML = fight.affix
+      ? `<span class="enemy-affix affix-${fight.affix}">${Icons.svg('a-'+fight.affix)} ${I18n.t('affix.'+fight.affix+'.name')}</span>` : '';
     const width = `${fight.hp / fight.maxHp * 100}%`;
     for (const id of ['enemyHpFill','enemyHpGhost']) {
       const el = document.getElementById(id);
@@ -517,13 +529,14 @@ const Renderer = {
       el.style.width = width;
       if (first) requestAnimationFrame(() => { el.style.transition = ''; });
     }
-    const intent = Combat.intent(fight), base = intent === 'seal2' ? 'seal' : intent;
+    const intent = Combat.intent(fight), hidden = !this.intentVisible(fight,GameState.run.tier);
+    const base = hidden ? 'hidden' : intent === 'seal2' ? 'seal' : intent;
     const params = this.intentHelpParams(intent, fight, room.floorIdx, GameState.run.tier);
     const chip = document.getElementById('enemyIntent');
-    chip.innerHTML = `${Icons.svg('i-' + base)}<span class="intent-text">${I18n.t('intent.' + intent, params)} · ${I18n.t(fight.intentIn === 1 ? 'hud.inMoves' : 'hud.inMovesPlural', { n:fight.intentIn })}</span><span class="intent-more" aria-hidden="true">?</span>`;
-    chip.setAttribute('aria-label', `${I18n.t('intent.' + intent, params)} · ${I18n.t(fight.intentIn === 1 ? 'hud.inMoves' : 'hud.inMovesPlural', { n:fight.intentIn })}`);
+    chip.innerHTML = `${Icons.svg('i-' + base)}<span class="intent-text">${hidden ? '???' : I18n.t('intent.' + intent, params)} · ${I18n.t(fight.intentIn === 1 ? 'hud.inMoves' : 'hud.inMovesPlural', { n:fight.intentIn })}</span><span class="intent-more" aria-hidden="true">?</span>`;
+    chip.setAttribute('aria-label', `${hidden ? '???' : I18n.t('intent.' + intent, params)} · ${I18n.t(fight.intentIn === 1 ? 'hud.inMoves' : 'hud.inMovesPlural', { n:fight.intentIn })}`);
     const passive = def.id === 'colossus' ? 'gravity' : def.id === 'clockmaker' ? 'clock' : null;
-    document.getElementById('enemyPassive').innerHTML = [passive ? I18n.t('combat.' + passive) : '', fight.reviveAvailable ? `<span class="phylactery" title="${I18n.t('combat.reviveAvailable')}">${Icons.svg('i-heal')} ${I18n.t('combat.reviveAvailable')}</span>` : ''].filter(Boolean).join(' · ');
+    document.getElementById('enemyPassive').innerHTML = [passive ? I18n.t('combat.' + passive) : '', def.id === 'guardian' ? I18n.t('combat.threshold',{v:Board.base()*8}) : '', fight.reviveAvailable ? `<span class="phylactery" title="${I18n.t('combat.reviveAvailable')}">${Icons.svg('i-heal')} ${I18n.t('combat.reviveAvailable')}</span>` : ''].filter(Boolean).join(' · ');
     chip.classList.toggle('is-imminent', fight.intentIn === 1);
   },
 
@@ -611,8 +624,13 @@ const Renderer = {
   // ── Map ──
   renderMap() {
     const gs = GameState;
-    document.getElementById('mapFloorLabel').textContent = `${I18n.t('map.floor', { n: GameState.run.floorIdx + 1 })} · ${I18n.t('floor.name.' + Math.min(GameState.run.floorIdx, 2))}`;
+    document.getElementById('mapFloorLabel').textContent = GameState.run.floorIdx === 3
+      ? I18n.t('map.summit')
+      : `${I18n.t('map.floor', { n: GameState.run.floorIdx + 1 })} · ${I18n.t('floor.name.' + GameState.run.floorIdx)}`;
     document.getElementById('mapGold').innerHTML = `${Icons.svg('gold')} ${gs.run.gold}`;
+    // The summit (floor IV) is a single, staged boss node.
+    document.getElementById('mapScreen').classList.toggle('is-summit', GameState.run.floorIdx === 3);
+    document.getElementById('floorMap').dataset.summitHint = I18n.t('map.summitHint');
 
     // Relics
     this.renderRelicTray('mapRelics');
@@ -697,15 +715,15 @@ const Renderer = {
 
     // Highest unlocked tier
     const ascBadge = document.getElementById('ascensionBadge');
-    if (m.tierUnlocked > 0) {
-      ascBadge.textContent = I18n.t('tier.label', { n: m.tierUnlocked });
+    if (bestTier(m) > 0) {
+      ascBadge.textContent = I18n.t('tier.label', { n: bestTier(m) });
       ascBadge.style.display = '';
     } else {
       ascBadge.style.display = 'none';
     }
 
     const lines = META_DEFS
-      .filter(u => tierRequirement(u.ascReq) <= m.tierUnlocked && (m.upgrades[u.id] || 0) > 0)
+      .filter(u => tierRequirement(u.ascReq) <= bestTier(m) && (m.upgrades[u.id] || 0) > 0)
       .map(u => u.getEffect(m.upgrades[u.id]));
 
     const pi = document.getElementById('passiveInfo');
@@ -739,8 +757,8 @@ const Renderer = {
 
     // Tier info
     const ascInfo = document.getElementById('metaAscInfo');
-    if (m.tierUnlocked > 0) {
-      ascInfo.textContent = I18n.t('tier.label', { n: m.tierUnlocked });
+    if (bestTier(m) > 0) {
+      ascInfo.textContent = I18n.t('tier.label', { n: bestTier(m) });
       ascInfo.style.display = '';
     } else {
       ascInfo.style.display = 'none';
@@ -750,7 +768,7 @@ const Renderer = {
     list.innerHTML = '';
 
     // Group visible upgrades by tier requirement
-    const visible = META_DEFS.filter(u => tierRequirement(u.ascReq) <= m.tierUnlocked);
+    const visible = META_DEFS.filter(u => tierRequirement(u.ascReq) <= bestTier(m));
     let lastAsc = -1;
 
     visible.forEach(u => {
@@ -875,7 +893,7 @@ const Renderer = {
     document.getElementById('endStats').innerHTML = `
       <div class="end-stat"><div class="end-stat-val">${r.gold}</div><div class="end-stat-label">${Icons.svg('gold')} ${I18n.t('end.goldGained')}</div></div>
       <div class="end-stat"><div class="end-stat-val">${r.totalScore}</div><div class="end-stat-label">${I18n.t('end.totalScore')}</div></div>
-      <div class="end-stat"><div class="end-stat-val">${r.floorIdx + 1}/3</div><div class="end-stat-label">${I18n.t('end.floorReached')}</div></div>
+      <div class="end-stat"><div class="end-stat-val">${r.floorIdx + 1}/${r.floors?.length >= 4 ? 4 : 3}</div><div class="end-stat-label">${I18n.t('end.floorReached')}</div></div>
       <div class="end-stat"><div class="end-stat-val">${r.relics.length}</div><div class="end-stat-label">${I18n.t('end.relics')}</div></div>`;
     document.getElementById('endSeed').textContent = r.seed === undefined ? '' : `${I18n.t('end.seed')} : ${r.seed}`;
 

@@ -44,23 +44,42 @@ const Combat = {
   },
   damage(fight, merges) {
     const combo = 1 + 0.25 * Math.max(0, merges.length - 1);
-    const raw = Math.floor(merges.reduce((sum, merge) => sum + merge.val, 0) * combo * (fight.invertTurns > 0 ? 1.25 : 1));
+    const raw = Math.floor(merges.reduce((sum, merge) => sum + this.mergeDamage(fight,merge), 0) * combo * (fight.invertTurns > 0 ? 1.25 : 1));
     const absorbed = Math.min(raw, fight.block);
     fight.block -= absorbed;
     fight.hp = Math.max(0, fight.hp - (raw - absorbed));
     this.revive(fight);
     return { raw, dealt:raw - absorbed, absorbed, combo };
   },
+  mergeDamage(fight, merge) {
+    const rank = Board.rank(merge.val);
+    if (fight.id === 'guardian' && rank < 4) return 0;
+    return fight.affix === 'armored' && rank < 3 ? merge.val / 2 : merge.val;
+  },
+  actionAffix(fight, board, bombTimers, effect, portals = []) {
+    if (fight.affix === 'pyro') {
+      const empty = Board.getEmpty(board).filter(([r,c]) => !portals.some(([pr,pc]) => pr === r && pc === c));
+      if (empty.length) {
+        const [r,c] = empty[Rng.int(empty.length)];
+        board[r][c] = TILE.BOMB; bombTimers[`${r},${c}`] = 5; effect.cells.push([r,c]);
+        (effect.bombCells ??= []).push([r,c]);
+      }
+    } else if (fight.affix === 'vampire') {
+      fight.hp = Math.min(fight.maxHp, fight.hp + Math.floor(fight.maxHp * 0.02));
+    }
+  },
   revive(fight) {
     if (fight.id !== 'necromancer' || !fight.reviveAvailable || fight.hp > 0) return false;
     fight.reviveAvailable = false;
     fight.hp = Math.ceil(fight.maxHp * 0.4);
-    fight.phase = 2;
-    fight.cadence = 3;
-    fight.pattern = ['seal','strike','heal'];
-    fight.patternIndex = 0;
-    fight.intentIn = fight.cadence;
-    this.announce(fight);
+    if (fight.phase < 3) {
+      fight.phase = 2;
+      fight.cadence = 3;
+      fight.pattern = ['seal','strike','heal'];
+      fight.patternIndex = 0;
+      fight.intentIn = fight.cadence;
+      this.announce(fight);
+    }
     return true;
   },
   placeVoid(fight, board, portals = []) {
@@ -104,9 +123,16 @@ const Combat = {
     if (fight.invertTurns > 0) fight.invertTurns--;
     if (!phaseChanged) fight.intentIn--;
   },
-  phase(fight, def) {
+  phase(fight, def, tier = 0) {
+    if (tier >= 10 && def.kind === 'boss' && fight.phase < 3 && fight.hp > 0 && fight.hp <= fight.maxHp * .25) {
+      const source = fight.phase === 1 && def.phase2 ? def.phase2 : fight;
+      const pattern = fight.phase === 1 && fight.phase2Pattern ? fight.phase2Pattern : source.pattern;
+      fight.phase = 3; fight.cadence = Math.max(2,source.cadence - 1);
+      fight.pattern = [...pattern, 'strike']; fight.patternIndex = 0;
+      fight.intentIn = fight.cadence; this.announce(fight); return true;
+    }
     if (fight.id !== 'necromancer' && fight.phase === 1 && def.phase2 && fight.hp > 0 && fight.hp <= fight.maxHp / 2) {
-      fight.phase = 2; fight.cadence = def.phase2.cadence; fight.pattern = def.phase2.pattern;
+      fight.phase = 2; fight.cadence = def.phase2.cadence; fight.pattern = fight.phase2Pattern || def.phase2.pattern;
       fight.patternIndex = 0; fight.intentIn = fight.cadence; this.announce(fight);
       return true;
     }
@@ -142,7 +168,7 @@ const Combat = {
         if (board[r][c] > best) { best = board[r][c]; at = [r,c]; }
       if (at) { board[at[0]][at[1]] = Math.max(Board.base(), best / 2); effect.cells.push(at); }
     } else if (intent === 'strike') {
-      effect.strike = floor === 2 ? 3 : 2;
+      effect.strike = floor >= 2 ? 3 : 2;
     } else if (intent === 'lock') {
       fight.locked = fight.intentDirection; fight.lockTurns = 3;
     } else if (intent === 'invert') {
@@ -161,6 +187,7 @@ const Combat = {
     } else if (intent === 'void') {
       this.placeVoid(fight,board,portals);
     }
+    this.actionAffix(fight, board, bombTimers, effect, portals);
     fight.patternIndex++;
     fight.intentIn = fight.cadence;
     this.announce(fight);

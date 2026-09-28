@@ -10,20 +10,20 @@ A roguelike variant of 2048 with meta-progression, relics, difficulty tiers, ach
 
 ## How to Play
 
-Open `index.html` in a browser. Swipe or use arrow keys / WASD / ZQSD to move tiles. The v3.2.0 combat layout puts the moves and relic tray above the grid, spells below it, and the score and settings in the top-right menu.
+Open `index.html` in a browser. Swipe or use arrow keys / WASD / ZQSD to move tiles. The v3.3.0 combat layout puts the moves and relic tray above the grid, spells below it, and the score and settings in the top-right menu.
 
-Each **run** spans 3 floors. Each floor has a branching node map with battles, elite rooms, mystery events, rest stops, a merchant, and one boss drawn from a pool of three. The map reveals the boss before you reach it. Merge tiles to damage enemies before your moves run out. Enemy intents show what happens next and when; three hearts let you survive failed rooms.
+Each **run** spans 3 floors, with a hidden fourth floor at A9+. The first three floors have branching node maps with battles, elite rooms, mystery events, rest stops, a merchant, and a boss. A6+ puts the Threshold Warden on floor II. Floor IV holds the Ascendant. Merge tiles to damage enemies before your moves run out. Enemy intents show what happens next and when, except under A4+ fog; three hearts let you survive failed rooms, or two at A5+.
 
 ## Features
 
-- **Roguelike runs** – 3 floors of connected nodes with branching paths
+- **Roguelike runs** – 3 floors of connected nodes with branching paths and a hidden final boss floor at A9+
 - **41 relics** – 7 common, 10 rare, 9 epic, 9 legendary, 6 curses. Eight build families increase the weight of related offers by 30%
 - **Rule relics** – Expanse gives battle rooms a 5×5 board and four more moves; Trinity changes tiles to 3, 6, 12... while enemies gain 40% HP. Both start with the next battle room. Tile rank counts upward from 2 or 3 as rank 1, so existing relic thresholds follow either series.
 - **Hook-based relic system** – adding a relic is a single entry in `constants.js`, no other files to touch
 - **Meta-progression** – spend gold on permanent upgrades in the Forge of Fate
 - **Codex**: browse discovered relics, defeated enemies, achievements and the latest 20 runs. Best tile, hit and gold records persist between runs.
 - **Achievements**: 13 long-term goals unlock the Artificer, Monk and four relics. Earlier saves retain earned unlocks when their run history proves eligibility.
-- **Difficulty tiers**: A0 to A10 add cumulative rules. Win at tier N to unlock N + 1; upgrades stay purchased. Higher tiers multiply banked gold.
+- **Difficulty tiers**: each character has an independent A0 to A10 ladder. A2 changes a rest to a fight on each floor; A3 gives elites an affix; A4 hides enemy intents; A5 starts with two hearts; A6 brings the Threshold Warden; A7 traps mystery rooms; A8 adds a starting curse; A9 opens floor IV; A10 gives every boss a third phase. Enemies gain 2% HP per tier (affixed elites keep 85% of their HP), and banked gold grows by 10% per tier.
 - **Daily challenge**: one local attempt per UTC day, with a shared date seed, rotating character and tier A3. Permanent upgrades are ignored for the challenge.
 - **Result card**: share or download a 1080 × 1350 PNG, or copy a short text summary with floor squares.
 - **Mystery rooms** – eight events with visible choices, risks, and rewards
@@ -69,7 +69,7 @@ haptics → i18n → icons → rng → constants → storage → state → board
 | `share.js` | PNG result card and text sharing |
 | `input.js` | Touch, keyboard, button bindings, boot |
 
-Run `npm test` for board and combat checks. Run `npm run balance` for the 300-seed-per-enemy greedy bot report. Use `npm run balance -- --relic expanse` or `--relic trinity` for informative relic reports.
+Run `npm test` for board and combat checks. Run `npm run balance` for the 300-seed-per-enemy greedy bot report. Use `npm run balance -- --tier 6` for an informative tier report or `--relic expanse` and `--relic trinity` for relic reports.
 
 ## License
 

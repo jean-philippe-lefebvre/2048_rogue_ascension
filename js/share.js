@@ -9,11 +9,13 @@ const Share = {
     return run.daily ? `${I18n._lang === 'en' ? 'Daily challenge' : 'Défi du'} ${run.daily.slice(8,10)}/${run.daily.slice(5,7)}`
       : I18n.t('tier.label', { n:run.tier || 0 });
   },
-  floor(run) { return Math.min(3, (run.floorIdx || 0) + 1); },
+  // A9+ runs have a hidden fourth floor.
+  floors(run) { return run.floors?.length >= 4 ? 4 : 3; },
+  floor(run) { return Math.min(this.floors(run), (run.floorIdx || 0) + 1); },
   boss(run) {
     const floor = this.floor(run) - 1;
     const rows = run.floors?.[floor];
-    const id = rows?.[rows.length - 1]?.[0]?.bossId || rows?.bossId || ['jailer','smith','eye'][floor];
+    const id = floor === 3 ? 'ascendant' : rows?.[rows.length - 1]?.[0]?.bossId || rows?.bossId || ['jailer','smith','eye'][floor];
     return I18n.t('enemy.' + id + '.name');
   },
   result(run) {
@@ -24,7 +26,8 @@ const Share = {
     const squares = this.floorStates(run).map(state => ({ cleared:'🟨', failed:'🟥', none:'⬛' })[state]).join('');
     const floor = this.floor(run);
     const hearts = run.hearts ?? 0;
-    const floorText = I18n._lang === 'en' ? `Floor ${floor}/3` : `Étage ${floor}/3`;
+    const total = this.floors(run);
+    const floorText = I18n._lang === 'en' ? `Floor ${floor}/${total}` : `Étage ${floor}/${total}`;
     const heartText = I18n._lang === 'en' ? `${hearts} hearts` : `${hearts} cœurs`;
     const link = this.link();
     return `2048 Rogue · ${this.label(run)} · ${floorText} · ${heartText} · ${squares}` + (link ? `\n${link}` : '');
@@ -45,8 +48,9 @@ const Share = {
   link() { return /^https?:$/.test(location.protocol) ? location.origin + location.pathname : ''; },
   // Floor states shared by the card and the text: cleared, failed, or not reached.
   floorStates(run) {
-    const cleared = Math.min(3, run.stats?.floorsCleared || (run.win ? 3 : 0));
-    return Array.from({length:3}, (_, i) => i < cleared ? 'cleared' : i === cleared && !run.win && !run.abandoned ? 'failed' : 'none');
+    const total = this.floors(run);
+    const cleared = Math.min(total, run.stats?.floorsCleared || (run.win ? total : 0));
+    return Array.from({length:total}, (_, i) => i < cleared ? 'cleared' : i === cleared && !run.win && !run.abandoned ? 'failed' : 'none');
   },
   // Fits text to a width by stepping the font size down.
   fit(ctx, text, weightFamily, size, maxWidth) {
@@ -61,7 +65,7 @@ const Share = {
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
     const gold = '#d4a843', text = '#e8e4d8', dim = '#9a9488', muted = '#6a6a5a';
-    const accents = ['#4a7cc4', '#c47d4a', '#9a4ac4'];
+    const accents = ['#4a7cc4', '#c47d4a', '#9a4ac4', '#d4b25a'];
     // Background: deep ink, floor-coloured glow behind the hero, soft vignette.
     ctx.fillStyle = '#0c0b12'; ctx.fillRect(0, 0, W, H);
     const glow = ctx.createRadialGradient(540, 420, 20, 540, 420, 720);
@@ -90,24 +94,24 @@ const Share = {
     ctx.fillStyle = text; ctx.font = '40px Cinzel';
     ctx.fillText(I18n.t('character.' + character.id + '.name'), 540, 430);
     // Result.
-    const headline = run.win ? I18n.t('tier.victory').toUpperCase() : (en ? `FLOOR ${this.floor(run)} / 3` : `ÉTAGE ${this.floor(run)} / 3`);
+    const headline = run.win ? I18n.t('tier.victory').toUpperCase() : (en ? `FLOOR ${this.floor(run)} / ${this.floors(run)}` : `ÉTAGE ${this.floor(run)} / ${this.floors(run)}`);
     ctx.fillStyle = run.win ? gold : text;
     this.fit(ctx, headline, '700 {px}px Cinzel', 92, 900);
     ctx.fillText(headline, 540, 548);
     ctx.fillStyle = dim;
-    const sub = run.win ? (en ? 'All three floors cleared' : 'Les trois étages vaincus') : (en ? 'Against ' : 'Face à ') + this.boss(run);
+    const sub = run.win ? (this.floors(run) === 4 ? (en ? 'All four floors cleared' : 'Les quatre étages vaincus') : (en ? 'All three floors cleared' : 'Les trois étages vaincus')) : (en ? 'Against ' : 'Face à ') + this.boss(run);
     this.fit(ctx, sub, '34px Cinzel', 34, 900);
     ctx.fillText(sub, 540, 604);
     // Floor squares, same states as the shared text.
     const states = this.floorStates(run);
     states.forEach((state, i) => {
-      const x = 540 - 150 + i * 112, y = 648, size = 76;
+      const x = 540 - (states.length * 112 - 36) / 2 + i * 112, y = 648, size = 76;
       ctx.lineWidth = 3;
       if (state === 'cleared') { ctx.fillStyle = gold; ctx.fillRect(x, y, size, size); }
       else if (state === 'failed') { ctx.fillStyle = 'rgba(196,74,58,.25)'; ctx.fillRect(x, y, size, size); ctx.strokeStyle = '#c44a3a'; ctx.strokeRect(x, y, size, size); }
       else { ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.strokeRect(x, y, size, size); }
       ctx.fillStyle = state === 'cleared' ? '#0c0b12' : state === 'failed' ? '#e8a09a' : muted;
-      ctx.font = '700 30px Cinzel'; ctx.fillText(['I', 'II', 'III'][i], x + size / 2, y + 50);
+      ctx.font = '700 30px Cinzel'; ctx.fillText(['I', 'II', 'III', 'IV'][i], x + size / 2, y + 50);
     });
     // Stats: 3 columns × 2 rows, big numerals.
     const stats = run.stats || {};

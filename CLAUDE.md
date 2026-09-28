@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Feature** (new mechanic, new relics, UI change) → bump minor: `v1.0.0` → `v1.1.0`
 - **Major** (user-requested big upgrade) → bump major: `v1.0.0` → `v2.0.0`
 
-Current version: **v3.2.0** (`index.html` title screen, bottom)
+Current version: **v3.3.0** (`index.html` title screen, bottom)
 
 ## Development
 
@@ -77,12 +77,13 @@ Per-room state for 1x/room relics: `GameState.room.relicState = {}`
 
 ### Game structure
 
-- **Meta-progression**: permanent gold and upgrades plus 10 cumulative difficulty tiers. Win tier N to unlock N + 1; upgrades stay purchased. Old ascension saves migrate to tier 3 × old level. Persisted in localStorage.
+- **Meta-progression**: permanent gold and upgrades plus three independent A0 to A10 character ladders in `meta.tiers`. Win tier N with a character to unlock N + 1 for that character. Upgrade gates use the highest ladder. Legacy `tierUnlocked` saves grant that level to each character; old ascension saves first convert to tier 3 × old level.
 - **Codex and achievements**: meta saves discovered relics, defeated enemy counts, the latest 20 runs, tile/damage/gold records, 13 achievements, and cumulative bomb/spell progress. Four achievements unlock relics and two unlock characters. Locked relics are excluded from all offer pools.
 - **Music**: a separate persisted music toggle controls a procedural WebAudio bed at 0.22 of master gain. `Music.sceneFor()` and `Music.tempoFor()` are pure scene selectors; `showScreen()` and boss phase changes drive 1.2 second crossfades.
 - **Daily challenge**: UTC date hashed with FNV-1a, rotating character, tier A3, one local attempt per day. Meta upgrades and start relic upgrades are ignored. Runs can be resumed.
 - **Result card**: 1080 × 1350 PNG generated in `share.js`, with native file sharing or download fallback, plus a copied text summary.
-- **Run**: 3 floors (étages). Each floor has a **Slay-the-Spire-style node map**: 5 rows of 3 connected nodes + 1 boss. Nodes have connections to 1-2 nodes in the next row. Each floor has a seeded `bossId`, persisted on its boss node because JSON arrays do not serialize custom properties. The map shows its emblem and name. Older runs default to jailer, smith, eye. Only the current floor is shown
+- **Run**: 3 floors (étages), plus a one-boss hidden floor IV at A9+. The first three floors each have a **Slay-the-Spire-style node map**: 5 rows of 3 connected nodes + 1 boss. Nodes have connections to 1-2 nodes in the next row. Each floor has a seeded `bossId`, persisted on its boss node because JSON arrays do not serialize custom properties. A6+ always draws the Threshold Warden on floor II. Floor IV contains the Ascendant, whose pattern uses the first intent of the three drawn bosses plus strike. Older runs default to jailer, smith, eye. Only the current floor is shown.
+- **Tier milestones**: A2 converts one pre-boss rest per floor to a fight; A3 adds one seeded affix per elite; A4 hides intents until two moves remain; A5 starts with two hearts; A7 traps one third of mystery rooms with an elite ambush; A8 starts with a curse; A10 adds a third boss phase at 25% HP. Enemy HP scales by 2% per tier; affixed elites keep 85% of their HP. Affixes are armored, enraged, pyro and vampire.
 - **Room types**: normal/elite/boss (HP combat with telegraphed enemy intents), rest (relic, healing or spell recharge), shop (run gold purchases), mystery (eight choice events)
 - **Relics**: 41 total (7 common, 10 rare, 9 epic, 9 legendary, 6 curses). Rarity-weighted drops that scale by floor. Expanse makes the next battle board 5×5 with 4 more moves; Trinity uses the 3, 6, 12... tile series and raises enemy HP by 40%. Curses enter through mystery events and can be removed by the merchant
 - **Board**: 4×4 by default, 5×5 with Expanse. `GameState.size` and `GameState.base` belong to the room and are saved with battles and Undo. All numbered tiles follow `base × 2^k`; `Board.rank(value)` maps either series to shared thresholds and colours. Negative values represent obstacles (`-1`), bombs (`-2`), ×2 (`-3`) and jokers (`-4`). `GameState.kinds` is a parallel grid of `null | gold | ice` for numbered tiles. `GameState.portals` stores a cell pair in floor III battle rooms; `room.iceHits` tracks cracks. Bombs halve adjacent numbered tiles without removing their kind, and destroy adjacent jokers and ×2 tiles. Adjacent rank 4+ merges defuse bombs and temporary seals.

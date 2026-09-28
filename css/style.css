@@ -281,7 +281,7 @@ body {
 #enemyHpGhost, #enemyHpFill { position: absolute; inset: 0 auto 0 0; width: 100%; border-radius: 4px; }
 #enemyHpGhost { background: rgba(255,255,255,.35); transition: width 450ms ease-out 250ms; }
 #enemyHpFill { background: linear-gradient(90deg,#8a2a20,var(--red)); transition: width 160ms cubic-bezier(.2,.8,.2,1); }
-.enemy-panel.is-phase2 #enemyHpFill { background: linear-gradient(90deg,#c44a3a,#ff6a2a); box-shadow: 0 0 8px rgba(255,106,42,.45); }
+.enemy-panel.is-phase2 #enemyHpFill, .enemy-panel.is-phase3 #enemyHpFill { background: linear-gradient(90deg,#c44a3a,#ff6a2a); box-shadow: 0 0 8px rgba(255,106,42,.45); }
 .enemy-intent { display: flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 12px; color: var(--text-dim); }
 .enemy-intent .ico { width: 16px; height: 16px; }
 .enemy-passive { min-height:12px; margin-top:3px; font-size:10px; color:var(--text-dim); }
@@ -339,8 +339,12 @@ body {
 .tier-option.selected { border-color:var(--gold); color:var(--gold); }
 .tier-option:disabled { opacity:.3; cursor:default; }
 .tier-rules { width:100%; color:var(--text-dim); font-size:12px; line-height:1.6; text-align:center; margin-bottom:16px; }
+.tier-milestone { color:#d4a843; }
 .daily-countdown { text-align:center; color:var(--text-dim); font-size:12px; letter-spacing:2px; }
 .character-card { display: flex; flex-direction: column; align-items: center; width: 100%; padding: 16px; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); cursor: pointer; font-family: inherit; }
+.character-card { position:relative; }
+.character-card.is-selected { border-color:#d4a843; }
+.character-tier-badge { position:absolute; top:10px; right:10px; border:1px solid #d4a843; border-radius:3px; color:#d4a843; padding:2px 4px; font:700 10px 'Courier Prime',monospace; }
 .character-card:hover, .character-card:focus-visible { border-color: var(--gold); }
 .character-icon .ico { width: 40px; height: 40px; }
 .character-name { font-family: Cinzel, serif; font-size: 18px; color: var(--gold); }
@@ -704,6 +708,13 @@ body {
 .enemy-intent .ico { width:15px; height:15px; }
 .enemy-intent .intent-text { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .enemy-intent .intent-more { flex:none; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:grid; place-items:center; font:700 9px 'Courier Prime',monospace; color:var(--text-muted); }
+#enemyAffix { margin-top:5px; }
+.enemy-affix { display:inline-flex; align-items:center; gap:4px; border:1px solid currentColor; border-radius:3px; padding:2px 5px; font:700 10px 'Courier Prime',monospace; text-transform:uppercase; }
+.enemy-affix .ico { width:13px; height:13px; }
+.affix-armored { color:#9fb3c8; }
+.affix-enraged { color:#ff6a2a; }
+.affix-pyro { color:#e07a3a; }
+.affix-vampire { color:#c44a8a; }
 .enemy-intent:hover .intent-text { color:var(--text); }
 .enemy-passive { min-height:0; margin-top:3px; font-size:10px; }
 #phaseBanner { position:static; height:0; overflow:visible; text-align:left; font:700 10px 'Courier Prime',monospace; color:var(--red); }
@@ -805,3 +816,12 @@ body {
 .achievement-toast.show { transform: translate(-50%, 0); }
 .achievement-toast svg { width: 24px; height: 24px; flex: none; }
 @media (prefers-reduced-motion: reduce) { .achievement-toast { transition: none; } }
+
+/* Floor IV: the last fight sits alone in the middle of the summit. */
+#mapScreen.is-summit .floor-map { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 52vh; }
+#mapScreen.is-summit .room-node { width: 96px; height: 96px; border-radius: 16px; border-color: rgba(245,217,122,.6);
+  box-shadow: 0 0 0 1px rgba(245,217,122,.15), 0 0 38px rgba(245,217,122,.22); }
+#mapScreen.is-summit .boss-emblem .ico { width: 44px; height: 44px; }
+#mapScreen.is-summit .boss-name { font: 700 15px 'Cinzel', serif; color: #f5d97a; letter-spacing: .04em; white-space: nowrap; }
+#mapScreen.is-summit .floor-map::after { content: attr(data-summit-hint); margin-top: 38px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); }
+#mapScreen.is-summit svg.map-lines { display: none; }

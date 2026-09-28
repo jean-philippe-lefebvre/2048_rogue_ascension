@@ -91,7 +91,13 @@ const ENEMIES = [
   { id:'clockmaker', floor:1, kind:'boss', hp:340, cadence:4, pattern:['strike','invert','shield'], phase2:{ cadence:3, pattern:['strike','invert','shield'] } },
   { id:'mirror', floor:2, kind:'boss', hp:480, cadence:3, pattern:['flip','gnaw','seal'], phase2:{ cadence:3, pattern:['flip','flipv','strike'] } },
   { id:'stareater', floor:2, kind:'boss', hp:350, cadence:3, pattern:['void','gnaw','strike'], phase2:{ cadence:2, pattern:['void','gnaw','strike'] } },
+  { id:'guardian', floor:1, kind:'boss', hp:225, cadence:4, pattern:['shield','lock','seal'], phase2:{ cadence:3, pattern:['seal2','strike','lock'] } },
+  { id:'ascendant', floor:3, kind:'boss', hp:470, cadence:3, pattern:['seal','bomb','invert','strike'], phase2:{ cadence:2, pattern:['seal','bomb','invert','strike'] } },
 ];
+
+const ELITE_AFFIXES = ['armored','enraged','pyro','vampire'];
+const bestTier = meta => Math.max(0, ...Object.values(meta?.tiers || {}).filter(Number.isFinite));
+const characterTier = (meta, id) => meta?.tiers?.[id] || 0;
 
 // ── Relic Hook System ──
 const RelicHooks = {
@@ -124,7 +130,7 @@ const RELICS = [
   { id:'haste',     icon:'haste', name:'Hâte',           rarity:'common', desc:'+4 coups dans toutes les salles.',                effect:'+4 coups max',
     hooks: { onMovesCalc: ctx => { ctx.bonus += 4; } } },
   { id:'shield',    icon:'shield', name:'Bouclier',       rarity:'common', desc:'La première bombe ennemie de chaque salle est neutralisée.', effect:'Première bombe neutralisée',
-    hooks: { onEnemyIntent: (ctx, run, gs) => { if(ctx.effect?.intent !== 'bomb' || !ctx.effect.cells?.length || gs.room?.relicState?._shieldUsed) return; gs.room.relicState._shieldUsed=true; const [r,c]=ctx.effect.cells[0]; ctx.board[r][c]=0; delete ctx.bombTimers[`${r},${c}`]; } } },
+    hooks: { onEnemyIntent: (ctx, run, gs) => { const cells=ctx.effect?.intent === 'bomb' ? ctx.effect.cells : ctx.effect?.bombCells; if(!cells?.length || gs.room?.relicState?._shieldUsed) return; gs.room.relicState._shieldUsed=true; const [r,c]=cells[0]; ctx.board[r][c]=0; delete ctx.bombTimers[`${r},${c}`]; } } },
   { id:'sprout',    icon:'sprout', name:'Germination',    rarity:'common', desc:'+1 tuile de départ dans chaque salle.',           effect:'3 tuiles au départ',
     hooks: { onRoomStart: ctx => { Board.addRandom(ctx.board, false, 0); } } },
   { id:'collector', icon:'collector', name:'Collecteur',     rarity:'common', desc:'+3 or à chaque salle terminée.',                  effect:'+3 or/salle',

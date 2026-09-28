@@ -68,28 +68,16 @@ const Controller = {
       comboStep:GameState.run.character === 'monk' ? 0.35 : 0.25 };
     RelicHooks.fire('onDamageCalc',ctx);
     const combo = 1 + ctx.comboStep * Math.max(0,merges.length-1);
-    const raw = Math.floor(ctx.merges.reduce((sum,m) => sum + m.val*m.damageMultiplier,0) * combo *
+    const raw = Math.floor(ctx.merges.reduce((sum,m) => sum + Combat.mergeDamage(fight,m)*m.damageMultiplier,0) * combo *
       (fight.invertTurns>0 ? 1.25 : 1) * ctx.multiplier);
     const absorbed = Math.min(raw,fight.block);
     fight.block -= absorbed;
     fight.hp = Math.max(0,fight.hp-(raw-absorbed));
     return {raw,dealt:raw-absorbed,absorbed,combo};
   },
-  enterTierPhase(fight, def) {
-    fight.phase = 2;
-    fight.cadence = def.phase2.cadence;
-    fight.pattern = def.phase2.pattern;
-    fight.patternIndex = 0;
-    fight.intentIn = fight.cadence;
-    Combat.announce(fight);
-    if (typeof Music !== 'undefined') Music.forScreen('gameScreen');
-    return true;
-  },
   advancePhase(fight, def) {
-    const changed = fight.phaseThreshold && fight.phase === 1 && fight.hp > 0 && fight.id !== 'necromancer' &&
-      fight.hp <= fight.maxHp * fight.phaseThreshold && def.phase2
-      ? this.enterTierPhase(fight, def) : Combat.phase(fight, def);
-    if (changed && typeof Music !== 'undefined') Music.forScreen('gameScreen');
+    const changed = Combat.phase(fight, def, GameState.run?.tier || 0);
+    if (changed && fight.phase !== 3 && typeof Music !== 'undefined') Music.forScreen('gameScreen');
     return changed;
   },
 
@@ -111,7 +99,7 @@ const Controller = {
 
   shopPrice(value) {
     const discount = GameState.run.character === 'alchemist' ? 0.8 : 1;
-    return Math.floor(value * discount * (GameState.run.tier >= 4 ? 1.2 : 1));
+    return Math.floor(value * discount);
   },
   dailyDate(now = new Date()) { return now.toISOString().slice(0,10); },
   dailySeed(date) {
@@ -132,8 +120,8 @@ const Controller = {
     return true;
   },
   tierGold(gold, tier) { return Math.floor(gold * (1 + 0.1 * (tier || 0))); },
-  roomGold(amount) { return Math.floor(amount * (GameState.run.tier >= 7 ? 0.75 : 1)); },
-  strikeCost(effect) { return effect.strike + (GameState.run.tier >= 9 ? 1 : 0); },
+  roomGold(amount) { return amount; },
+  strikeCost(effect) { return effect.strike; },
   earnedGold(amount) {
     const run = GameState.run;
     run.gold += amount;
@@ -171,7 +159,7 @@ const Controller = {
   recordRun(result) {
     const r = GameState.run, codex = GameState.meta.codex;
     codex.runs.unshift({date:new Date().toISOString(),character:r.character,tier:r.tier,daily:!!r.daily,
-      result,floor:Math.min(3,r.floorIdx + 1),boss:r.floors?.[Math.min(2,r.floorIdx)]?.at(-1)?.[0]?.bossId || null,
+      result,floor:Math.min(r.tier >= 9 ? 4 : 3,r.floorIdx + 1),boss:r.floors?.[r.floorIdx]?.at(-1)?.[0]?.bossId || null,
       bosses:(r.bossesDefeated || []).map(id => ENEMIES.find(e => e.id === id)?.floor).filter(Number.isInteger),
       hearts:r.hearts,seed:r.seed});
     codex.runs.length = Math.min(20,codex.runs.length);
@@ -179,16 +167,25 @@ const Controller = {
 
   // ── Run ──
   startRun() {
-    this.selectedTier = Math.min(this.selectedTier ?? GameState.meta.tierUnlocked, GameState.meta.tierUnlocked);
+    this.selectedCharacter ??= 'alchemist';
+    this.selectedTier = Math.min(this.selectedTier ?? characterTier(GameState.meta,this.selectedCharacter), characterTier(GameState.meta,this.selectedCharacter));
     Renderer.renderCharacters(); showScreen('characterScreen');
   },
+  selectCharacter(id) {
+    if (!this.characterUnlocked(id)) return;
+    this.selectedCharacter = id;
+    this.selectedTier = Math.min(this.selectedTier ?? 0,characterTier(GameState.meta,id));
+    Renderer.renderCharacters();
+  },
   selectTier(value) {
-    this.selectedTier = Math.max(0, Math.min(MAX_TIER, GameState.meta.tierUnlocked, value));
+    this.selectedTier = Math.max(0, Math.min(MAX_TIER, characterTier(GameState.meta,this.selectedCharacter || 'alchemist'), value));
     Renderer.renderTierSelector();
   },
 
   chooseCharacter(characterId) {
     if (!CHARACTERS.some(c => c.id === characterId) || !this.characterUnlocked(characterId)) return false;
+    this.selectedCharacter = characterId;
+    this.selectedTier = Math.min(this.selectedTier ?? 0,characterTier(GameState.meta,characterId));
     this._beginRun(characterId);
     return true;
   },
@@ -229,7 +226,7 @@ const Controller = {
       lastTileVal: 0,
       floorIdx: 0,
       singularityReady: !daily && !!(m.upgrades.singularity),
-      floors: this._generateFloors(),
+      floors: this._generateFloors(daily?.tier ?? this.selectedTier ?? 0),
     };
 
     this._grantRelic(RELICS.find(r => r.id === CHARACTERS.find(c => c.id === characterId).relic));
@@ -309,7 +306,7 @@ const Controller = {
         GameState.stuck = !!saved.stuck;
         const type = enemyDef.kind, def = ROOM_DEFS[type];
         const roomLabel = type === 'boss' ? I18n.t('enemy.' + enemyDef.id + '.name') : I18n.t('room.' + type);
-        document.getElementById('roomName').innerHTML = `<span style="color:${def.color}">${Icons.svg(def.icon)}</span> ${type === 'boss' ? '' : ['I','II','III'][saved.floorIdx] + ' · '}${roomLabel}`;
+        document.getElementById('roomName').innerHTML = `<span style="color:${def.color}">${Icons.svg(def.icon)}</span> ${type === 'boss' ? '' : ['I','II','III','IV'][saved.floorIdx] + ' · '}${roomLabel}`;
         Renderer.hideRoomOverlay(); Renderer.renderEnemy(true); Renderer.updateHUD();
         Renderer.buildGrid(); showScreen('gameScreen');
         this._startClock(saved.clockRemaining);
@@ -320,12 +317,12 @@ const Controller = {
     Renderer.renderMap(); showScreen('mapScreen');
   },
 
-  _generateFloors() {
+  _generateFloors(tier = 0) {
     const COLS = 3;
     const ROWS = 5;
     const POOL = ['normal','normal','normal','elite','mystery','rest'];
 
-    return Array.from({ length: 3 }, (_, floorIdx) => {
+    const floors = Array.from({ length: 3 }, (_, floorIdx) => {
       // 5 rows of 3 nodes
       const rows = [];
       for (let r = 0; r < ROWS; r++) rows.push(
@@ -387,17 +384,25 @@ const Controller = {
 
       // Last row connects to boss (index 0 in boss row)
       rows[ROWS - 1].forEach(node => { node.connections = [0]; });
+      if (tier >= 2) rows[ROWS - 1][Rng.int(COLS)].type = 'normal';
 
       // Boss row (single node)
-      const bosses = ENEMIES.filter(e => e.floor === floorIdx && e.kind === 'boss');
-      rows.bossId = bosses[Rng.int(bosses.length)].id;
+      const bosses = ENEMIES.filter(e => e.floor === floorIdx && e.kind === 'boss' && e.id !== 'guardian');
+      rows.bossId = floorIdx === 1 && tier >= 6 ? 'guardian' : bosses[Rng.int(bosses.length)].id;
       rows.push([{ type: 'boss', bossId:rows.bossId, available: false, completed: false, connections: [] }]);
 
       // First row available
       rows[0].forEach(n => { n.available = true; });
 
+      if (tier >= 7) for (const row of rows.slice(0,-1)) for (const node of row)
+        if (node.type === 'mystery') node.ambush = Rng.int(3) === 0;
       return rows;
     });
+    if (tier >= 9) {
+      const summit = [[{type:'boss',bossId:'ascendant',available:false,completed:false,connections:[]}]];
+      summit.bossId = 'ascendant'; floors.push(summit);
+    }
+    return floors;
   },
 
   // Pick `count` random items from `pool` with rarity weighting by floor
@@ -470,7 +475,16 @@ const Controller = {
 
     if (roomData.type === 'rest')    { this._doRestRoom();    return; }
     if (roomData.type === 'shop')    { this._doShopRoom(); return; }
-    if (roomData.type === 'mystery') { this._doMysteryRoom(); return; }
+    if (roomData.type === 'mystery') {
+      if (roomData.ambush) {
+        roomData.ambush = false;
+        GameState.run.pendingTrappedMystery = true;
+        GameState.run.pendingRoom = {floorIdx,rowIdx,nodeIdx};
+        GameState.room.enemyDef = Combat.pick(floorIdx,'elite');
+        this._startBattleRoom('elite',floorIdx);
+      } else this._doMysteryRoom();
+      return;
+    }
 
     this._startBattleRoom(roomData.type, floorIdx);
   },
@@ -489,23 +503,32 @@ const Controller = {
     GameState.room.combat = Combat.create(enemy);
     const fight = GameState.room.combat;
     const tier = run.tier || 0;
-    const hpMultiplier = (tier >= 1 ? 1.1 : 1) * (type === 'boss' && tier >= 6 ? 1.15 : 1);
+    if (enemy.id === 'ascendant') {
+      const firstIntents = run.floors.slice(0,3).map(floor => ENEMIES.find(e => e.id === floor.bossId)?.pattern[0]).filter(Boolean);
+      fight.pattern = [...firstIntents,'strike'];
+      fight.phase2Pattern = [...fight.pattern];
+    }
+    const hpMultiplier = 1 + .02 * tier;
     fight.maxHp = Math.ceil(fight.maxHp * hpMultiplier);
     fight.hp = fight.maxHp;
-    if (type === 'elite' && tier >= 3) fight.cadence = fight.intentIn = Math.max(2, fight.cadence - 1);
-    if (type === 'boss' && tier >= 10) fight.phaseThreshold = 0.65;
+    if (type === 'elite' && tier >= 3) {
+      fight.affix = ELITE_AFFIXES[Rng.int(ELITE_AFFIXES.length)];
+      if (fight.affix === 'enraged') fight.cadence = fight.intentIn = Math.max(2,fight.cadence - 1);
+      // An affix changes how the elite plays; its lower HP keeps the wall fair (tuned with npm run balance --tier 3).
+      fight.maxHp = fight.hp = Math.ceil(fight.maxHp * 0.85);
+    }
     if (type === 'boss' && run.bossHpMult > 1) {
       GameState.room.combat.maxHp = Math.ceil(GameState.room.combat.maxHp * run.bossHpMult);
       GameState.room.combat.hp = GameState.room.combat.maxHp;
     }
-    const base = (type === 'boss' ? [50,56,62] : type === 'elite' ? [40,44,48] : [36,40,44])[floorIdx];
+    const base = (type === 'boss' ? [50,56,62,66] : type === 'elite' ? [40,44,48] : [36,40,44])[floorIdx];
     // Meta bonuses
     const moveCtx = { base, bonus: GameState.getUpgradeLevel('extraMoves') * 2, type, floorIdx };
     if (type === 'boss') moveCtx.bonus += Math.floor(base * GameState.getUpgradeLevel('mastery') * 0.1);
     // Relic hooks modify bonus
     RelicHooks.fire('onMovesCalc', moveCtx);
     if (run.nextFight) { moveCtx.bonus += run.nextFight.movesDelta || 0; delete run.nextFight; }
-    GameState.movesMax  = Math.max(1, moveCtx.base + moveCtx.bonus - (tier >= 2 ? 2 : 0));
+    GameState.movesMax  = Math.max(1, moveCtx.base + moveCtx.bonus);
     GameState.movesLeft = GameState.movesMax;
     GameState.score      = 0;
     GameState.mergeCount = 0;
@@ -542,7 +565,7 @@ const Controller = {
     // Render room UI
     const def = ROOM_DEFS[type];
     const roomLabel = type === 'boss' ? I18n.t('enemy.' + enemy.id + '.name') : I18n.t('room.' + type);
-    document.getElementById('roomName').innerHTML = `<span style="color:${def.color}">${Icons.svg(def.icon)}</span> ${type === 'boss' ? '' : ['I','II','III'][floorIdx] + ' · '}${roomLabel}`;
+    document.getElementById('roomName').innerHTML = `<span style="color:${def.color}">${Icons.svg(def.icon)}</span> ${type === 'boss' ? '' : ['I','II','III','IV'][floorIdx] + ' · '}${roomLabel}`;
     Renderer.renderEnemy(true);
     Renderer.hideRoomOverlay();
     Renderer.updateHUD();
@@ -1001,7 +1024,7 @@ const Controller = {
     if (fight.id === 'necromancer' && fight.reviveAvailable && fight.hp <= 0) {
       Combat.revive(fight); Renderer.phaseBanner('combat.revive');
       if (typeof Music !== 'undefined') Music.forScreen('gameScreen');
-    } else if (phaseChanged) Renderer.phaseBanner();
+    } else if (phaseChanged) Renderer.phaseBanner(fight.phase === 3 ? 'combat.phase3' : 'combat.phase2');
     if (!moveCtx.freeMove) gs.movesLeft--;
     if (!moveCtx.freeMove && fight.id === 'clockmaker') this._resetClock();
     if (fight.hp <= 0) {
@@ -1083,14 +1106,16 @@ const Controller = {
     gs.roomFinished = true;
     this._stopClock();
     delete gs.run.pendingAmbushRare;
+    const trappedMystery = !!gs.run.pendingTrappedMystery;
+    delete gs.run.pendingTrappedMystery;
     const defeated = Combat.loseHeart(gs.run);
-    const type = gs.room.data.type;
-    const reward = type === 'boss' ? [12,16,20][gs.room.floorIdx] : type === 'elite' ? 12 : 8;
+    const type = trappedMystery ? 'elite' : gs.room.data.type;
+    const reward = type === 'boss' ? [12,16,20,24][gs.room.floorIdx] : type === 'elite' ? 12 : 8;
     const endCtx = { won:false, type, floorIdx:gs.room.floorIdx, goldBonus:0, goldMultiplier:1, roomReward:reward };
     RelicHooks.fire('onRoomEnd', endCtx);
     this.earnedGold(this.roomGold(endCtx.goldBonus * endCtx.goldMultiplier));
-    gs.overlayMode = defeated ? 'defeat' : type === 'boss' ? 'retryBoss' : 'failedRoom';
-    if (!defeated && type !== 'boss') this._completeCurrentRoom();
+    gs.overlayMode = defeated ? 'defeat' : type === 'boss' ? 'retryBoss' : trappedMystery ? 'trappedEvent' : 'failedRoom';
+    if (!defeated && type !== 'boss' && !trappedMystery) this._completeCurrentRoom();
     Renderer.updateHUD();
     Renderer.showRoomOverlay('failure', defeated ? I18n.t('overlay.noHearts') : I18n.t('overlay.noMoves'));
     Audio2.fail();
@@ -1103,7 +1128,7 @@ const Controller = {
     gs.stuck = false;
     gs.roomFinished = true;
     this._stopClock();
-    const type = gs.room.data.type;
+    const type = gs.run.pendingTrappedMystery ? 'elite' : gs.room.data.type;
     const enemyId = gs.room.enemyDef?.id;
     if (enemyId) {
       const enemies = gs.meta.codex.enemies;
@@ -1113,7 +1138,7 @@ const Controller = {
       if (type === 'boss') this.checkAchievements({event:'boss',floor:gs.room.floorIdx});
       Storage.save(gs.meta);
     }
-    const reward = type === 'boss' ? [12,16,20][gs.room.floorIdx] : type === 'elite' ? 12 : 8;
+    const reward = type === 'boss' ? [12,16,20,24][gs.room.floorIdx] : type === 'elite' ? 12 : 8;
     const leftover = Combat.leftoverGold(gs.movesLeft);
     const endCtx = { won:true, type, floorIdx:gs.room.floorIdx, goldBonus:0,
       goldMultiplier:1, roomReward:reward + leftover };
@@ -1126,7 +1151,7 @@ const Controller = {
     }
     gs.run.pendingReward = { floorIdx:gs.room.floorIdx, rowIdx:gs.room.rowIdx,
       nodeIdx:gs.room.nodeIdx, type };
-    this._completeCurrentRoom();
+    if (!gs.run.pendingTrappedMystery) this._completeCurrentRoom();
     this._renderAfterMove(result, dir);
     Renderer.renderEnemy();
     Fx.roomSuccess(); Audio2.win();
@@ -1166,6 +1191,9 @@ const Controller = {
 
     if (mode === 'success') {
       this._showBattleReward();
+    } else if (mode === 'trappedEvent') {
+      GameState.room.enemyDef = null;
+      this._doMysteryRoom();
     } else if (mode === 'failedRoom') {
       Renderer.renderMap();
       showScreen('mapScreen');
@@ -1181,6 +1209,13 @@ const Controller = {
 
   _finishBattleReward() {
     const reward = GameState.run.pendingReward;
+    if (GameState.run.pendingTrappedMystery) {
+      delete GameState.run.pendingTrappedMystery;
+      delete GameState.run.pendingReward;
+      GameState.room.enemyDef = null;
+      this._doMysteryRoom();
+      return;
+    }
     if (reward?.type === 'boss') {
       GameState.run.stats ??= {biggestTile:0,bestDamage:0,goldEarned:0,floorsCleared:0};
       GameState.run.stats.floorsCleared = Math.max(GameState.run.stats.floorsCleared, reward.floorIdx + 1);
@@ -1193,7 +1228,7 @@ const Controller = {
 
   _showBattleReward() {
     const reward = GameState.run.pendingReward;
-    if (reward?.type === 'boss' && reward.floorIdx === 2) {
+    if (reward?.type === 'boss' && reward.floorIdx === GameState.run.floors.length - 1) {
       this._endRun(true); return;
     }
     this._offerRelics(this._relicCount(), () => this._finishBattleReward(), null, 'battle');
@@ -1246,14 +1281,14 @@ const Controller = {
     const r  = GameState.run;
     if (win) {
       this.earnedGold(30);
-      r.floorIdx = 2;
+      r.floorIdx = r.floors.length - 1;
       r.stats ??= {biggestTile:0,bestDamage:0,goldEarned:0,floorsCleared:0};
-      r.stats.floorsCleared = 3;
+      r.stats.floorsCleared = r.floors.length;
     }
     const banked = this.tierGold(r.gold, r.tier);
     m.permanentGold += banked;
     m.totalGold += banked;
-    if (win && !r.daily) m.tierUnlocked = Math.max(m.tierUnlocked || 0, Math.min(MAX_TIER, (r.tier || 0) + 1));
+    if (win && !r.daily) (m.tiers ??= {})[r.character] = Math.max(characterTier(m,r.character), Math.min(MAX_TIER, (r.tier || 0) + 1));
     if (r.daily) m.daily = { date:r.daily, result:win ? 'victory' : 'defeat', score:r.totalScore, floor:r.floorIdx + 1 };
     this.checkAchievements({event:'run',win,hearts:r.hearts,tier:r.tier});
     this.recordRun(win ? 'victory' : 'defeat');
@@ -1270,7 +1305,7 @@ const Controller = {
   buyUpgrade(id, cardEl) {
     const m   = GameState.meta;
     const def = META_DEFS.find(u => u.id === id);
-    if (!def || (m.tierUnlocked || 0) < tierRequirement(def.ascReq)) return;
+    if (!def || bestTier(m) < tierRequirement(def.ascReq)) return;
     const lvl = m.upgrades[id] || 0;
     if (lvl >= def.maxLvl) return;
     const cost = def.costs[lvl];
