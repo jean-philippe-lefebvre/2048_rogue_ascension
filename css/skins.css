@@ -1,0 +1,65 @@
+/* Tile skins, unlocked by winning A10 with a character. Applied with <body data-skin="...">.
+   Each skin redefines the value ramp (--g) and the face material; ranks keep the same order of brightness. */
+
+/* ── Obsidienne: volcanic glass, gold light caught on the edge ── */
+[data-skin="obsidian"] .t2    {--g:#8a7a5a}
+[data-skin="obsidian"] .t4    {--g:#a08a5c}
+[data-skin="obsidian"] .t8    {--g:#b89a5e}
+[data-skin="obsidian"] .t16   {--g:#cfa95e}
+[data-skin="obsidian"] .t32   {--g:#e0b85e}
+[data-skin="obsidian"] .t64   {--g:#efc65c}
+[data-skin="obsidian"] .t128  {--g:#f5d77a}
+[data-skin="obsidian"] .t256  {--g:#fae39a}
+[data-skin="obsidian"] .t512  {--g:#fdeebb}
+[data-skin="obsidian"] .t1024 {--g:#fff5d6}
+[data-skin="obsidian"] .t2048 {--g:#ffffff}
+[data-skin="obsidian"] .tile-face {
+  background:
+    linear-gradient(115deg, transparent 38%, rgba(255,255,255,.06) 46%, transparent 54%),
+    linear-gradient(160deg, color-mix(in srgb, var(--g) 9%, #0b0a0e), #040306);
+  border-color: color-mix(in srgb, var(--g) 60%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--g) 35%, transparent), inset 0 -2px 0 rgba(0,0,0,.6), 0 0 var(--glow) color-mix(in srgb, var(--g) 40%, transparent);
+}
+[data-skin="obsidian"] .tile-face::after { opacity: .28; }
+
+/* ── Braise: embers, the heat rises from the bottom of each tile ── */
+[data-skin="ember"] .t2    {--g:#8a5646}
+[data-skin="ember"] .t4    {--g:#a4603e}
+[data-skin="ember"] .t8    {--g:#bd6a38}
+[data-skin="ember"] .t16   {--g:#d67634}
+[data-skin="ember"] .t32   {--g:#ea8634}
+[data-skin="ember"] .t64   {--g:#f69a38}
+[data-skin="ember"] .t128  {--g:#ffae48}
+[data-skin="ember"] .t256  {--g:#ffc15e}
+[data-skin="ember"] .t512  {--g:#ffd27a}
+[data-skin="ember"] .t1024 {--g:#ffe29a}
+[data-skin="ember"] .t2048 {--g:#fff1c1}
+[data-skin="ember"] .tile-face {
+  background:
+    radial-gradient(120% 70% at 50% 115%, color-mix(in srgb, var(--g) 42%, transparent), transparent 70%),
+    linear-gradient(170deg, #1c100c, #0c0605);
+  border-color: color-mix(in srgb, var(--g) 50%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,210,160,.08), inset 0 -2px 0 rgba(0,0,0,.5), 0 0 var(--glow) color-mix(in srgb, var(--g) 50%, transparent);
+}
+[data-skin="ember"] .tile-face::after { border-style: dashed; opacity: .18; }
+
+/* ── Givre: frosted glass, cold light from the top ── */
+[data-skin="frost"] .t2    {--g:#7390ac}
+[data-skin="frost"] .t4    {--g:#80a4c4}
+[data-skin="frost"] .t8    {--g:#8cb8d8}
+[data-skin="frost"] .t16   {--g:#9ccbe8}
+[data-skin="frost"] .t32   {--g:#b0dcf2}
+[data-skin="frost"] .t64   {--g:#c4e7f8}
+[data-skin="frost"] .t128  {--g:#d6f0fc}
+[data-skin="frost"] .t256  {--g:#e4f6fe}
+[data-skin="frost"] .t512  {--g:#eefaff}
+[data-skin="frost"] .t1024 {--g:#f7fdff}
+[data-skin="frost"] .t2048 {--g:#ffffff}
+[data-skin="frost"] .tile-face {
+  background:
+    radial-gradient(90% 55% at 50% -10%, color-mix(in srgb, var(--g) 30%, transparent), transparent 70%),
+    linear-gradient(165deg, color-mix(in srgb, var(--g) 16%, #111a2c), #080d18);
+  border-color: color-mix(in srgb, var(--g) 55%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -2px 0 rgba(0,0,0,.4), 0 0 var(--glow) color-mix(in srgb, var(--g) 45%, transparent);
+}
+[data-skin="frost"] .tile-face::after { inset: 12%; border-radius: 30%; opacity: .2; }

@@ -13,20 +13,22 @@ const Scene = {
     b1:    { base:'#1d1812', deep:'#070504', acc:'#c9a36a' },
     b2:    { base:'#2c0d06', deep:'#0b0302', acc:'#ff6a2a' },
     b3:    { base:'#1d0722', deep:'#050108', acc:'#e04a8a' },
+    f4:    { base:'#1b1608', deep:'#050402', acc:'#f5d97a' },
+    b4:    { base:'#1c1a2c', deep:'#050409', acc:'#fff1c1' },
   },
-  MOTIFS: { title:'portal', shop:'shelves', rest:'campfire', f1:'colonnade', f2:'chains', f3:'stars', b1:'keyhole', b2:'anvil', b3:'eye' },
+  MOTIFS: { title:'portal', shop:'shelves', rest:'campfire', f1:'colonnade', f2:'chains', f3:'stars', b1:'keyhole', b2:'anvil', b3:'eye', f4:'summit', b4:'halo' },
   _current: null,
 
   // Scene for a screen, derived from the game state.
   forScreen(screenId) {
-    const fi = Math.min(GameState.run?.floorIdx ?? 0, 2);
+    const fi = Math.min(GameState.run?.floorIdx ?? 0, 3);
     switch (screenId) {
       case 'titleScreen': case 'endScreen': return this.set('title');
       case 'metaScreen':  return this.set(GameState._shopReturnToMap ? 'shop' : 'title');
       case 'mapScreen':   return this.set('map', fi);
       case 'gameScreen': {
         const type = GameState.room?.data?.type;
-        const roomFloor = Math.min(GameState.room?.floorIdx ?? fi, 2);
+        const roomFloor = Math.min(GameState.room?.floorIdx ?? fi, 3);
         return this.set(type === 'boss' ? `b${roomFloor + 1}` : `f${roomFloor + 1}`);
       }
       case 'relicScreen': if (GameState._restDone) return this.set('rest'); return;
@@ -129,6 +131,23 @@ const Scene = {
             const h = 20 + R() * 26, w = 10 + R() * 10;
             d += `<rect x="${n(x)}" y="${n(y - h)}" width="${n(w)}" height="${n(h)}" rx="3"/>`;
           }
+        });
+        return d;
+      }
+      case 'summit': {
+        // Snow-lit peaks under a floating crown and a few cold stars.
+        let d = '<path d="M-10 470L60 340l38 58 62-170 52 96 30-44 78 190"/><path d="M160 228l-20 56 22-14 18 24 14-30" opacity=".6"/><path d="M60 340l-14 34 16-8 12 14" opacity=".5"/>';
+        d += '<path d="M112 128l18 26 20-38 20 38 18-26v44h-76z"/><path d="M112 180h76" opacity=".6"/>';
+        for (let i = 0; i < 18; i++) d += `<circle cx="${n(R() * 300)}" cy="${n(R() * 110)}" r="${(R() * 1.4 + .5).toFixed(1)}"/>`;
+        return d;
+      }
+      case 'halo': {
+        // Three halos around a spire-crowned silhouette, one orb per borrowed boss.
+        let d = '';
+        [60, 96, 132].forEach((r, i) => { d += `<circle cx="150" cy="260" r="${r}"${i ? ` opacity="${(1 - i * .25).toFixed(2)}"` : ''}/>`; });
+        d += '<path d="M150 186l16 40h-32z"/><path d="M132 232h36l12 110h-60z"/><path d="M136 232l8-16 6 10 6-10 8 16"/>';
+        [[-.5, 132], [.5, 132], [Math.PI / 2, 96]].forEach(([a, r]) => {
+          d += `<circle cx="${n(150 + Math.cos(a - Math.PI / 2) * r)}" cy="${n(260 + Math.sin(a - Math.PI / 2) * r)}" r="9"/>`;
         });
         return d;
       }
