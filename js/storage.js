@@ -21,6 +21,7 @@ const Storage = {
       meta.records = { tile:0, hit:0, gold:0, ...meta.records };
       meta.progress = { bombs:0, spells:0, ...meta.progress };
       meta.achievements ??= [];
+      meta.dailyStreak ??= {count:0,last:null};
       meta.skins = [...new Set((Array.isArray(meta.skins) ? meta.skins : []).filter(id => ['obsidian','ember','frost'].includes(id)))];
       meta.skin = meta.skins.includes(meta.skin) ? meta.skin : null;
       // Only infer achievements from persisted evidence. Older aggregate counters do not
@@ -64,6 +65,10 @@ const Storage = {
       run.character ??= 'alchemist';
       run.hearts ??= 3;
       run.tier ??= 0;
+      if (run.daily) {
+        run.dailyRule ??= null;
+        run.dailyStreak ??= 1;
+      }
       run.stats ??= { biggestTile:0, bestDamage:0, goldEarned:0, floorsCleared:0 };
       run.spells = (run.spells ?? [{ id:'smash', charges:2 }])
         .filter(spell => SPELLS.some(def => def.id === spell.id)).slice(0,2)
@@ -114,6 +119,6 @@ const Storage = {
     } catch { return false; }
   },
   clearRun() { try { localStorage.removeItem(this.RUN_KEY); } catch {} },
-  defaultMeta: () => ({ totalRuns:0, bestFloor:0, totalGold:0, permanentGold:0, upgrades:{}, tiers:Object.fromEntries(CHARACTERS.map(({id}) => [id,0])), skins:[], skin:null, daily:null,
+  defaultMeta: () => ({ totalRuns:0, bestFloor:0, totalGold:0, permanentGold:0, upgrades:{}, tiers:Object.fromEntries(CHARACTERS.map(({id}) => [id,0])), skins:[], skin:null, daily:null, dailyStreak:{count:0,last:null},
     codex:{relics:[],enemies:{},runs:[]}, records:{tile:0,hit:0,gold:0}, progress:{bombs:0,spells:0}, achievements:[], settings:{sound:true,music:true} }),
 };

@@ -75,8 +75,12 @@ const Controller = {
     fight.hp = Math.max(0,fight.hp-(raw-absorbed));
     return {raw,dealt:raw-absorbed,absorbed,combo};
   },
+  dailyEnemyCadence(fight) {
+    if (GameState.run?.dailyRule === 'frenzy') fight.cadence = fight.intentIn = Math.max(2, fight.cadence - 1);
+  },
   advancePhase(fight, def) {
     const changed = Combat.phase(fight, def, GameState.run?.tier || 0);
+    if (changed) this.dailyEnemyCadence(fight);
     if (changed && fight.phase !== 3 && typeof Music !== 'undefined') Music.forScreen('gameScreen');
     return changed;
   },
@@ -99,7 +103,7 @@ const Controller = {
 
   shopPrice(value) {
     const discount = GameState.run.character === 'alchemist' ? 0.8 : 1;
-    return Math.floor(value * discount);
+    return Math.floor(value * discount * (GameState.run.dailyRule === 'rich' ? 1.25 : 1));
   },
   dailyDate(now = new Date()) { return now.toISOString().slice(0,10); },
   dailySeed(date) {
@@ -110,17 +114,28 @@ const Controller = {
   dailyCharacter(date) {
     return CHARACTERS[Math.floor(Date.parse(date + 'T00:00:00Z') / 86400000) % CHARACTERS.length];
   },
+  dailyRule(date) { return DAILY_RULES[this.dailySeed(date) % DAILY_RULES.length]; },
+  dailyStreak(date, previous = GameState.meta.dailyStreak) {
+    const yesterday = new Date(Date.parse(date + 'T00:00:00Z') - 86400000).toISOString().slice(0,10);
+    return { count:previous?.last === yesterday ? (previous.count || 0) + 1 : 1, last:date };
+  },
+  dailyReward(run, win) {
+    return (10 + 5 * (run.stats?.floorsCleared || 0)) * (win ? 2 : 1)
+      + 5 * Math.min(run.dailyStreak || 1, 7);
+  },
   startDaily(now = new Date()) {
     const date = this.dailyDate(now);
     if (GameState.meta.daily?.date === date) return false;
+    GameState.meta.dailyStreak = this.dailyStreak(date);
     GameState.meta.daily = { date, result:'playing', score:0 };
-    this._beginRun(this.dailyCharacter(date).id, { date, seed:this.dailySeed(date), tier:3 });
+    this._beginRun(this.dailyCharacter(date).id, { date, seed:this.dailySeed(date), tier:3,
+      rule:this.dailyRule(date).id, streak:GameState.meta.dailyStreak.count });
     Storage.save(GameState.meta);
     Renderer.renderTitle();
     return true;
   },
   tierGold(gold, tier) { return Math.floor(gold * (1 + 0.1 * (tier || 0))); },
-  roomGold(amount) { return amount; },
+  roomGold(amount) { return GameState.run?.dailyRule === 'gold' ? Math.floor(amount * 0.75) : amount; },
   strikeCost(effect) { return effect.strike; },
   earnedGold(amount) {
     const run = GameState.run;
@@ -216,6 +231,8 @@ const Controller = {
       hearts: (daily?.tier ?? this.selectedTier ?? 0) >= 5 ? 2 : 3,
       tier: daily?.tier ?? this.selectedTier ?? 0,
       daily: daily?.date || null,
+      dailyRule: daily?.rule || null,
+      dailyStreak: daily?.streak || null,
       stats: { biggestTile:0, bestDamage:0, goldEarned:0, floorsCleared:0 },
       totalScore: 0,
       relics: [],
@@ -232,6 +249,16 @@ const Controller = {
     };
 
     this._grantRelic(RELICS.find(r => r.id === CHARACTERS.find(c => c.id === characterId).relic));
+    if (daily) {
+      const rule = DAILY_RULES.find(item => item.id === daily.rule);
+      for (const id of rule?.relics || [])
+        if (!GameState.run.relics.some(relic => relic.id === id)) this._grantRelic(RELICS.find(r => r.id === id), false);
+      if (daily.rule === 'twospells') {
+        const available = SPELLS.filter(spell => !GameState.run.spells.some(owned => owned.id === spell.id));
+        GameState.run.spells.push({id:available[Rng.int(available.length)].id,charges:2});
+      }
+      if (daily.rule === 'rich') GameState.run.gold = 60;
+    }
     if (GameState.run.tier >= 8) {
       const curses = RELICS.filter(r => r.isCurse);
       this._grantRelic(curses[Rng.int(curses.length)]);
@@ -447,11 +474,11 @@ const Controller = {
     return (customPool || RELICS).filter(r => !owned.has(r.id) && this.relicUnlocked(r.id));
   },
 
-  _grantRelic(relic) {
+  _grantRelic(relic, discover = true) {
     if (!relic) return false;
     GameState.run.relics.push(relic);
     const discovered = GameState.meta.codex.relics;
-    if (!discovered.includes(relic.id)) { discovered.push(relic.id); Storage.save(GameState.meta); }
+    if (discover && !discovered.includes(relic.id)) { discovered.push(relic.id); Storage.save(GameState.meta); }
     RelicHooks.invalidate();
     if (relic.hooks?.onRunStart) relic.hooks.onRunStart({}, GameState.run, GameState);
     Storage.saveRun(GameState.run);
@@ -462,7 +489,8 @@ const Controller = {
     this._stopClock();
     const m = GameState.meta;
     const run = GameState.run;
-    const banked = this.tierGold(run.gold, run.tier);
+    const banked = run.daily ? this.dailyReward(run, false) : this.tierGold(run.gold, run.tier);
+    if (run.daily) run.dailyReward = banked;
     m.permanentGold += banked;
     m.totalGold += banked;
     if (run.daily) m.daily = { date:run.daily, result:'abandoned', score:run.totalScore, floor:run.floorIdx + 1 };
@@ -477,6 +505,7 @@ const Controller = {
 
   // ── Room entry ──
   enterRoom(floorIdx, rowIdx, nodeIdx) {
+    if (GameState.run.daily) GameState.run.dailyBannerSeen = true;
     const roomData = GameState.run.floors[floorIdx][rowIdx][nodeIdx];
     GameState.room = { floorIdx, rowIdx, nodeIdx, data: roomData };
 
@@ -524,6 +553,10 @@ const Controller = {
       // An affix changes how the elite plays; its lower HP keeps the wall fair (tuned with npm run balance --tier 3).
       fight.maxHp = fight.hp = Math.ceil(fight.maxHp * 0.85);
     }
+    if (run.dailyRule === 'frenzy') {
+      this.dailyEnemyCadence(fight);
+      fight.maxHp = fight.hp = Math.ceil(fight.maxHp * 0.85);
+    }
     if (type === 'boss' && run.bossHpMult > 1) {
       GameState.room.combat.maxHp = Math.ceil(GameState.room.combat.maxHp * run.bossHpMult);
       GameState.room.combat.hp = GameState.room.combat.maxHp;
@@ -565,6 +598,19 @@ const Controller = {
 
     // Relic hooks modify board at room start (crystal, mirror, germination, curses, etc.)
     RelicHooks.fire('onRoomStart', { board: GameState.board, type, floorIdx, run });
+    if (run.dailyRule === 'frost') {
+      // Prefer a tile of 8 or more, like the enemy freeze; a fresh board only has small tiles, so fall back to any of them.
+      const big = [], any = [];
+      for (let r=0; r<GameState.board.length; r++) for (let c=0; c<GameState.board.length; c++) {
+        if (GameState.board[r][c] > 0) any.push([r,c]);
+        if (GameState.board[r][c] >= GameState.base * 4) big.push([r,c]);
+      }
+      const cells = big.length ? big : any;
+      if (cells.length) {
+        const [r,c] = cells[Rng.int(cells.length)];
+        GameState.kinds[r][c] = 'ice';
+      }
+    }
     if (floorIdx === 2) GameState.portals = Board.createPortals(GameState.board);
     if (enemy.id === 'stareater') Combat.placeVoid(GameState.room.combat,GameState.board,GameState.portals);
     this.recordMoveStats(GameState.board, 0);
@@ -1035,7 +1081,9 @@ const Controller = {
     if (hit.dealt > 0) Renderer.enemyHit(hit.dealt);
     const phaseChanged = this.advancePhase(fight, gs.room.enemyDef);
     if (fight.id === 'necromancer' && fight.reviveAvailable && fight.hp <= 0) {
-      Combat.revive(fight); Renderer.phaseBanner('combat.revive');
+      Combat.revive(fight);
+      this.dailyEnemyCadence(fight);
+      Renderer.phaseBanner('combat.revive');
       if (typeof Music !== 'undefined') Music.forScreen('gameScreen');
     } else if (phaseChanged) Renderer.phaseBanner(fight.phase === 3 ? 'combat.phase3' : 'combat.phase2');
     if (!moveCtx.freeMove) gs.movesLeft--;
@@ -1298,7 +1346,8 @@ const Controller = {
       r.stats ??= {biggestTile:0,bestDamage:0,goldEarned:0,floorsCleared:0};
       r.stats.floorsCleared = r.floors.length;
     }
-    const banked = this.tierGold(r.gold, r.tier);
+    const banked = r.daily ? this.dailyReward(r, win) : this.tierGold(r.gold, r.tier);
+    if (r.daily) r.dailyReward = banked;
     m.permanentGold += banked;
     m.totalGold += banked;
     if (win && !r.daily) (m.tiers ??= {})[r.character] = Math.max(characterTier(m,r.character), Math.min(MAX_TIER, (r.tier || 0) + 1));

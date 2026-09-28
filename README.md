@@ -10,7 +10,7 @@ A roguelike variant of 2048 with meta-progression, relics, difficulty tiers, ach
 
 ## How to Play
 
-Open `index.html` in a browser. Swipe or use arrow keys / WASD / ZQSD to move tiles. The v3.4.0 combat layout puts the moves and relic tray above the grid, spells below it, and the score and settings in the top-right menu.
+Open `index.html` in a browser. Swipe or use arrow keys / WASD / ZQSD to move tiles. The combat layout puts the moves and relic tray above the grid, spells below it, and the score and settings in the top-right menu.
 
 Each **run** spans 3 floors, with a hidden fourth floor at A9+. The first three floors have branching node maps with battles, elite rooms, mystery events, rest stops, a merchant, and a boss. A6+ puts the Threshold Warden on floor II. Floor IV holds the Ascendant. Merge tiles to damage enemies before your moves run out. Enemy intents show what happens next and when, except under A4+ fog; three hearts let you survive failed rooms, or two at A5+.
 
@@ -24,7 +24,7 @@ Each **run** spans 3 floors, with a hidden fourth floor at A9+. The first three 
 - **Codex**: browse discovered relics, defeated enemies, achievements and the latest 20 runs. Best tile, hit and gold records persist between runs.
 - **Achievements**: 15 long-term goals unlock the Artificer, Monk, Cartographer, Usurer and four relics. Earlier saves retain earned unlocks when their run history proves eligibility.
 - **Difficulty tiers**: each character has an independent A0 to A10 ladder. A2 changes a rest to a fight on each floor; A3 gives elites an affix; A4 hides enemy intents; A5 starts with two hearts; A6 brings the Threshold Warden; A7 traps mystery rooms; A8 adds a starting curse; A9 opens floor IV; A10 gives every boss a third phase. Enemies gain 2% HP per tier (affixed elites keep 85% of their HP), and banked gold grows by 10% per tier.
-- **Daily challenge**: one local attempt per UTC day, with a shared date seed, rotating character and tier A3. Permanent upgrades are ignored for the challenge.
+- **Daily challenge**: one local attempt per UTC day, with a date-seeded rule, rotating character and tier A3. Permanent upgrades are ignored. Eight rules change starting relics, spells, gold, frozen tiles or enemy pace. Consecutive days build a streak. Every completed, failed or abandoned attempt awards permanent gold based on floors cleared and streak; daily run gold is not banked. Runs and their rules can be resumed.
 - **Result card**: share or download a 1080 × 1350 PNG, or copy a short text summary with floor squares.
 - **Mystery rooms** – eight events with visible choices, risks, and rewards
 - **Special tiles**: gold tiles pay on merges; ice blocks until two adjacent merges thaw it; jokers merge with numbered tiles; ×2 doubles a numbered tile. Obstacles block movement, bombs halve adjacent numbers and destroy jokers or ×2 tiles, and floor III battles place paired portals. Prophet and Herald can freeze numbered tiles. Gold, joker and ×2 are fully implemented; spells can create joker and ×2 tiles.

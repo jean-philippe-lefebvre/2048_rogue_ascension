@@ -629,6 +629,12 @@ const Renderer = {
   // ── Map ──
   renderMap() {
     const gs = GameState;
+    const banner = document.getElementById('dailyRuleBanner');
+    const rule = gs.run.dailyRule && typeof DAILY_RULES !== 'undefined' ? DAILY_RULES.find(item => item.id === gs.run.dailyRule) : null;
+    if (banner) {
+      banner.style.display = rule && gs.run.floorIdx === 0 && !gs.run.dailyBannerSeen ? '' : 'none';
+      if (banner.style.display !== 'none') banner.innerHTML = `${Icons.svg(rule.icon)} <strong>${I18n.t('daily.rule.' + rule.id)}</strong> · ${I18n.t('daily.effect.' + rule.id)}`;
+    }
     document.getElementById('mapFloorLabel').textContent = GameState.run.floorIdx === 3
       ? I18n.t('map.summit')
       : `${I18n.t('map.floor', { n: GameState.run.floorIdx + 1 })} · ${I18n.t('floor.name.' + GameState.run.floorIdx)}`;
@@ -775,6 +781,13 @@ const Renderer = {
     dailyBtn.innerHTML = `${Icons.svg('daily')} ${done
       ? m.daily.result === 'victory' ? I18n.t('tier.victory') : I18n.t('tier.dailyDone', { n:Math.min(3, GameState.run?.daily === today ? GameState.run.floorIdx + 1 : m.daily.floor || 1) })
       : I18n.t('ui.btn.daily')}`;
+    if (!done) {
+      const rule = Controller.dailyRule(today);
+      const yesterday = new Date(Date.parse(today + 'T00:00:00Z') - 86400000).toISOString().slice(0,10);
+      const streak = m.dailyStreak?.count >= 2 && [today,yesterday].includes(m.dailyStreak.last)
+        ? `<span class="daily-streak">${Icons.svg('flame')} ${m.dailyStreak.count}</span>` : '';
+      dailyBtn.innerHTML += `<span class="daily-button-detail"><span>${Icons.svg(rule.icon)} ${I18n.t('daily.rule.' + rule.id)}</span>${streak}</span>`;
+    }
     const countdown = document.getElementById('dailyCountdown');
     countdown.style.display = done ? '' : 'none';
     if (done) {
@@ -924,10 +937,13 @@ const Renderer = {
     const gs = GameState;
     const r = gs.run || { gold:0, totalScore:0, relics:[], floorIdx:0 };
     document.getElementById('endStats').innerHTML = `
-      <div class="end-stat"><div class="end-stat-val">${r.gold}</div><div class="end-stat-label">${Icons.svg('gold')} ${I18n.t('end.goldGained')}</div></div>
+      <div class="end-stat"><div class="end-stat-val">${r.daily ? r.dailyReward : r.gold}</div><div class="end-stat-label">${Icons.svg('gold')} ${I18n.t(r.daily ? 'daily.permanentGold' : 'end.goldGained')}</div></div>
       <div class="end-stat"><div class="end-stat-val">${r.totalScore}</div><div class="end-stat-label">${I18n.t('end.totalScore')}</div></div>
       <div class="end-stat"><div class="end-stat-val">${r.floorIdx + 1}/${r.floors?.length >= 4 ? 4 : 3}</div><div class="end-stat-label">${I18n.t('end.floorReached')}</div></div>
       <div class="end-stat"><div class="end-stat-val">${r.relics.length}</div><div class="end-stat-label">${I18n.t('end.relics')}</div></div>`;
+    const dailyReward = document.getElementById('endDailyReward');
+    dailyReward.style.display = r.daily ? '' : 'none';
+    if (r.daily) dailyReward.textContent = I18n.t('daily.endReward', {gold:r.dailyReward, streak:r.dailyStreak});
     document.getElementById('endSeed').textContent = r.seed === undefined ? '' : `${I18n.t('end.seed')} : ${r.seed}`;
 
     const rel = document.getElementById('endRelics');

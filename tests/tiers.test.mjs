@@ -13,8 +13,8 @@ const context = vm.createContext({console,Date,location:{protocol:'https:',origi
 });
 for (const file of ['i18n','rng','constants','storage','state','board','combat','spells','controller','share'])
   vm.runInContext(fs.readFileSync(new URL(`../js/${file}.js`,import.meta.url),'utf8'),context,{filename:file});
-const {Controller,GameState,Storage,Rng,ENEMIES,CHARACTERS,Share} =
-  vm.runInContext('({Controller,GameState,Storage,Rng,ENEMIES,CHARACTERS,Share})',context);
+const {Controller,GameState,Storage,Rng,ENEMIES,CHARACTERS,Share,DAILY_RULES,Board} =
+  vm.runInContext('({Controller,GameState,Storage,Rng,ENEMIES,CHARACTERS,Share,DAILY_RULES,Board})',context);
 const fresh = (tier = 0) => {
   GameState.meta = Storage.defaultMeta();
   GameState.meta.tiers = {alchemist:10,artificer:10,monk:10};
@@ -205,10 +205,10 @@ test('daily seed, rollover, character rotation and one attempt per UTC day', () 
   assert.equal(GameState.run.seed,Controller.dailySeed('2026-09-27'));
   assert.equal(GameState.run.tier,3);
   assert.equal(GameState.getUpgradeLevel('extraMoves'),0);
-  assert.equal(GameState.run.relics.length,1);
+  assert.equal(GameState.run.dailyRule,Controller.dailyRule('2026-09-27').id);
   GameState.room = {floorIdx:0,rowIdx:0,nodeIdx:0,data:{type:'normal'},enemyDef:ENEMIES.find(e=>e.id==='rat')};
   Controller._startBattleRoom('normal',0);
-  assert.equal(GameState.movesMax,36);
+  assert.equal(GameState.movesMax,36 + (GameState.run.dailyRule === 'expanse' ? 4 : 0));
   assert.equal(Controller.startDaily(first),false);
   assert.equal(Controller.startDaily(new Date('2026-09-28T00:00:00Z')),true);
   const tiers={...GameState.meta.tiers};
@@ -217,13 +217,112 @@ test('daily seed, rollover, character rotation and one attempt per UTC day', () 
 });
 
 test('share text shows daily date, tier and floor outcome squares', () => {
-  const run = {daily:'2026-09-27',tier:3,hearts:2,floorIdx:1,stats:{floorsCleared:1},win:false,abandoned:false};
-  assert.equal(Share.text(run),'2048 Rogue · Défi du 27/09 · Étage 2/3 · 2 cœurs · 🟨🟥⬛\nhttps://example.com/game/');
+  const run = {daily:'2026-09-27',dailyRule:'trinity',dailyStreak:4,tier:3,hearts:2,floorIdx:1,stats:{floorsCleared:1},win:false,abandoned:false};
+  assert.equal(Share.text(run),'2048 Rogue · Défi du 27/09 · Trinité imposée · série 4 · Étage 2/3 · 2 cœurs · 🟨🟥⬛\nhttps://example.com/game/');
   context.location.protocol = 'file:';
-  assert.equal(Share.text(run),'2048 Rogue · Défi du 27/09 · Étage 2/3 · 2 cœurs · 🟨🟥⬛');
+  assert.equal(Share.text(run),'2048 Rogue · Défi du 27/09 · Trinité imposée · série 4 · Étage 2/3 · 2 cœurs · 🟨🟥⬛');
+  vm.runInContext('I18n._lang="en"; I18n._strings=I18n._data.en',context);
+  assert.equal(Share.text(run),'2048 Rogue · Daily challenge 27/09 · Trinity enforced · streak 4 · Floor 2/3 · 2 hearts · 🟨🟥⬛');
+  vm.runInContext('I18n._lang="fr"; I18n._strings=I18n._data.fr',context);
   context.location.protocol = 'https:';
-  run.daily=null; run.win=true; run.floorIdx=2; run.stats.floorsCleared=3;
+  run.daily=null; run.dailyRule=null; run.win=true; run.floorIdx=2; run.stats.floorsCleared=3;
   assert.match(Share.text(run),/Palier A3 · Étage 3\/3 · 2 cœurs · 🟨🟨🟨/);
+});
+
+test('daily rule uses the date seed and does not follow character rotation', () => {
+  assert.equal(Controller.dailyRule('2026-09-28').id, Controller.dailyRule('2026-09-28').id);
+  assert.equal(Controller.dailyRule('2026-09-28').id, DAILY_RULES[Controller.dailySeed('2026-09-28') % DAILY_RULES.length].id);
+  const dates = Array.from({length:32}, (_,i) => new Date(Date.UTC(2026,8,1+i)).toISOString().slice(0,10));
+  assert.equal(new Set(dates.map(date => Controller.dailyRule(date).id)).size,8);
+  assert.ok(dates.some((date,i) => i && Controller.dailyRule(date).id !== Controller.dailyRule(dates[i-1]).id
+    && Controller.dailyCharacter(date).id !== Controller.dailyCharacter(dates[i-1]).id));
+});
+
+test('daily rule setup applies each twist without discovering granted relics', () => {
+  for (const rule of DAILY_RULES) {
+    GameState.meta = Storage.defaultMeta();
+    Controller._beginRun('artificer',{date:'2026-09-28',seed:123,tier:3,rule:rule.id,streak:2});
+    const run = GameState.run;
+    assert.equal(run.dailyRule,rule.id);
+    for (const id of rule.relics || []) {
+      assert.ok(run.relics.some(relic => relic.id === id),rule.id);
+      assert.ok(!GameState.meta.codex.relics.includes(id),rule.id);
+    }
+    if (rule.id === 'twospells') {
+      assert.equal(run.spells.length,2);
+      assert.equal(run.spells[1].charges,2);
+      assert.notEqual(run.spells[0].id,run.spells[1].id);
+    }
+    if (rule.id === 'rich') {
+      assert.equal(run.gold,60);
+      assert.equal(Controller.shopPrice(100),125);
+    }
+    if (rule.id === 'gold') assert.equal(Controller.roomGold(20),15);
+    if (rule.id === 'gold') assert.equal(run.relics.filter(relic=>relic.id==='magnet').length,1);
+    GameState.room = {floorIdx:0,rowIdx:0,nodeIdx:0,data:{type:'normal'},enemyDef:ENEMIES.find(e=>e.id==='rat')};
+    const originalAddRandom = Board.addRandom;
+    if (rule.id === 'frost') Board.addRandom = board => { Board.placeValue(board,2); };
+    try { Controller._startBattleRoom('normal',0); } finally { Board.addRandom = originalAddRandom; }
+    if (rule.id === 'trinity') assert.equal(GameState.base,3);
+    if (rule.id === 'expanse') { assert.equal(GameState.size,5); assert.equal(GameState.movesMax,40); }
+    if (rule.id === 'frost') assert.equal(GameState.kinds.flat().filter(kind=>kind==='ice').length,1);
+    if (rule.id === 'frenzy') {
+      assert.equal(GameState.room.combat.cadence,3);
+      assert.equal(GameState.room.combat.maxHp,Math.ceil(Math.ceil(180*1.06)*.85));
+    }
+  }
+  GameState.meta=Storage.defaultMeta();
+  Controller._beginRun('alchemist',{date:'2026-09-28',seed:123,tier:3,rule:'gold',streak:2});
+  assert.equal(GameState.run.relics.filter(relic=>relic.id==='magnet').length,1);
+});
+
+test('daily streak follows UTC dates and reward covers wins, losses, abandonment and cap', () => {
+  GameState.meta = Storage.defaultMeta();
+  const start = date => Controller.startDaily(new Date(date));
+  assert.equal(start('2026-09-27T23:59:00Z'),true);
+  assert.equal(GameState.run.dailyStreak,1);
+  Controller.abandonRun();
+  assert.equal(GameState.meta.permanentGold,15);
+  assert.equal(start('2026-09-28T00:00:00Z'),true);
+  assert.equal(GameState.run.dailyStreak,2);
+  GameState.run.stats.floorsCleared=2;
+  GameState.run.gold=100;
+  Controller._endRun(false);
+  assert.equal(GameState.meta.permanentGold,45);
+  assert.equal(start('2026-09-30T00:00:00Z'),true);
+  assert.equal(GameState.run.dailyStreak,1);
+  GameState.run.gold=100;
+  Controller._endRun(true);
+  assert.equal(GameState.meta.permanentGold,100);
+  assert.equal(Controller.dailyReward({dailyStreak:9,stats:{floorsCleared:2}},false),55);
+  assert.equal(Controller.dailyReward({dailyStreak:9,stats:{floorsCleared:3}},true),85);
+});
+
+test('daily rule and streak survive save and resume', () => {
+  GameState.meta=Storage.defaultMeta();
+  Controller.startDaily(new Date('2026-10-01T00:00:00Z'));
+  const {dailyRule,dailyStreak} = GameState.run;
+  const loaded=Storage.loadRun();
+  assert.equal(loaded.dailyRule,dailyRule);
+  assert.equal(loaded.dailyStreak,dailyStreak);
+  GameState.run=loaded;
+  Controller.resumeRun();
+  assert.equal(GameState.run.dailyRule,dailyRule);
+  const legacy=JSON.parse(saved.get(Storage.RUN_KEY));
+  delete legacy.dailyRule;
+  saved.set(Storage.RUN_KEY,JSON.stringify(legacy));
+  assert.equal(Storage.loadRun().dailyRule,null);
+});
+
+test('Frenzy also shortens the Necromancer revival cadence', () => {
+  GameState.meta=Storage.defaultMeta();
+  Controller._beginRun('artificer',{date:'2026-09-28',seed:123,tier:3,rule:'frenzy',streak:1});
+  const fight=vm.runInContext('Combat.create(ENEMIES.find(enemy=>enemy.id==="necromancer"))',context);
+  fight.hp=0;
+  assert.equal(vm.runInContext('Combat',context).revive(fight),true);
+  Controller.dailyEnemyCadence(fight);
+  assert.equal(fight.cadence,2);
+  assert.equal(fight.intentIn,2);
 });
 
 test('earned gold and completed boss reward update persisted stats', () => {

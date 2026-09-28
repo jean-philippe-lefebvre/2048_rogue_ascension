@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Feature** (new mechanic, new relics, UI change) → bump minor: `v1.0.0` → `v1.1.0`
 - **Major** (user-requested big upgrade) → bump major: `v1.0.0` → `v2.0.0`
 
-Current version: **v3.4.0** (`index.html` title screen, bottom)
+Current version: **v3.5.0** (`index.html` title screen, bottom)
 
 ## Development
 
@@ -80,7 +80,7 @@ Per-room state for 1x/room relics: `GameState.room.relicState = {}`
 - **Meta-progression**: permanent gold and upgrades plus five independent A0 to A10 character ladders in `meta.tiers`. Win tier N with a character to unlock N + 1 for that character. Upgrade gates use the highest ladder. Legacy `tierUnlocked` saves grant that level to each character; old ascension saves first convert to tier 3 × old level.
 - **Codex and achievements**: meta saves discovered relics, defeated enemy counts, the latest 20 runs, tile/damage/gold records, 15 achievements, and cumulative bomb/spell progress. Four achievements unlock relics and four unlock characters. Locked relics are excluded from all offer pools.
 - **Music**: a separate persisted music toggle controls a procedural WebAudio bed at 0.22 of master gain. `Music.sceneFor()` and `Music.tempoFor()` are pure scene selectors; `showScreen()` and boss phase changes drive 1.2 second crossfades.
-- **Daily challenge**: UTC date hashed with FNV-1a, rotating character, tier A3, one local attempt per day. Meta upgrades and start relic upgrades are ignored. Runs can be resumed.
+- **Daily challenge**: UTC date hashed with FNV-1a draws one of eight rules separately from the rotating character. Tier A3, one local attempt per day. Meta upgrades and start relic upgrades are ignored. The rule and streak persist on the run, including resumes. Streaks count consecutive UTC attempt dates. Daily endings, including abandonment, award permanent gold from floors cleared and streak instead of banking run gold. Rule-granted relics are not discovered by that grant.
 - **Result card**: 1080 × 1350 PNG generated in `share.js`, with native file sharing or download fallback, plus a copied text summary.
 - **Run**: 3 floors (étages), plus a one-boss hidden floor IV at A9+. The first three floors each have a **Slay-the-Spire-style node map**: 5 rows of 3 connected nodes + 1 boss. Nodes have connections to 1-2 nodes in the next row. Each floor has a seeded `bossId`, persisted on its boss node because JSON arrays do not serialize custom properties. A6+ always draws the Threshold Warden on floor II. Floor IV contains the Ascendant, whose pattern uses the first intent of the three drawn bosses plus strike. Older runs default to jailer, smith, eye. The Cartographer sees the current and future floors with enemy emblems.
 - **Tier milestones**: A2 converts one pre-boss rest per floor to a fight; A3 adds one seeded affix per elite; A4 hides intents until two moves remain; A5 starts with two hearts; A7 traps one third of mystery rooms with an elite ambush; A8 starts with a curse; A10 adds a third boss phase at 25% HP. Enemy HP scales by 2% per tier; affixed elites keep 85% of their HP. Affixes are armored, enraged, pyro and vampire.

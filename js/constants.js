@@ -30,6 +30,17 @@ const CHARACTERS = [
   { id:'usurer', icon:'c-usurer', relic:'greed', spell:'swap' },
 ];
 
+const DAILY_RULES = [
+  { id:'trinity', icon:'trinity', relics:['trinity'] },
+  { id:'expanse', icon:'expanse', relics:['expanse'] },
+  { id:'twospells', icon:'s-joker' },
+  { id:'rich', icon:'gold' },
+  { id:'frost', icon:'i-freeze' },
+  { id:'jokers', icon:'wildcard', relics:['wildcard'] },
+  { id:'gold', icon:'magnet', relics:['magnet','collector'] },
+  { id:'frenzy', icon:'a-enraged' },
+];
+
 const UNLOCKS = { artificer:'jailbreak', monk:'gaze', cartographer:'cartographer', usurer:'usurer', chainreact:'chain5', cornerstone:'tile1024', philosopher:'rich', wildcard:'scholar' };
 
 const ACHIEVEMENTS = [

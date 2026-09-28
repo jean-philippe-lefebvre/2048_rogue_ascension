@@ -30,7 +30,8 @@ const Share = {
     const floorText = I18n._lang === 'en' ? `Floor ${floor}/${total}` : `Étage ${floor}/${total}`;
     const heartText = I18n._lang === 'en' ? `${hearts} hearts` : `${hearts} cœurs`;
     const link = this.link();
-    return `2048 Rogue · ${this.label(run)} · ${floorText} · ${heartText} · ${squares}` + (link ? `\n${link}` : '');
+    const daily = run.daily && run.dailyRule ? ` · ${I18n.t('daily.rule.' + run.dailyRule)} · ${I18n.t('daily.shareStreak', {n:run.dailyStreak || 1})}` : '';
+    return `2048 Rogue · ${this.label(run)}${daily} · ${floorText} · ${heartText} · ${squares}` + (link ? `\n${link}` : '');
   },
   async copyText() {
     if (this.current) await navigator.clipboard.writeText(this.text());
@@ -87,6 +88,10 @@ const Share = {
     ctx.letterSpacing = '6px'; ctx.fillText('2048 ROGUE ASCENSION', 540, 128); ctx.letterSpacing = '0px';
     ctx.fillStyle = dim; ctx.font = '30px "Courier Prime"';
     ctx.fillText(run.daily ? this.label(run) + ' · ' + I18n.t('tier.label', { n:run.tier || 0 }) : this.label(run), 540, 178);
+    if (run.daily && run.dailyRule) {
+      ctx.font = '26px "Courier Prime"';
+      ctx.fillText(I18n.t('daily.rule.' + run.dailyRule), 540, 210);
+    }
     // Hero: character.
     const character = CHARACTERS.find(c => c.id === run.character) || CHARACTERS[0];
     const characterIcon = await this.icon(character.icon, gold, 150);
