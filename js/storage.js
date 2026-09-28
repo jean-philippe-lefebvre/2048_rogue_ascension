@@ -4,7 +4,17 @@ const Storage = {
   KEY: '2048rogue_v2',
   RUN_KEY: '2048rogue_run_v2',
   load() {
-    try { const s = localStorage.getItem(this.KEY); return s ? JSON.parse(s) : null; } catch { return null; }
+    try {
+      const s = localStorage.getItem(this.KEY);
+      if (!s) return null;
+      const meta = JSON.parse(s);
+      if (meta.tierUnlocked === undefined)
+        meta.tierUnlocked = Math.min(MAX_TIER, Math.max(0, 3 * (meta.ascension ?? meta.ascensionLevel ?? 0)));
+      meta.tierUnlocked = Math.min(MAX_TIER, Math.max(0, meta.tierUnlocked));
+      delete meta.ascension;
+      delete meta.ascensionLevel;
+      return meta;
+    } catch { return null; }
   },
   save(data) {
     try { localStorage.setItem(this.KEY, JSON.stringify(data)); return true; }
@@ -17,6 +27,8 @@ const Storage = {
       const run = JSON.parse(raw);
       run.character ??= 'alchemist';
       run.hearts ??= 3;
+      run.tier ??= 0;
+      run.stats ??= { biggestTile:0, bestDamage:0, goldEarned:0, floorsCleared:0 };
       run.spells = (run.spells ?? [{ id:'smash', charges:2 }])
         .filter(spell => SPELLS.some(def => def.id === spell.id)).slice(0,2)
         .map(spell => ({ id:spell.id, charges:Math.min((run.relics || []).some(r => (r?.id || r) === 'grimoire') ? 4 : 3,Math.max(0,spell.charges ?? 0)) }));
@@ -66,5 +78,5 @@ const Storage = {
     } catch { return false; }
   },
   clearRun() { try { localStorage.removeItem(this.RUN_KEY); } catch {} },
-  defaultMeta: () => ({ totalRuns:0, bestFloor:0, totalGold:0, permanentGold:0, upgrades:{}, ascensionLevel:0, settings:{ sound:true } }),
+  defaultMeta: () => ({ totalRuns:0, bestFloor:0, totalGold:0, permanentGold:0, upgrades:{}, tierUnlocked:0, daily:null, settings:{ sound:true } }),
 };

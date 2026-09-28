@@ -182,26 +182,27 @@ const RELIC_TAGS = {
 };
 for (const relic of RELICS) relic.tags = RELIC_TAGS[relic.id] || [];
 
-const ASCENSION_COSTS = [200, 500, 1000];
-const MAX_ASCENSION   = ASCENSION_COSTS.length;
+const MAX_TIER = 10;
+const TIER_UPGRADE_REQUIREMENTS = { 0:0, 1:2, 2:4, 3:7 };
+const tierRequirement = ascReq => TIER_UPGRADE_REQUIREMENTS[ascReq || 0];
 
 const META_DEFS = [
-  // ── Base (Ascension 0+) ──
+  // ── Base upgrades ──
   { id:'extraMoves',  icon:'extraMoves', name:'Élan',           maxLvl:4, costs:[20,40,70,110], ascReq:0, desc:'Coups de base de toutes les salles.',     getEffect: l => `+${l*2} coups de base` },
   { id:'startTile',   icon:'startTile', name:'Tuile de départ', maxLvl:3, costs:[30,60,100],   ascReq:0, desc:'Commence chaque run avec une tuile bonus.', getEffect: l => `Tuile ${Board.base() * 2 ** l} au départ` },
   { id:'goldBonus',   icon:'goldBonus', name:'Alchimie',        maxLvl:3, costs:[25,50,90],    ascReq:0, desc:"Or gagné en fin de salle.",               getEffect: l => `+${l*2} or/salle` },
   { id:'relicSlots',  icon:'relicSlots', name:'Besace',          maxLvl:2, costs:[50,100],      ascReq:0, desc:'Plus de choix de reliques proposés.',     getEffect: l => `${l+3} reliques proposées` },
   { id:'startRelic',  icon:'startRelic', name:'Bénédiction',     maxLvl:1, costs:[80],          ascReq:0, desc:'1 relique commune gratuite au départ.',   getEffect: _  => '1 relique gratuite' },
 
-  // ── Ascension 1 ──
+  // ── Unlocked at tier A2 ──
   { id:'forgedEntropy', icon:'forgedEntropy', name:'Entropie Forgée', maxLvl:3, costs:[80,160,300], ascReq:1, desc:'Les tuiles générées commencent plus haut.', getEffect: l => `Tuiles de base : ${Board.base() * 2 ** (l + 1)}` },
   { id:'synergy',       icon:'synergy', name:'Synergie',        maxLvl:2, costs:[120,250],   ascReq:1, desc:'Les reliques proposées sont de meilleure rareté.', getEffect: l => `+${l*10} rareté` },
 
-  // ── Ascension 2 ──
+  // ── Unlocked at tier A4 ──
   { id:'deepForge',  icon:'deepForge', name:'Forge Profonde', maxLvl:3, costs:[100,200,400], ascReq:2, desc:'Chance de super-fusion (résultat ×2).', getEffect: l => `${l*10}% chance super-fusion` },
   { id:'destiny',    icon:'destiny', name:'Destinée',       maxLvl:1, costs:[250],        ascReq:2, desc:'Choisis 1 relique rare au début de chaque run.', getEffect: _ => '1 relique rare au départ' },
 
-  // ── Ascension 3 ──
+  // ── Unlocked at tier A7 ──
   { id:'singularity', icon:'singularity', name:'Singularité', maxLvl:1, costs:[500],        ascReq:3, desc:'1×/run : une fusion de rang 7+ double toutes les tuiles.', getEffect: _ => 'Doublement total au rang 7+' },
   { id:'mastery',     icon:'mastery', name:'Maîtrise',    maxLvl:3, costs:[150,300,500], ascReq:3, desc:'Coups bonus dans les salles boss.',                           getEffect: l => `+${l*10}% coups boss` },
 ];

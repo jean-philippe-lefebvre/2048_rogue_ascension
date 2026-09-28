@@ -26,16 +26,21 @@
   <div class="flex flex-col gap-2 w-full">
     <button class="btn btn-primary" id="btnContinueRun" style="display:none" data-i18n="ui.btn.continueRun">▶ Continuer la run</button>
     <button class="btn" id="btnStartRun" data-icon="sword" data-i18n="ui.btn.newRun">Nouvelle Run</button>
+    <button class="btn" id="btnDaily" data-icon="daily" data-i18n="ui.btn.daily">Défi du jour</button>
+    <div class="daily-countdown" id="dailyCountdown" style="display:none"></div>
     <button class="btn" id="btnShowMeta" data-icon="castle" data-i18n="ui.btn.upgrades">Améliorations</button>
     <button class="btn-ghost" id="btnResetSave" style="margin-top:4px;color:var(--text-muted)" data-i18n="ui.btn.resetSave">↺ Tout effacer</button>
   </div>
   <div class="lang-toggle"><div id="langToggle"></div><button class="lang-btn" id="soundToggle" type="button"></button></div>
-  <div class="version-tag">v2.5.0</div>
+  <div class="version-tag">v3.0.0</div>
 </div>
 
 <!-- CHARACTER CHOICE -->
 <div id="characterScreen" class="screen">
   <div class="relic-header"><div class="text-xs text-dim" data-i18n="character.eyebrow">Nouvelle Run</div><div class="relic-screen-title" data-i18n="character.choose">Choisis ton personnage</div></div>
+  <div class="tier-selector"><button class="tier-step" id="btnTierDown" aria-label="Previous tier">−</button><div class="tier-label" id="tierLabel"></div><button class="tier-step" id="btnTierUp" aria-label="Next tier">+</button></div>
+  <div class="tier-options" id="tierOptions"></div>
+  <div class="tier-rules" id="tierRules"></div>
   <div class="character-choices" id="characterChoices"></div>
   <button class="btn" id="btnCharacterBack" data-i18n="ui.btn.cancel">Annuler</button>
 </div>
@@ -133,6 +138,8 @@
   </div>
   <div class="flex flex-col gap-2 w-full">
     <button class="btn btn-primary" id="btnReplay" data-icon="sword" data-i18n="ui.btn.replay">Rejouer</button>
+    <button class="btn" id="btnShare" data-icon="share" data-i18n="ui.btn.share">Partager</button>
+    <button class="btn" id="btnCopyResult" data-i18n="ui.btn.copyResult">Copier le texte</button>
     <button class="btn" id="btnEndToMeta" data-icon="castle" data-i18n="ui.btn.spendGold">Dépenser l'or</button>
     <button class="btn" id="btnEndToTitle" data-i18n="ui.btn.menu">← Menu</button>
   </div>
@@ -146,7 +153,6 @@
     <div class="text-sm text-dim"><span data-icon="gold" data-i18n="meta.availableGold">Or disponible : </span><span class="text-gold" id="metaGold">0</span></div>
   </div>
   <div class="flex flex-col gap-2 w-full" id="metaList"></div>
-  <button class="btn btn-ascend mt-2" id="btnAscend" style="display:none"></button>
   <button class="btn mt-2" id="btnMetaBack" data-i18n="ui.btn.back">← Retour</button>
 </div>
 
@@ -194,20 +200,7 @@
   </div>
 </div>
 
-<!-- ASCENSION MODAL -->
-<div class="modal-backdrop" id="ascendModal">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ascendModalTitle">
-    <div class="modal-icon" data-static-icon="ascend"></div>
-    <div class="modal-title" id="ascendModalTitle" style="color:var(--purple)" data-i18n="modal.ascensionTitle">Ascension</div>
-    <div class="modal-sub" id="ascendModalSub"></div>
-    <div class="flex flex-col gap-2 w-full" style="margin-top:4px">
-      <button class="btn btn-ascend-confirm" id="btnAscendConfirm" data-i18n="modal.ascendConfirm">Transcender</button>
-      <button class="btn" id="btnAscendCancel" data-i18n="ui.btn.cancel">Annuler</button>
-    </div>
-  </div>
-</div>
-
-<!-- JS, order matters: haptics → i18n → icons → rng → constants → storage → state → board → combat → fx → scene → audio → renderer → controller → input -->
+<!-- JS, order matters: haptics → i18n → icons → rng → constants → storage → state → board → combat → spells → fx → scene → audio → renderer → controller → share → input -->
 <script src="js/haptics.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/icons.js"></script>
@@ -223,6 +216,7 @@
 <script src="js/audio.js"></script>
 <script src="js/renderer.js"></script>
 <script src="js/controller.js"></script>
+<script src="js/share.js"></script>
 <script src="js/input.js"></script>
 </body>
 </html>

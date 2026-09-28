@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Feature** (new mechanic, new relics, UI change) → bump minor: `v1.0.0` → `v1.1.0`
 - **Major** (user-requested big upgrade) → bump major: `v1.0.0` → `v2.0.0`
 
-Current version: **v2.5.0** (`index.html` title screen, bottom)
+Current version: **v3.0.0** (`index.html` title screen, bottom)
 
 ## Development
 
@@ -24,10 +24,10 @@ No linter or dependencies.
 
 ## Architecture
 
-**Single-page app with 8 screens** managed by CSS `.active` class toggling (`showScreen()` in `renderer.js`). Screens: title, map, game (2048 grid), relic choice, merchant, event, end, meta (permanent upgrades). Screen refs are cached for performance.
+**Single-page app with 9 screens** managed by CSS `.active` class toggling (`showScreen()` in `renderer.js`). Screens: title, character choice, map, game (2048 grid), relic choice, merchant, event, end, meta (permanent upgrades). Screen refs are cached for performance.
 
 **Script load order matters** (declared in `index.html`):
-`haptics → i18n → icons → rng → constants → storage → state → board → combat → spells → fx → scene → audio → renderer → controller → input`
+`haptics → i18n → icons → rng → constants → storage → state → board → combat → spells → fx → scene → audio → renderer → controller → share → input`
 
 Each file exposes a global singleton object. Dependencies flow left-to-right.
 
@@ -39,7 +39,7 @@ Each file exposes a global singleton object. Dependencies flow left-to-right.
 | `i18n.js` | French and English translations |
 | `icons.js` | Hand-authored "Gravure fine" SVG icon set (24px grid, 1.5px round stroke, soft fills); icons are ids, never emojis |
 | `rng.js` | Seeded mulberry32 random stream for game decisions |
-| `constants.js` | Game data: room types, enemies, **RelicHooks system**, relic definitions (40 relics), meta-upgrades, ascension costs, rarity weights |
+| `constants.js` | Game data: room types, enemies, **RelicHooks system**, relic definitions (40 relics), meta-upgrades, tier requirements, rarity weights |
 | `storage.js` | localStorage wrapper (keys: `2048rogue_v2`, `2048rogue_run_v2`). Persists meta-progression, sound, active run and hearts |
 | `state.js` | `GameState` singleton – holds meta, run, room, board, score, moves |
 | `board.js` | Pure line merge model, kinds and bomb move map, ice thaw, portals, tile placement. Fires `onTileSpawn` in `addRandom()` |
@@ -49,7 +49,8 @@ Each file exposes a global singleton object. Dependencies flow left-to-right.
 | `scene.js` | "Brume minimaliste" backdrops: one scene per context (title, map per floor, floors I-III, bosses I-III, shop, rest), crossfaded from `showScreen()` |
 | `audio.js` | Lazy WebAudio sound effects |
 | `renderer.js` | All DOM manipulation. Tile geometry cached (`_geoCache`), invalidated on resize/buildGrid. SVG connection lines for map |
-| `controller.js` | Game flow orchestrator: run lifecycle, room entry, move processing, relic hook fire points, ascension, mystery events |
+| `controller.js` | Game flow orchestrator: run lifecycle, room entry, move processing, relic hook fire points, tiers, daily challenge, mystery events |
+| `share.js` | Result card PNG and copied result text |
 | `input.js` | Touch swipe, keyboard (arrows + WASD + ZQSD), d-pad buttons, window resize. Button bindings and boot IIFE |
 
 ### Relic Hook System
@@ -73,7 +74,9 @@ Per-room state for 1x/room relics: `GameState.room.relicState = {}`
 
 ### Game structure
 
-- **Meta-progression**: permanent gold + upgrades + **ascension system** (3 tiers, resets upgrades, unlocks new passifs). Persisted in localStorage
+- **Meta-progression**: permanent gold and upgrades plus 10 cumulative difficulty tiers. Win tier N to unlock N + 1; upgrades stay purchased. Old ascension saves migrate to tier 3 × old level. Persisted in localStorage.
+- **Daily challenge**: UTC date hashed with FNV-1a, rotating character, tier A3, one local attempt per day. Meta upgrades and start relic upgrades are ignored. Runs can be resumed.
+- **Result card**: 1080 × 1350 PNG generated in `share.js`, with native file sharing or download fallback, plus a copied text summary.
 - **Run**: 3 floors (étages). Each floor has a **Slay-the-Spire-style node map**: 5 rows of 3 connected nodes + 1 boss. Nodes have connections to 1-2 nodes in the next row. Each floor has a seeded `bossId`, persisted on its boss node because JSON arrays do not serialize custom properties. The map shows its emblem and name. Older runs default to jailer, smith, eye. Only the current floor is shown
 - **Room types**: normal/elite/boss (HP combat with telegraphed enemy intents), rest (relic, healing or spell recharge), shop (run gold purchases), mystery (eight choice events)
 - **Relics**: 40 total (7 common, 10 rare, 9 epic, 8 legendary, 6 curses). Rarity-weighted drops that scale by floor. Expanse makes the next battle board 5×5 with 4 more moves; Trinity uses the 3, 6, 12... tile series and raises enemy HP by 40%. Curses enter through mystery events and can be removed by the merchant
@@ -84,7 +87,7 @@ Per-room state for 1x/room relics: `GameState.room.relicState = {}`
 
 ### CSS
 
-Single `style.css` with CSS custom properties (`:root` tokens). Dark theme with gold/red/blue/purple accents. Tile colors are class-based (`t2`, `t4`... `t-obstacle`, `t-bomb`). Curses styled with red border (`.is-curse`). Ascension UI uses purple theme. Mobile-first, max-width 440px.
+Single `style.css` with CSS custom properties (`:root` tokens). Dark theme with gold/red/blue/purple accents. Tile colors are class-based (`t2`, `t4`... `t-obstacle`, `t-bomb`). Curses styled with red border (`.is-curse`). Tier selection uses the existing gold and purple accents. Mobile-first, max-width 440px.
 
 ### Special tile board API
 

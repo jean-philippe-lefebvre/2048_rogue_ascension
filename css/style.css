@@ -142,7 +142,7 @@ body {
 .btn-ghost:hover { color: var(--text-dim); }
 
 /* ─── FOCUS ─── */
-.btn:focus-visible, .btn-primary:focus-visible, .btn-ghost:focus-visible, .btn-ascend:focus-visible {
+.btn:focus-visible, .btn-primary:focus-visible, .btn-ghost:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
@@ -329,6 +329,17 @@ body {
 .family-chip { display: inline-block; padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; color: var(--text-muted); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; line-height: 1.4; }
 .relic-family-list { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
 .character-choices { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.tier-selector { display:flex; align-items:center; justify-content:center; gap:16px; width:100%; margin:14px 0 8px; }
+.tier-step { width:44px; height:44px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--gold); font:700 24px 'Courier Prime', monospace; cursor:pointer; }
+.tier-step:disabled { opacity:.35; cursor:default; }
+.tier-step:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+.tier-label { min-width:126px; text-align:center; font:700 18px Cinzel, serif; color:var(--gold); }
+.tier-options { display:flex; flex-wrap:wrap; justify-content:center; gap:4px; width:100%; margin-bottom:8px; }
+.tier-option { min-width:31px; height:31px; border:1px solid var(--border); border-radius:4px; background:var(--surface); color:var(--text-dim); font:12px 'Courier Prime', monospace; cursor:pointer; }
+.tier-option.selected { border-color:var(--gold); color:var(--gold); }
+.tier-option:disabled { opacity:.3; cursor:default; }
+.tier-rules { width:100%; color:var(--text-dim); font-size:12px; line-height:1.6; text-align:center; margin-bottom:16px; }
+.daily-countdown { text-align:center; color:var(--text-dim); font-size:12px; letter-spacing:2px; }
 .character-card { display: flex; flex-direction: column; align-items: center; width: 100%; padding: 16px; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); cursor: pointer; font-family: inherit; }
 .character-card:hover, .character-card:focus-visible { border-color: var(--gold); }
 .character-icon .ico { width: 40px; height: 40px; }
@@ -605,11 +616,10 @@ body {
 }
 .modal-icon { font-size: 48px; color: var(--gold); }
 .modal-icon[data-static-icon="warning"], .modal-icon[data-static-icon="abandon"] { color: var(--red); }
-.modal-icon[data-static-icon="ascend"] { color: var(--purple); }
 .modal-title { font-family: 'Cinzel', serif; font-size: 20px; font-weight: 900; color: var(--gold); }
 .modal-sub { font-size: 12px; color: var(--text-dim); line-height: 1.6; }
 
-/* ─── ASCENSION ─── */
+/* ─── TIERS ─── */
 .ascension-badge {
   font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
   color: var(--purple); border: 1px solid rgba(154,74,196,0.4);
@@ -628,21 +638,6 @@ body {
   border-top: 1px solid rgba(154,74,196,0.2); margin-top: 4px;
 }
 
-.btn-ascend {
-  background: linear-gradient(135deg, rgba(154,74,196,0.2), rgba(154,74,196,0.05));
-  border: 1px solid rgba(154,74,196,0.4);
-  color: var(--purple); font-weight: 700;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.btn-ascend:hover:not(.is-locked) {
-  border-color: var(--purple);
-  box-shadow: 0 0 20px rgba(154,74,196,0.3);
-  color: #c480e8;
-}
-.btn-ascend.is-locked {
-  opacity: 0.35; cursor: default;
-}
-
 /* ─── DANGER BUTTON ─── */
 .btn-danger {
   background: linear-gradient(135deg, #a03020, #6a1a10);
@@ -650,13 +645,6 @@ body {
   font-weight: 700;
 }
 .btn-danger:hover { background: linear-gradient(135deg, #b03828, #7a2218); }
-
-.btn-ascend-confirm {
-  background: linear-gradient(135deg, #9a4ac4, #5a1a8a);
-  border-color: #9a4ac4; color: var(--text);
-  font-weight: 700;
-}
-.btn-ascend-confirm:hover { background: linear-gradient(135deg, #aa5ad4, #6a2a9a); }
 
 /* ─── SHAKE (insufficient gold) ─── */
 @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-4px)} 40%{transform:translateX(4px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(2px)} }

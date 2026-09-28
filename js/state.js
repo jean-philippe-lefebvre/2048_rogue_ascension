@@ -19,6 +19,6 @@ const GameState = {
   // Relic choice callback
   _relicDone: null,
 
-  getUpgradeLevel(id) { return this.meta.upgrades[id] || 0; },
+  getUpgradeLevel(id) { return this.run?.daily ? 0 : this.meta.upgrades[id] || 0; },
   hasRelic(id) { return this.run?.relics.some(r => r.id === id); },
 };

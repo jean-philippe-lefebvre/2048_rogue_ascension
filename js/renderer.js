@@ -22,6 +22,7 @@ const Renderer = {
     return (relic.tags || []).map(tag => `<span class="family-chip">${I18n.t('family.'+tag)}</span>`).join('');
   },
   renderCharacters() {
+    this.renderTierSelector();
     const container=document.getElementById('characterChoices');
     container.innerHTML='';
     for(const character of CHARACTERS) {
@@ -32,6 +33,30 @@ const Renderer = {
       container.appendChild(card);
     }
     document.getElementById('btnCharacterBack').onclick=()=>showScreen('titleScreen');
+  },
+  renderTierSelector() {
+    const tier = Controller.selectedTier ?? 0;
+    document.getElementById('tierLabel').textContent = I18n.t('tier.label', { n:tier });
+    document.getElementById('btnTierDown').disabled = tier <= 0;
+    document.getElementById('btnTierUp').disabled = tier >= Math.min(MAX_TIER, GameState.meta.tierUnlocked || 0);
+    const options = document.getElementById('tierOptions');
+    options.innerHTML = '';
+    for (let n = 0; n <= MAX_TIER; n++) {
+      const button = document.createElement('button');
+      button.className = 'tier-option' + (n === tier ? ' selected' : '');
+      button.textContent = `A${n}`;
+      button.disabled = n > (GameState.meta.tierUnlocked || 0);
+      button.setAttribute('aria-label', I18n.t('tier.label', { n }));
+      button.onclick = () => Controller.selectTier(n);
+      options.appendChild(button);
+    }
+    const rules = document.getElementById('tierRules');
+    rules.innerHTML = '';
+    for (let n = tier; n >= 1; n--) {
+      const line = document.createElement('div');
+      line.textContent = `A${n} · ${I18n.t('tier.rule.' + n)}`;
+      rules.appendChild(line);
+    }
   },
   // ── Grid ──
   buildGrid() {
@@ -372,7 +397,7 @@ const Renderer = {
     const intent = Combat.intent(fight), base = intent === 'seal2' ? 'seal' : intent;
     const arrow = fight.intentDirection ? { left:'←', right:'→', up:'↑', down:'↓' }[fight.intentDirection] : '';
     const chip = document.getElementById('enemyIntent');
-    chip.innerHTML = `${Icons.svg('i-' + base)} <span>${I18n.t('intent.' + base, { n:room.floorIdx === 2 ? 3 : 2, arrow })} · ${I18n.t('intent.in', { n:fight.intentIn })}</span>`;
+    chip.innerHTML = `${Icons.svg('i-' + base)} <span>${I18n.t('intent.' + base, { n:(room.floorIdx === 2 ? 3 : 2) + (GameState.run.tier >= 9 ? 1 : 0), arrow })} · ${I18n.t('intent.in', { n:fight.intentIn })}</span>`;
     const passive = def.id === 'colossus' ? 'gravity' : def.id === 'clockmaker' ? 'clock' : null;
     document.getElementById('enemyPassive').textContent = passive ? I18n.t('combat.' + passive) : '';
     chip.classList.toggle('is-imminent', fight.intentIn === 1);
@@ -560,17 +585,17 @@ const Renderer = {
     document.getElementById('s-gold').textContent = m.totalGold;
     I18n.renderSoundToggle();
 
-    // Ascension badge
+    // Highest unlocked tier
     const ascBadge = document.getElementById('ascensionBadge');
-    if (m.ascensionLevel > 0) {
-      ascBadge.textContent = I18n.t('meta.ascension', { n: m.ascensionLevel });
+    if (m.tierUnlocked > 0) {
+      ascBadge.textContent = I18n.t('tier.label', { n: m.tierUnlocked });
       ascBadge.style.display = '';
     } else {
       ascBadge.style.display = 'none';
     }
 
     const lines = META_DEFS
-      .filter(u => (u.ascReq || 0) <= m.ascensionLevel && (m.upgrades[u.id] || 0) > 0)
+      .filter(u => tierRequirement(u.ascReq) <= m.tierUnlocked && (m.upgrades[u.id] || 0) > 0)
       .map(u => u.getEffect(m.upgrades[u.id]));
 
     const pi = document.getElementById('passiveInfo');
@@ -582,6 +607,19 @@ const Renderer = {
     const hasRun = !!GameState.run;
     document.getElementById('btnContinueRun').style.display = hasRun ? '' : 'none';
     document.getElementById('btnStartRun').className = hasRun ? 'btn' : 'btn btn-primary';
+    const today = Controller.dailyDate();
+    const done = m.daily?.date === today;
+    const dailyBtn = document.getElementById('btnDaily');
+    dailyBtn.disabled = done;
+    dailyBtn.innerHTML = `${Icons.svg('daily')} ${done
+      ? m.daily.result === 'victory' ? I18n.t('tier.victory') : I18n.t('tier.dailyDone', { n:Math.min(3, GameState.run?.daily === today ? GameState.run.floorIdx + 1 : m.daily.floor || 1) })
+      : I18n.t('ui.btn.daily')}`;
+    const countdown = document.getElementById('dailyCountdown');
+    countdown.style.display = done ? '' : 'none';
+    if (done) {
+      const left = 86400000 - Date.now() % 86400000;
+      countdown.textContent = `${String(Math.floor(left / 3600000)).padStart(2,'0')}:${String(Math.floor(left / 60000) % 60).padStart(2,'0')}:${String(Math.floor(left / 1000) % 60).padStart(2,'0')}`;
+    }
   },
 
   // ── Meta ──
@@ -589,10 +627,10 @@ const Renderer = {
     const m = GameState.meta;
     document.getElementById('metaGold').textContent = m.permanentGold;
 
-    // Ascension info
+    // Tier info
     const ascInfo = document.getElementById('metaAscInfo');
-    if (m.ascensionLevel > 0) {
-      ascInfo.textContent = I18n.t('meta.ascension', { n: m.ascensionLevel });
+    if (m.tierUnlocked > 0) {
+      ascInfo.textContent = I18n.t('tier.label', { n: m.tierUnlocked });
       ascInfo.style.display = '';
     } else {
       ascInfo.style.display = 'none';
@@ -601,17 +639,17 @@ const Renderer = {
     const list = document.getElementById('metaList');
     list.innerHTML = '';
 
-    // Group visible upgrades by ascension tier
-    const visible = META_DEFS.filter(u => (u.ascReq || 0) <= m.ascensionLevel);
+    // Group visible upgrades by tier requirement
+    const visible = META_DEFS.filter(u => tierRequirement(u.ascReq) <= m.tierUnlocked);
     let lastAsc = -1;
 
     visible.forEach(u => {
-      // Section header for new ascension tier
+      // Section header for newly available upgrades
       if (u.ascReq > 0 && u.ascReq !== lastAsc) {
         lastAsc = u.ascReq;
         const header = document.createElement('div');
         header.className = 'meta-section-header';
-        header.textContent = I18n.t('meta.ascension', { n: u.ascReq });
+        header.textContent = I18n.t('tier.label', { n: tierRequirement(u.ascReq) });
         list.appendChild(header);
       }
 
@@ -644,18 +682,6 @@ const Renderer = {
       list.appendChild(card);
     });
 
-    // Ascension button
-    const ascBtn = document.getElementById('btnAscend');
-    if (m.ascensionLevel < MAX_ASCENSION) {
-      const cost = ASCENSION_COSTS[m.ascensionLevel];
-      const canAscend = Controller.canAscend();
-      ascBtn.style.display = '';
-      ascBtn.innerHTML = `${Icons.svg('ascend')} ${I18n.t('meta.ascension', { n: m.ascensionLevel + 1 })} – ${Icons.svg('gold')}${cost}`;
-      ascBtn.className = canAscend ? 'btn btn-ascend' : 'btn btn-ascend is-locked';
-      ascBtn.disabled = !canAscend;
-    } else {
-      ascBtn.style.display = 'none';
-    }
   },
 
   // ── Relic choice ──
@@ -727,6 +753,7 @@ const Renderer = {
 
   // ── End screen ──
   renderEndScreen(win, abandoned) {
+    if (typeof Share !== 'undefined') Share.capture(GameState.run, win, abandoned);
     document.getElementById('endIcon').innerHTML = Icons.svg(win ? 'crown' : abandoned ? 'abandon' : 'death');
     document.getElementById('endIcon').style.color = win ? 'var(--gold)' : 'var(--red)';
     const title = document.getElementById('endTitle');

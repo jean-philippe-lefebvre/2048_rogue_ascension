@@ -97,6 +97,9 @@ function bindButtons() {
     Controller.resumeRun();
   });
   document.getElementById('btnStartRun').addEventListener('click',  () => Controller.startRun());
+  document.getElementById('btnDaily').addEventListener('click', () => Controller.startDaily());
+  document.getElementById('btnTierDown').addEventListener('click', () => Controller.selectTier((Controller.selectedTier ?? 0) - 1));
+  document.getElementById('btnTierUp').addEventListener('click', () => Controller.selectTier((Controller.selectedTier ?? 0) + 1));
   document.getElementById('btnShowMeta').addEventListener('click',  () => { Renderer.renderMeta(); showScreen('metaScreen'); });
 
   // Map : abandon with confirmation
@@ -142,6 +145,8 @@ function bindButtons() {
 
   // End screen
   document.getElementById('btnReplay').addEventListener('click',    () => Controller.startRun());
+  document.getElementById('btnShare').addEventListener('click', () => Share.share());
+  document.getElementById('btnCopyResult').addEventListener('click', () => Share.copyText());
   document.getElementById('btnEndToMeta').addEventListener('click', () => { Renderer.renderMeta(); showScreen('metaScreen'); });
   document.getElementById('btnEndToTitle').addEventListener('click',() => showScreen('titleScreen'));
 
@@ -172,21 +177,6 @@ function bindButtons() {
     }
   });
 
-  // Ascension
-  document.getElementById('btnAscend').addEventListener('click', () => {
-    if (!Controller.canAscend()) return;
-    document.getElementById('ascendModal').classList.add('show');
-    const cost = ASCENSION_COSTS[GameState.meta.ascensionLevel];
-    const nextLvl = GameState.meta.ascensionLevel + 1;
-    document.getElementById('ascendModalSub').innerHTML = I18n.t('modal.ascendSub', { n: nextLvl, cost: `${Icons.svg('gold')}${cost}` });
-  });
-  document.getElementById('btnAscendCancel').addEventListener('click', () => {
-    document.getElementById('ascendModal').classList.remove('show');
-  });
-  document.getElementById('btnAscendConfirm').addEventListener('click', () => {
-    document.getElementById('ascendModal').classList.remove('show');
-    Controller.doAscension();
-  });
 }
 
 // ── BOOT ──
@@ -205,6 +195,9 @@ function bindButtons() {
   document.querySelectorAll('[data-static-icon]').forEach(el => { el.innerHTML = Icons.svg(el.dataset.staticIcon); });
   I18n.applyDOM();
   Renderer.renderTitle();
+  setInterval(() => {
+    if (document.getElementById('titleScreen').classList.contains('active')) Renderer.renderTitle();
+  }, 1000);
 
   // Haptic nudge on every button tap
   document.addEventListener('click', e => {
