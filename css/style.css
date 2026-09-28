@@ -358,6 +358,8 @@ body {
 }
 
 .gcell { aspect-ratio: 1; background: var(--cell-bg, #131326); border-radius: 6px; border: 1px solid rgba(255,255,255,0.03); }
+.gcell.is-portal { position:relative; box-shadow:inset 0 0 0 2px rgba(154,106,224,.55), inset 0 0 14px rgba(154,106,224,.35); }
+.gcell.is-portal::after { content:''; position:absolute; inset:15%; border-radius:50%; background:radial-gradient(circle, transparent 35%, rgba(154,106,224,.25) 70%, transparent 72%); pointer-events:none; }
 
 #gameTiles { position: absolute; inset: 0; pointer-events: none; }
 .fx-layer { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:21; }
@@ -406,6 +408,33 @@ body {
 .t-bomb .tile-face {background:var(--bomb-bg,#220c0a);color:var(--bomb-fg,#e04030);border:2px solid var(--bomb-bd,rgba(220,64,48,0.5));font-size:14px !important}
 .t-bomb.bomb-imminent .tile-face {animation:tile-bomb 0.5s ease-in-out infinite;border-color:rgba(255,40,20,0.8)}
 @keyframes tile-bomb { 0%,100%{box-shadow:0 0 8px rgba(196,74,58,0.4)} 50%{box-shadow:0 0 20px rgba(255,40,20,0.9)} }
+.tile.is-gold .tile-face::after { border-color:#d4a843; opacity:.9; }
+.tile.is-gold .tile-face::before { content:''; position:absolute; top:6px; left:6px; width:6px; height:6px; border-radius:50%; background:#d4a843; box-shadow:0 0 6px rgba(212,168,67,.6); }
+.tile.is-ice .tile-face {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d8ecff' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9'/%3E%3C/svg%3E") no-repeat 6px 6px / 12px 12px,
+    linear-gradient(160deg,rgba(190,225,255,.38),rgba(120,170,220,.12));
+  border:1px solid rgba(190,225,255,.7); color:#d8ecff; box-shadow: inset 0 0 12px rgba(190,225,255,.18);
+}
+.tile.is-ice.is-cracked .tile-face::before { content:''; position:absolute; left:20%; top:25%; width:72%; height:1px; background:rgba(255,255,255,.6); transform-origin:left center; transform:rotate(39deg); }
+.tile.is-thawing .tile-face::before { content:''; position:absolute; inset:0; border-radius:6px; background:linear-gradient(160deg,rgba(190,225,255,.38),rgba(120,170,220,.12)); animation:ice-thaw 220ms ease-out forwards; }
+@keyframes ice-thaw { from { opacity:1; } to { opacity:0; } }
+/* Joker: a pale star inside a slowly turning iridescent halo, on the plain dark face. */
+.t-joker .tile-face { font-size:30px; background:radial-gradient(circle at 50% 45%, rgba(180,140,255,.16), transparent 62%), var(--surface2);
+  color:#f5e9c8; text-shadow:0 0 10px rgba(180,140,255,.6), 0 0 2px rgba(255,255,255,.5); border:1px solid rgba(180,140,255,.35); }
+.t-joker .tile-face::after { inset:12%; border:none; opacity:.9;
+  background:conic-gradient(#b48cff, #5b8cff, #3fd29a, #f0b429, #ff5d6c, #b48cff);
+  -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+          mask:radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+  animation:joker-spin 8s linear infinite; }
+@keyframes joker-spin { to { transform:rotate(360deg); } }
+.t-mult .tile-face { font-size:22px; color:#d4a843; background:var(--surface); border:1px dashed rgba(212,168,67,.6); animation:mult-glow 1.6s ease-in-out infinite alternate; }
+@keyframes mult-glow { from { box-shadow:0 0 10px rgba(212,168,67,.35); } to { box-shadow:0 0 18px rgba(212,168,67,.35); } }
+.tile.is-teleported .tile-face { animation:tile-teleport 180ms ease-out; }
+@keyframes tile-teleport { from { transform:scale(.8); opacity:.4; } to { transform:scale(1); opacity:1; } }
+@media (prefers-reduced-motion: reduce) {
+  .t-joker .tile-face, .t-joker .tile-face::after, .t-mult .tile-face, .tile.is-teleported .tile-face { animation:none; }
+}
 
 /* ─── ROOM OVERLAY ─── */
 .room-overlay {

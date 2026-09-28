@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-2048 Rogue Ascension — a roguelike variant of 2048 built as a static vanilla JS game (no build tools, no framework, no bundler). French UI. Part of a portfolio project.
+2048 Rogue Ascension – a roguelike variant of 2048 built as a static vanilla JS game (no build tools, no framework, no bundler). French UI. Part of a portfolio project.
 
 ## Versioning
 
@@ -14,11 +14,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Feature** (new mechanic, new relics, UI change) → bump minor: `v1.0.0` → `v1.1.0`
 - **Major** (user-requested big upgrade) → bump major: `v1.0.0` → `v2.0.0`
 
-Current version: **v2.0.0** (`index.html` title screen, bottom)
+Current version: **v2.1.0** (`index.html` title screen, bottom)
 
 ## Development
 
-Open `index.html` directly in a browser — no server or build step required. For live reload during development, use any static file server (e.g. `python3 -m http.server`). Validate syntax with `node -c js/<file>.js` and run `npm test` for board and map checks.
+Open `index.html` directly in a browser – no server or build step required. For live reload during development, use any static file server (e.g. `python3 -m http.server`). Validate syntax with `node -c js/<file>.js` and run `npm test` for board and map checks.
 
 No linter or dependencies.
 
@@ -41,8 +41,8 @@ Each file exposes a global singleton object. Dependencies flow left-to-right.
 | `rng.js` | Seeded mulberry32 random stream for game decisions |
 | `constants.js` | Game data: room types, enemies, **RelicHooks system**, relic definitions (29 relics), meta-upgrades, ascension costs, rarity weights |
 | `storage.js` | localStorage wrapper (keys: `2048rogue_v2`, `2048rogue_run_v2`). Persists meta-progression, sound, active run and hearts |
-| `state.js` | `GameState` singleton — holds meta, run, room, board, score, moves |
-| `board.js` | Board logic: slide/merge rows, place tiles. Fires `onTileSpawn` hook in `addRandom()` |
+| `state.js` | `GameState` singleton – holds meta, run, room, board, score, moves |
+| `board.js` | Pure line merge model, kinds and bomb move map, ice thaw, portals, tile placement. Fires `onTileSpawn` in `addRandom()` |
 | `combat.js` | Pure enemy HP, damage, intent, seal, status, phase and heart rules |
 | `fx.js` | Particles, floating merge values, shake, flash, and combo label |
 | `scene.js` | "Brume minimaliste" backdrops: one scene per context (title, map per floor, floors I-III, bosses I-III, shop, rest), crossfaded from `showScreen()` |
@@ -60,7 +60,7 @@ Each file exposes a global singleton object. Dependencies flow left-to-right.
 { id:'example', hooks: { onMovesCalc: ctx => { ctx.bonus += 5; } } }
 ```
 
-`RelicHooks.fire(hookName, ctx)` iterates all owned relics and calls matching hooks. The `ctx` object is mutable — hooks modify it, the caller reads the result. Hooks chain: each relic sees the result of previous relics.
+`RelicHooks.fire(hookName, ctx)` iterates all owned relics and calls matching hooks. The `ctx` object is mutable – hooks modify it, the caller reads the result. Hooks chain: each relic sees the result of previous relics.
 
 **10 hook points**: `onMovesCalc`, `onRoomStart`, `onTileSpawn`, `onAfterMove`, `onGoldCalc`, `onTransmute`, `onMovesExhausted`, `onRoomEnd`, `onRunStart`, `onEnemyIntent`
 
@@ -72,9 +72,13 @@ Per-room state for 1x/room relics: `GameState.room.relicState = {}`
 - **Run**: 3 floors (étages). Each floor has a **Slay-the-Spire-style node map**: 5 rows of 3 connected nodes + 1 boss. Nodes have connections to 1-2 nodes in the next row. Only the current floor is shown
 - **Room types**: normal/elite/boss (HP combat with telegraphed enemy intents), rest (relics, shop or heart healing), mystery (weighted random events including gold, relics, curses, ambush combat)
 - **Relics**: 29 total (7 common, 6 rare, 6 epic, 4 legendary, 6 curses). Rarity-weighted drops that scale by floor. Curses only appear via mystery rooms
-- **Board**: 4×4 grid. Special tiles use negative values (`TILE.OBSTACLE = -1`, `TILE.BOMB = -2`). Bombs halve adjacent numbered tiles on explosion; adjacent merges ≥16 defuse bombs and break temporary seals. Permanent obstacles are unaffected.
+- **Board**: 4×4 numeric grid with negative values for obstacles (`-1`), bombs (`-2`), ×2 (`-3`) and jokers (`-4`). `GameState.kinds` is a parallel grid of `null | gold | ice` for numbered tiles. `GameState.portals` stores a cell pair in floor III battle rooms; `room.iceHits` tracks cracks. All three are saved with battle snapshots. Bombs halve adjacent numbered tiles without removing their kind, and destroy adjacent jokers and ×2 tiles. Adjacent merges ≥16 defuse bombs and temporary seals.
 - **Difficulty scaling**: enemy HP, moves, obstacles and intent cadence vary by floor. Failed rooms cost one of three hearts; bosses restart on a surviving failure.
 
 ### CSS
 
 Single `style.css` with CSS custom properties (`:root` tokens). Dark theme with gold/red/blue/purple accents. Tile colors are class-based (`t2`, `t4`... `t-obstacle`, `t-bomb`). Curses styled with red border (`.is-curse`). Ascension UI uses purple theme. Mobile-first, max-width 440px.
+
+### Special tile board API
+
+`Board.applyMove(board, dir, { kinds, iceHits, deepForgeChance, ... })` mutates the numeric board and kinds, then returns merges, score, gold payout, `moveMap`, `bombMoves`, spawn, and cracked/thawed cells. Each merge is processed once in movement order. Ice partitions lines and thaws after two adjacent merges. The controller remaps bomb timers, applies portals after merges and before bomb ticks, then resolves enemy intent. `Board.canMove(board, kinds)` and `Combat.hasLegalMove(fight, board, kinds)` share the same line semantics. Legacy v2.0 battle saves default to an empty kinds grid and no portals.

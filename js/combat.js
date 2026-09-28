@@ -26,14 +26,16 @@ const Combat = {
   intent(fight) { return fight.pattern[fight.patternIndex % fight.pattern.length]; },
   direction(fight, input) { return fight.invertTurns > 0 ? this.opposite[input] : input; },
   isLocked(fight, input) { return fight.lockTurns > 0 && fight.locked === input; },
-  hasLegalMove(fight, board) {
+  hasLegalMove(fight, board, kinds = Board.emptyKinds()) {
     for (const input of this.directions) {
       if (this.isLocked(fight, input)) continue;
       const dir = this.direction(fight, input);
       for (let i = 0; i < GRID_SIZE; i++) {
         const row = dir === 'left' ? board[i] : dir === 'right' ? [...board[i]].reverse()
           : dir === 'up' ? board.map(r => r[i]) : board.map(r => r[i]).reverse();
-        const slid = Board.slideRow(row).row;
+        const tags = dir === 'left' ? kinds[i] : dir === 'right' ? [...kinds[i]].reverse()
+          : dir === 'up' ? kinds.map(r => r[i]) : kinds.map(r => r[i]).reverse();
+        const slid = Board.slideRow(row, 0, tags).row;
         if (slid.some((value,j) => value !== row[j])) return true;
       }
     }
@@ -82,7 +84,7 @@ const Combat = {
     }
     return false;
   },
-  resolve(fight, board, bombTimers, floor) {
+  resolve(fight, board, bombTimers, floor, kinds = Board.emptyKinds(), portals = []) {
     if (fight.intentIn > 0 || fight.hp <= 0) return null;
     const intent = this.intent(fight);
     const effect = { intent, cells:[], strike:0 };
@@ -91,7 +93,7 @@ const Combat = {
     if (intent === 'seal' || intent === 'seal2' || intent === 'bomb') {
       const count = intent === 'seal2' ? 2 : 1;
       for (let i = 0; i < count; i++) {
-        const empty = Board.getEmpty(board);
+        const empty = Board.getEmpty(board).filter(([r,c]) => !portals.some(([pr,pc]) => pr === r && pc === c));
         if (!empty.length) break;
         const [r,c] = empty[Rng.int(empty.length)], key = `${r},${c}`;
         board[r][c] = intent === 'bomb' ? TILE.BOMB : TILE.OBSTACLE;
@@ -99,6 +101,13 @@ const Combat = {
         else fight.seals[key] = fight.id === 'jailer' ? 8 : 6;
         effect.cells.push([r,c]);
       }
+    } else if (intent === 'freeze') {
+      const numbered = [];
+      for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++)
+        if (board[r][c] > 0 && kinds[r][c] !== 'ice') numbered.push([r,c]);
+      const strong = numbered.filter(([r,c]) => board[r][c] >= 8);
+      const pool = strong.length ? strong : numbered;
+      if (pool.length) { const [r,c] = pool[Rng.int(pool.length)]; kinds[r][c] = 'ice'; effect.cells.push([r,c]); }
     } else if (intent === 'gnaw') {
       let best = 0, at = null;
       for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++)

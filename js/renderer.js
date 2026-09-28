@@ -30,6 +30,10 @@ const Renderer = {
     for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
       const cell = document.createElement('div');
       cell.className = 'gcell';
+      if (GameState.portals?.some(([r,c]) => r * GRID_SIZE + c === i)) {
+        cell.classList.add('is-portal');
+        cell.setAttribute('aria-label', I18n.t('tile.portal'));
+      }
       grid.appendChild(cell);
     }
     Fx.resize();
@@ -81,7 +85,7 @@ const Renderer = {
     return tile;
   },
 
-  renderTiles(newPositions = new Set(), mergedPositions = new Set(), dir = null) {
+  renderTiles(newPositions = new Set(), mergedPositions = new Set(), dir = null, teleported = [], thawed = []) {
     const container = document.getElementById('gameTiles');
     const geo = this.getTileGeometry();
     if (!geo) return;
@@ -92,12 +96,15 @@ const Renderer = {
     const prev = this._prevBoard;
     const srcBoard = prev ? prev.map(row => [...row]) : null;
     const searchOffset = dir ? this._searchDir[dir] : null;
+    const teleportedSet = new Set(teleported.map(([r,c]) => `${r},${c}`));
+    const thawedSet = new Set(thawed.map(({r,c}) => `${r},${c}`));
 
     board.forEach((row, r) => {
       row.forEach((val, c) => {
         if (val === 0) return;
 
         const key = `${r},${c}`;
+        const kind = GameState.kinds?.[r]?.[c];
         const { cellSize, left, top } = geo;
         const tile = this._getTile(container);
 
@@ -117,7 +124,14 @@ const Renderer = {
           label = `${Icons.svg('bomb')}${timer !== undefined ? timer : ''}`;
           if (timer !== undefined && timer <= 3) cls += ' bomb-imminent';
         }
+        else if (val === TILE.JOKER) { cls += 't-joker'; label = '★'; }
+        else if (val === TILE.MULT) { cls += 't-mult'; label = '×2'; }
         else { cls += `t${Math.min(val, 2048)}`; }
+
+        if (kind === 'gold') cls += ' is-gold';
+        if (kind === 'ice') cls += ' is-ice' + (GameState.room?.iceHits?.[key] ? ' is-cracked' : '');
+        if (thawedSet.has(key)) cls += ' is-thawing';
+        if (teleportedSet.has(key)) cls += ' is-teleported';
 
         if (newPositions.has(key))    cls += ' is-new';
         if (mergedPositions.has(key)) cls += ' is-merged';
@@ -150,6 +164,10 @@ const Renderer = {
         const dy = top(srcR) - finalTop;
 
         tile.className = cls.trim();
+        const accessible = kind === 'gold' ? I18n.t('tile.gold') : kind === 'ice' ? I18n.t('tile.ice')
+          : val === TILE.JOKER ? I18n.t('tile.joker') : val === TILE.MULT ? I18n.t('tile.mult') : null;
+        if (accessible) tile.setAttribute('aria-label', `${accessible}${val > 0 ? ` ${val}` : ''}`);
+        else tile.removeAttribute('aria-label');
         if (!tile.firstElementChild) tile.appendChild(document.createElement('div'));
         const face = tile.firstElementChild;
         face.className = 'tile-face';
@@ -311,7 +329,7 @@ const Renderer = {
       });
     }
 
-    // Map — connected node graph for current floor
+    // Map – connected node graph for current floor
     const mapEl = document.getElementById('floorMap');
     mapEl.innerHTML = '';
 
@@ -475,7 +493,7 @@ const Renderer = {
       const cost = ASCENSION_COSTS[m.ascensionLevel];
       const canAscend = Controller.canAscend();
       ascBtn.style.display = '';
-      ascBtn.innerHTML = `${Icons.svg('ascend')} ${I18n.t('meta.ascension', { n: m.ascensionLevel + 1 })} — ${Icons.svg('gold')}${cost}`;
+      ascBtn.innerHTML = `${Icons.svg('ascend')} ${I18n.t('meta.ascension', { n: m.ascensionLevel + 1 })} – ${Icons.svg('gold')}${cost}`;
       ascBtn.className = canAscend ? 'btn btn-ascend' : 'btn btn-ascend is-locked';
       ascBtn.disabled = !canAscend;
     } else {

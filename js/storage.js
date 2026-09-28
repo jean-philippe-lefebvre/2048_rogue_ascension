@@ -17,6 +17,11 @@ const Storage = {
       const run = JSON.parse(raw);
       run.hearts ??= 3;
       run.relics = (run.relics || []).map(value => RELICS.find(r => r.id === (value?.id || value))).filter(Boolean);
+      if (run.battle) {
+        run.battle.kinds ??= Board.emptyKinds();
+        run.battle.portals ??= [];
+        run.battle.iceHits ??= {};
+      }
       return run;
     } catch { return null; }
   },
@@ -26,7 +31,8 @@ const Storage = {
       const battle = room?.combat && !GameState.roomFinished ? {
         floorIdx:room.floorIdx, rowIdx:room.rowIdx, nodeIdx:room.nodeIdx,
         enemyId:room.enemyDef.id, combat:room.combat, relicState:room.relicState,
-        board:GameState.board, obstacleAge:GameState.obstacleAge, bombTimers:GameState.bombTimers,
+        board:GameState.board, kinds:GameState.kinds, portals:GameState.portals,
+        iceHits:room.iceHits, obstacleAge:GameState.obstacleAge, bombTimers:GameState.bombTimers,
         score:GameState.score, mergeCount:GameState.mergeCount,
         movesLeft:GameState.movesLeft, movesMax:GameState.movesMax,
       } : null;

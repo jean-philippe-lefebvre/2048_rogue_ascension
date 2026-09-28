@@ -43,134 +43,157 @@ const Board = {
     if (mr >= 0) board[mr][mc] = max * 2;
   },
 
-  // Slide a single row left, returns { row, score, mergedAt[] }
-  // deepForgeChance: 0-1 probability of super-merge (result ×2)
-  // Slide a segment (no obstacles) left. Bombs move but don't merge.
-  _slideSegment(seg, deepForgeChance) {
-    const merged = [];
-    const isMerged = new Set();
-    let score = 0;
-    let lastMergeIdx = -1;
+  emptyKinds() { return Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null)); },
 
-    for (const val of seg) {
-      if (val === 0) continue;
-      if (val === TILE.BOMB) {
-        merged.push(val);
-        lastMergeIdx = -1;
-        continue;
+  // A line is ordered from the side the player moved toward. Ice and obstacles
+  // split it into independent segments. Entries retain their source coordinate.
+  _moveLine(values, kinds, sources, deepForgeChance = 0) {
+    const output = [], merges = [], moveMap = [];
+    let score = 0, gold = 0;
+    const flush = segment => {
+      const compact = segment.filter(e => e.value !== 0);
+      const placed = [];
+      for (const entry of compact) {
+        const last = placed[placed.length - 1];
+        const a = last?.value, b = entry.value;
+        const normal = a > 0 && b > 0 && a === b;
+        const joker = (a === TILE.JOKER && (b > 0 || b === TILE.JOKER)) || (b === TILE.JOKER && a > 0);
+        const mult = (a === TILE.MULT && b > 0) || (b === TILE.MULT && a > 0);
+        if (last && !last.merged && (normal || joker || mult)) {
+          let value = normal ? a * 2 : a === TILE.JOKER && b === TILE.JOKER ? 4 : 2 * Math.max(a, b);
+          if (deepForgeChance > 0 && Rng.next() < deepForgeChance) value *= 2;
+          last.value = value;
+          last.kind = last.kind === 'gold' || entry.kind === 'gold' ? 'gold' : null;
+          last.merged = true;
+          last.origins.push(...entry.origins);
+          score += value;
+          const payout = last.kind === 'gold' ? Math.max(1, Math.floor(value / 8)) : 0;
+          gold += payout;
+          merges.push({ index:output.length + placed.length - 1, val:value, gold:payout, normal });
+        } else placed.push({ ...entry, origins:[...entry.origins], merged:false });
       }
-      if (merged.length && merged[merged.length - 1] === val && merged[merged.length - 1] > 0 && lastMergeIdx !== merged.length - 1) {
-        let v = val * 2;
-        if (deepForgeChance > 0 && Rng.next() < deepForgeChance) v *= 2;
-        merged[merged.length - 1] = v;
-        score += v;
-        lastMergeIdx = merged.length - 1;
-        isMerged.add(merged.length - 1);
-      } else {
-        merged.push(val);
+      for (let j = 0; j < segment.length; j++) {
+        const e = placed[j] || { value:0, kind:null, origins:[] };
+        const index = output.length;
+        output.push(e);
+        for (const from of e.origins) moveMap.push({ from, index });
       }
-    }
-    while (merged.length < seg.length) merged.push(0);
-    return { merged, isMerged, score };
-  },
-
-  slideRow(row, deepForgeChance = 0) {
-    // Split row into segments separated by obstacles
-    const segments = [];
-    let current = [];
+    };
+    let segment = [];
     for (let i = 0; i < GRID_SIZE; i++) {
-      if (row[i] === TILE.OBSTACLE) {
-        segments.push({ type: 'seg', cells: current });
-        segments.push({ type: 'obs', idx: i });
-        current = [];
-      } else {
-        current.push(row[i]);
-      }
+      const value = values[i], kind = kinds[i];
+      if (value === TILE.OBSTACLE || kind === 'ice') {
+        flush(segment); segment = [];
+        output.push({ value, kind, origins:[sources[i]] });
+        moveMap.push({ from:sources[i], index:output.length - 1 });
+      } else segment.push({ value, kind:value > 0 ? kind : null, origins:value ? [sources[i]] : [] });
     }
-    segments.push({ type: 'seg', cells: current });
-
-    // Slide each segment independently, reassemble
-    const result = [];
-    const mergedAt = [];
-    let totalScore = 0;
-
-    for (const part of segments) {
-      if (part.type === 'obs') {
-        result.push(TILE.OBSTACLE);
-      } else {
-        const { merged, isMerged, score } = this._slideSegment(part.cells, deepForgeChance);
-        totalScore += score;
-        const baseIdx = result.length;
-        for (let i = 0; i < merged.length; i++) {
-          if (isMerged.has(i)) mergedAt.push(baseIdx + i);
-          result.push(merged[i]);
-        }
-      }
-    }
-
-    return { row: result, score: totalScore, mergedAt };
+    flush(segment);
+    return { output, merges, moveMap, score, gold };
   },
 
-  // Apply a move direction, returns score, merges, spawn and bomb positions.
-  // mods: { useEntropy, forgedEntropyLvl, deepForgeChance }
+  slideRow(row, deepForgeChance = 0, kinds = Array(GRID_SIZE).fill(null)) {
+    const sources = row.map((_, i) => i);
+    const line = this._moveLine(row, kinds, sources, deepForgeChance);
+    return { row:line.output.map(e => e.value), kinds:line.output.map(e => e.kind),
+      score:line.score, gold:line.gold, mergedAt:line.merges.map(m => m.index) };
+  },
+
+  // Mutates the supplied board and kinds. The move map describes every tile,
+  // including both contributors to a merge, so auxiliary state can follow it.
   applyMove(board, dir, mods = {}) {
     const { useEntropy = false, forgedEntropyLvl = 0, deepForgeChance = 0 } = mods;
-    let moved = false;
-    let totalScore = 0;
-    const merges = [];
-    const bombMoves = [];
+    const kinds = mods.kinds || this.emptyKinds();
+    const iceHits = mods.iceHits || {};
+    const sourceBoard = board.map(row => [...row]);
+    const sourceKinds = kinds.map(row => [...row]);
     const coordinate = (line, index) => ({
       r: dir === 'up' ? index : dir === 'down' ? GRID_SIZE - 1 - index : line,
       c: dir === 'left' ? index : dir === 'right' ? GRID_SIZE - 1 - index : line,
     });
-
-    const processLine = (getLine, setCell) => {
-      for (let i = 0; i < GRID_SIZE; i++) {
-        const orig = getLine(i);
-        const { row, score, mergedAt } = this.slideRow(orig, deepForgeChance);
-        if (row.some((v, j) => v !== orig[j])) moved = true;
-        totalScore += score;
-        // Bombs preserve their order within each obstacle-delimited segment.
-        let start = 0;
-        for (let end = 0; end <= GRID_SIZE; end++) {
-          if (end !== GRID_SIZE && orig[end] !== TILE.OBSTACLE) continue;
-          const from = [], to = [];
-          for (let j = start; j < end; j++) {
-            if (orig[j] === TILE.BOMB) from.push(j);
-            if (row[j] === TILE.BOMB) to.push(j);
-          }
-          from.forEach((index, n) => bombMoves.push({ from:coordinate(i,index), to:coordinate(i,to[n]) }));
-          start = end + 1;
-        }
-        row.forEach((v, j) => {
-          setCell(i, j, v);
-          if (v > 0 && mergedAt.includes(j)) {
-            merges.push({ ...coordinate(i,j), val:v });
-          }
-        });
-      }
-    };
-
-    if (dir === 'left')  processLine(r => [...board[r]],                          (r,c,v) => board[r][c] = v);
-    if (dir === 'right') processLine(r => [...board[r]].reverse(),                (r,c,v) => board[r][GRID_SIZE-1-c] = v);
-    if (dir === 'up')    processLine(c => board.map(r => r[c]),                   (c,r,v) => board[r][c] = v);
-    if (dir === 'down')  processLine(c => [...board.map(r => r[c])].reverse(),    (c,r,v) => board[GRID_SIZE-1-r][c] = v);
-
+    let score = 0, gold = 0;
+    const merges = [], moveMap = [], bombMoves = [];
+    for (let lineIndex = 0; lineIndex < GRID_SIZE; lineIndex++) {
+      const positions = Array.from({ length:GRID_SIZE }, (_, i) => coordinate(lineIndex, i));
+      const values = positions.map(({r,c}) => sourceBoard[r][c]);
+      const tags = positions.map(({r,c}) => sourceKinds[r][c]);
+      const line = this._moveLine(values, tags, positions, deepForgeChance);
+      score += line.score; gold += line.gold;
+      line.output.forEach((e, i) => {
+        const {r,c} = positions[i]; board[r][c] = e.value;
+      });
+      line.merges.forEach(m => merges.push({ ...coordinate(lineIndex,m.index), val:m.val, gold:m.gold, normal:m.normal }));
+      line.moveMap.forEach(({from,index}) => {
+        const to = coordinate(lineIndex,index);
+        moveMap.push({ from,to });
+        if (sourceBoard[from.r][from.c] === TILE.BOMB) bombMoves.push({ from,to });
+      });
+    }
+    const nextKinds = this.emptyKinds();
+    for (const {from,to} of moveMap) {
+      const kind = sourceKinds[from.r][from.c];
+      if (kind === 'gold' || (kind === 'ice' && nextKinds[to.r][to.c] !== 'gold'))
+        nextKinds[to.r][to.c] = kind;
+    }
+    for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++)
+      kinds[r][c] = nextKinds[r][c];
+    const moved = board.some((row,r) => row.some((value,c) => value !== sourceBoard[r][c] || kinds[r][c] !== sourceKinds[r][c]));
     if (!moved) return null;
-
+    const cracked = [], thawed = [];
+    for (const merge of merges) for (const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const r = merge.r + dr, c = merge.c + dc;
+      if (kinds[r]?.[c] !== 'ice') continue;
+      const key = `${r},${c}`;
+      iceHits[key] = (iceHits[key] || 0) + 1;
+      if (iceHits[key] >= 2) { kinds[r][c] = null; delete iceHits[key]; thawed.push({r,c}); }
+      else cracked.push({r,c});
+    }
     const newTilePos = this.addRandom(board, useEntropy, forgedEntropyLvl);
-    return { score: totalScore, merges, newTilePos, bombMoves };
+    return { score, gold, merges, newTilePos, moveMap, bombMoves, cracked, thawed };
   },
 
-  canMove(board) {
-    for (let r = 0; r < GRID_SIZE; r++)
-      for (let c = 0; c < GRID_SIZE; c++) {
-        if (board[r][c] === 0) return true;
-        if (board[r][c] < 0) continue;
-        if (c < GRID_SIZE-1 && board[r][c] === board[r][c+1]) return true;
-        if (r < GRID_SIZE-1 && board[r][c] === board[r+1][c]) return true;
+  canMove(board, kinds = this.emptyKinds()) {
+    for (const dir of ['left','right','up','down']) {
+      const coordinate = (line, index) => ({
+        r: dir === 'up' ? index : dir === 'down' ? GRID_SIZE - 1 - index : line,
+        c: dir === 'left' ? index : dir === 'right' ? GRID_SIZE - 1 - index : line,
+      });
+      for (let line = 0; line < GRID_SIZE; line++) {
+        const cells = Array.from({length:GRID_SIZE}, (_,i) => coordinate(line,i));
+        const values = cells.map(({r,c}) => board[r][c]);
+        const tags = cells.map(({r,c}) => kinds[r][c]);
+        const next = this.slideRow(values, 0, tags);
+        if (next.row.some((v,i) => v !== values[i]) || next.kinds.some((v,i) => v !== tags[i])) return true;
       }
+    }
     return false;
+  },
+
+  createPortals(board) {
+    const empty = this.getEmpty(board);
+    const pairs = [];
+    for (let i = 0; i < empty.length; i++) for (let j = i + 1; j < empty.length; j++) {
+      const a = empty[i], b = empty[j];
+      if (Math.abs(a[0]-b[0]) + Math.abs(a[1]-b[1]) > 1) pairs.push([a,b]);
+    }
+    return pairs.length ? pairs[Rng.int(pairs.length)] : [];
+  },
+
+  applyPortals(board, kinds, timers, portals) {
+    if (!portals || portals.length !== 2) return [];
+    const [a,b] = portals;
+    const va = board[a[0]][a[1]], vb = board[b[0]][b[1]];
+    const movable = (v, kind) => kind !== 'ice' && (v > 0 || v === TILE.JOKER || v === TILE.MULT || v === TILE.BOMB);
+    if (!movable(va,kinds[a[0]][a[1]]) && !movable(vb,kinds[b[0]][b[1]])) return [];
+    if ((va !== 0 && !movable(va,kinds[a[0]][a[1]])) || (vb !== 0 && !movable(vb,kinds[b[0]][b[1]]))) return [];
+    const keyA = `${a[0]},${a[1]}`, keyB = `${b[0]},${b[1]}`;
+    [board[a[0]][a[1]],board[b[0]][b[1]]] = [vb,va];
+    [kinds[a[0]][a[1]],kinds[b[0]][b[1]]] = [kinds[b[0]][b[1]],kinds[a[0]][a[1]]];
+    const ta = timers[keyA], tb = timers[keyB];
+    delete timers[keyA]; delete timers[keyB];
+    if (tb !== undefined) timers[keyA] = tb;
+    if (ta !== undefined) timers[keyB] = ta;
+    return [a,b];
   },
 
   // Bomb timer system
@@ -193,7 +216,7 @@ const Board = {
   },
 
   // Tick bombs after movement and defuses; return the number that exploded.
-  tickBombs(board, timers) {
+  tickBombs(board, timers, kinds = this.emptyKinds()) {
     const exploded = [];
     for (const key of Object.keys(timers)) {
       const [r, c] = key.split(',').map(Number);
@@ -205,14 +228,17 @@ const Board = {
       }
     }
 
-    // Explosions halve adjacent numbered tiles; special tiles are untouched.
+    // Explosions halve numbered tiles and remove adjacent movable special tiles.
     for (const [br, bc] of exploded) {
       board[br][bc] = 0;
       const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
       for (const [dr, dc] of dirs) {
         const nr = br + dr, nc = bc + dc;
-        if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE && board[nr][nc] > 0)
-          board[nr][nc] = Math.max(2, board[nr][nc] / 2);
+        if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) continue;
+        if (board[nr][nc] > 0) board[nr][nc] = Math.max(2, board[nr][nc] / 2);
+        else if (board[nr][nc] === TILE.JOKER || board[nr][nc] === TILE.MULT) {
+          board[nr][nc] = 0; kinds[nr][nc] = null;
+        }
       }
     }
     return exploded.length;

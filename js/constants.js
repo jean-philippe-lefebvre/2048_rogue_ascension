@@ -23,8 +23,8 @@ const ENEMIES = [
   { id:'warden', floor:1, kind:'elite', hp:247, cadence:5, pattern:['shield','lock','bomb'] },
   { id:'larva', floor:2, kind:'normal', hp:220, cadence:5, pattern:['gnaw','strike'] },
   { id:'weaver', floor:2, kind:'normal', hp:285, cadence:3, pattern:['seal','lock','seal'] },
-  { id:'prophet', floor:2, kind:'normal', hp:223, cadence:3, pattern:['invert','gnaw','heal'] },
-  { id:'herald', floor:2, kind:'elite', hp:340, cadence:3, pattern:['invert','bomb','seal','gnaw'] },
+  { id:'prophet', floor:2, kind:'normal', hp:200, cadence:3, pattern:['invert','freeze','heal'] },
+  { id:'herald', floor:2, kind:'elite', hp:340, cadence:3, pattern:['invert','bomb','freeze','gnaw'] },
   { id:'jailer', floor:0, kind:'boss', hp:294, cadence:3, pattern:['seal','seal','strike'], phase2:{ cadence:3, pattern:['seal2','strike','seal2'] } },
   { id:'smith', floor:1, kind:'boss', hp:338, cadence:5, pattern:['bomb','strike','shield'], phase2:{ cadence:4, pattern:['bomb','lock','bomb','strike'] } },
   { id:'eye', floor:2, kind:'boss', hp:496, cadence:3, pattern:['invert','gnaw','seal'], phase2:{ cadence:2, pattern:['invert','gnaw','strike'] } },
@@ -77,7 +77,7 @@ const RELICS = [
   { id:'tide',      icon:'tide', name:'Marée',          rarity:'rare', desc:'1×/salle : le premier coup sans fusion est gratuit.', effect:'1 coup gratuit/salle',
     hooks: { onAfterMove: (ctx, run, gs) => { const rs=gs.room?.relicState; if(rs && !rs._tideUsed && ctx.result.merges.length===0) { rs._tideUsed=true; ctx.freeMove=true; } } } },
   { id:'blade',     icon:'blade', name:'Lame double',    rarity:'rare', desc:'Les fusions 2+2 donnent 8 au lieu de 4.',          effect:'2+2 → 8',
-    hooks: { onAfterMove: ctx => { for(const m of ctx.result.merges) { if(m.val===4) { ctx.board[m.r][m.c]=8; m.val=8; } } } } },
+    hooks: { onAfterMove: ctx => { for(const m of ctx.result.merges) { if(m.normal && m.val===4 && ctx.board[m.r][m.c]>0) { ctx.board[m.r][m.c]=8; m.val=8; } } } } },
   { id:'focus',     icon:'focus', name:'Focus',          rarity:'rare', desc:'+20% de coups dans les salles élite.',              effect:'+20% coups élite',
     hooks: { onMovesCalc: ctx => { if(ctx.type==='elite') ctx.bonus+=Math.floor(ctx.base*0.2); } } },
   { id:'recycle',   icon:'recycle', name:'Recyclage',      rarity:'rare', desc:'Quand tu rates une salle, récupère la moitié de l\'or.', effect:'50% or sur défaite',
@@ -159,4 +159,4 @@ const RARITY_WEIGHTS = {
 };
 
 // Special tile type codes (negative values on board)
-const TILE = { OBSTACLE: -1, BOMB: -2 };
+const TILE = { OBSTACLE: -1, BOMB: -2, MULT: -3, JOKER: -4 };

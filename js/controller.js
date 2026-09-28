@@ -11,6 +11,8 @@ const Controller = {
     Rng.seed(seed[0]);
     GameState._shopReturnToMap = false;
     GameState.room = null;
+    GameState.kinds = Board.emptyKinds();
+    GameState.portals = [];
     GameState.roomFinished = false;
     GameState._restDone = null;
     GameState._relicDone = null;
@@ -76,8 +78,10 @@ const Controller = {
       const enemyDef = ENEMIES.find(e => e.id === saved.enemyId);
       if (data && enemyDef) {
         GameState.room = { floorIdx:saved.floorIdx, rowIdx:saved.rowIdx, nodeIdx:saved.nodeIdx,
-          data, enemyDef, combat:saved.combat, relicState:saved.relicState || {} };
+          data, enemyDef, combat:saved.combat, relicState:saved.relicState || {}, iceHits:saved.iceHits || {} };
         GameState.board = saved.board;
+        GameState.kinds = saved.kinds || Board.emptyKinds();
+        GameState.portals = saved.portals || [];
         GameState.obstacleAge = saved.obstacleAge || {};
         GameState.bombTimers = saved.bombTimers || {};
         GameState.score = saved.score;
@@ -250,9 +254,12 @@ const Controller = {
     GameState.mergeCount = 0;
     GameState.roomFinished = false;
     GameState.room.relicState = {};
+    GameState.room.iceHits = {};
 
     // Build board
     GameState.board = Board.empty();
+    GameState.kinds = Board.emptyKinds();
+    GameState.portals = [];
     GameState.obstacleAge = {};
     GameState.bombTimers = {};
     if (type === 'elite') {
@@ -270,6 +277,7 @@ const Controller = {
 
     // Relic hooks modify board at room start (crystal, mirror, germination, curses, etc.)
     RelicHooks.fire('onRoomStart', { board: GameState.board, type, floorIdx, run });
+    if (floorIdx === 2) GameState.portals = Board.createPortals(GameState.board);
 
     // Render room UI
     const def = ROOM_DEFS[type];
@@ -448,12 +456,14 @@ const Controller = {
     }
     const dir = Combat.direction(fight, inputDir);
     const result = Board.applyMove(gs.board, dir, {
+      kinds: gs.kinds,
+      iceHits: gs.room.iceHits,
       forgedEntropyLvl: gs.meta.upgrades.forgedEntropy || 0,
       deepForgeChance: (gs.meta.upgrades.deepForge || 0) * 0.1,
     });
     if (!result) {
       Fx.nudge(inputDir); Audio2.bump();
-      if (!Combat.hasLegalMove(fight, gs.board)) this._checkFailure();
+      if (!Combat.hasLegalMove(fight, gs.board, gs.kinds)) this._checkFailure();
       return 'buzz';
     }
     gs.score += result.score;
@@ -465,7 +475,11 @@ const Controller = {
     RelicHooks.fire('onAfterMove', moveCtx);
     gs.movesLeft += moveCtx.addMove;
 
-    const goldCtx = { gold: Math.floor(result.score / 100), merges: result.merges,
+    const goldFromTiles = result.merges.reduce((sum, merge) => {
+      if (merge.gold) merge.gold = Math.max(1, Math.floor(merge.val / 8));
+      return sum + merge.gold;
+    }, 0);
+    const goldCtx = { gold: Math.floor(result.score / 100) + goldFromTiles, merges: result.merges,
       type: gs.room.data.type, floorIdx: gs.room.floorIdx };
     RelicHooks.fire('onGoldCalc', goldCtx);
     goldCtx.gold += (gs.meta.upgrades.goldBonus || 0) * 2 * (result.merges.length > 0 ? 1 : 0);
@@ -483,6 +497,7 @@ const Controller = {
       const at = Fx.cellCenter(r,c);
       if (at) Fx.burst(at.x, at.y, kind === 'bomb' ? '#c44a3a' : '#9fb3c8', 14);
     }
+    result.teleported = Board.applyPortals(gs.board, gs.kinds, gs.bombTimers, gs.portals);
     const hit = Combat.damage(fight, result.merges);
     if (hit.dealt > 0) Renderer.enemyHit(hit.dealt);
     const phaseChanged = Combat.phase(fight, gs.room.enemyDef);
@@ -493,7 +508,7 @@ const Controller = {
       return 'buzz';
     }
 
-    const exploded = Board.tickBombs(gs.board, gs.bombTimers);
+    const exploded = Board.tickBombs(gs.board, gs.bombTimers, gs.kinds);
     for (let i = 0; i < exploded; i++) Combat.bombExploded(fight);
     const transCtx = { board: gs.board, obstacleAge: gs.obstacleAge, active:false };
     RelicHooks.fire('onTransmute', transCtx);
@@ -510,7 +525,7 @@ const Controller = {
       }
     }
     if (!moveCtx.freeMove) Combat.tick(fight, gs.board, phaseChanged);
-    const effect = moveCtx.freeMove ? null : Combat.resolve(fight, gs.board, gs.bombTimers, gs.room.floorIdx);
+    const effect = moveCtx.freeMove ? null : Combat.resolve(fight, gs.board, gs.bombTimers, gs.room.floorIdx, gs.kinds, gs.portals);
     if (effect) RelicHooks.fire('onEnemyIntent', { effect, board:gs.board, bombTimers:gs.bombTimers });
     if (effect?.strike) {
       gs.movesLeft = Math.max(0, gs.movesLeft - effect.strike);
@@ -526,7 +541,7 @@ const Controller = {
 
   _checkFailure() {
     const gs = GameState;
-    if (gs.roomFinished || (gs.movesLeft > 0 && Combat.hasLegalMove(gs.room.combat, gs.board))) return false;
+    if (gs.roomFinished || (gs.movesLeft > 0 && Combat.hasLegalMove(gs.room.combat, gs.board, gs.kinds))) return false;
     const exhCtx = { movesLeft:0, consumed:false, overlayIcon:'', overlayTitle:'', overlaySub:'' };
     RelicHooks.fire('onMovesExhausted', exhCtx);
     if (exhCtx.consumed) {
@@ -582,8 +597,21 @@ const Controller = {
   _renderAfterMove(result, dir) {
     const newSet    = new Set(result.newTilePos ? [`${result.newTilePos[0]},${result.newTilePos[1]}`] : []);
     const mergedSet = new Set(result.merges.map(m => `${m.r},${m.c}`));
-    Renderer.renderTiles(newSet, mergedSet, dir);
+    Renderer.renderTiles(newSet, mergedSet, dir, result.teleported || [], result.thawed || []);
     Fx.merges(result.merges);
+    for (const merge of result.merges) {
+      if (!merge.gold) continue;
+      const at = Fx.cellCenter(merge.r, merge.c);
+      if (!at) continue;
+      Fx.burst(at.x, at.y, '#d4a843', 10);
+      Fx.float(at.x, at.y, merge.gold);
+      const label = document.querySelector('.grid-wrap .fx-float:last-of-type');
+      if (label) label.style.color = '#d4a843';
+    }
+    for (const {r,c} of result.thawed || []) {
+      const at = Fx.cellCenter(r,c);
+      if (at) Fx.burst(at.x, at.y, '#bfe3ff', 14);
+    }
     Audio2.merges(result.merges);
     Renderer.updateHUD();
   },

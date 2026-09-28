@@ -10,7 +10,7 @@ const bands = { normal:[75,92], elite:[55,75], boss:[[45,70],[40,65],[35,60]] };
 
 function trial(def, seed) {
   Rng.seed(seed);
-  const board = Board.empty(), timers = {};
+  const board = Board.empty(), kinds = Board.emptyKinds(), timers = {}, iceHits = {};
   const fight = Combat.create(def);
   let moves = (def.kind === 'boss' ? [50,56,62] : def.kind === 'elite' ? [40,44,48] : [36,40,44])[def.floor];
   if (def.kind === 'elite') {
@@ -18,14 +18,16 @@ function trial(def, seed) {
     if (def.floor === 2) Board.placeValue(board, TILE.OBSTACLE);
   }
   Board.addRandom(board); Board.addRandom(board);
-  while (moves > 0 && Combat.hasLegalMove(fight, board)) {
+  const portals = def.floor === 2 ? Board.createPortals(board) : [];
+  while (moves > 0 && Combat.hasLegalMove(fight, board, kinds)) {
     let best = null;
     for (const input of Combat.directions) {
       if (Combat.isLocked(fight, input)) continue;
       const dir = Combat.direction(fight, input);
       const copy = board.map(row => [...row]);
+      const copyKinds = kinds.map(row => [...row]);
       const rng = Rng._state;
-      const result = Board.applyMove(copy, dir);
+      const result = Board.applyMove(copy, dir, { kinds:copyKinds, iceHits:{...iceHits} });
       Rng._state = rng;
       if (!result) continue;
       const damage = Math.floor(result.merges.reduce((n,m) => n + m.val,0) *
@@ -34,17 +36,18 @@ function trial(def, seed) {
       if (!best || value > best.value) best = { input, value };
     }
     if (!best) break;
-    const result = Board.applyMove(board, Combat.direction(fight, best.input));
+    const result = Board.applyMove(board, Combat.direction(fight, best.input), { kinds, iceHits });
     Board.remapBombTimers(timers, result.bombMoves);
     Combat.breakHazards(fight, board, result.merges, timers);
+    Board.applyPortals(board, kinds, timers, portals);
     Combat.damage(fight, result.merges);
     const phaseChanged = Combat.phase(fight, def);
     moves--;
     if (fight.hp <= 0) return moves;
-    const exploded = Board.tickBombs(board, timers);
+    const exploded = Board.tickBombs(board, timers, kinds);
     for (let i = 0; i < exploded; i++) Combat.bombExploded(fight);
     Combat.tick(fight, board, phaseChanged);
-    const effect = Combat.resolve(fight, board, timers, def.floor);
+    const effect = Combat.resolve(fight, board, timers, def.floor, kinds, portals);
     if (effect?.strike) moves -= effect.strike;
   }
   return null;

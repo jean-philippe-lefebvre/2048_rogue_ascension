@@ -40,6 +40,9 @@ const I18n = {
       'intent.lock': 'Bloque {arrow}',
       'intent.invert': 'Inverse les commandes',
       'intent.heal': 'Se soigne',
+      'intent.freeze': 'Gèle une tuile',
+      'tile.gold': 'Tuile d\'or', 'tile.ice': 'Glace', 'tile.joker': 'Joker',
+      'tile.mult': 'Multiplicateur ×2', 'tile.portal': 'Portail',
       'intent.shield': 'Se protège',
       // UI static
       'ui.byline': 'Un jeu de',
@@ -169,7 +172,7 @@ const I18n = {
       'mystery.ambush.title': 'Embuscade !',
       'mystery.ambush.sub': 'Un ennemi surgit de l\'ombre...',
 
-      // Relics — names & descriptions
+      // Relics – names & descriptions
       'relic.entropy.name': 'Entropie',
       'relic.entropy.desc': 'Les nouvelles tuiles sont toujours 4.',
       'relic.entropy.effect': '+50% valeur tuile',
@@ -262,7 +265,7 @@ const I18n = {
       'relic.tax.desc': '-20% d\'or gagné par salle.',
       'relic.tax.effect': '-20% or',
 
-      // Meta upgrades — names & descriptions & effects
+      // Meta upgrades – names & descriptions & effects
       'meta.extraMoves.name': 'Élan',
       'meta.extraMoves.desc': 'Augmente les coups de base dans toutes les salles.',
       'meta.extraMoves.effect': '+{n} coups de base',
@@ -333,6 +336,9 @@ const I18n = {
       'intent.lock': 'Locks {arrow}',
       'intent.invert': 'Inverts controls',
       'intent.heal': 'Heals',
+      'intent.freeze': 'Freezes a tile',
+      'tile.gold': 'Gold tile', 'tile.ice': 'Ice', 'tile.joker': 'Joker',
+      'tile.mult': '×2 Multiplier', 'tile.portal': 'Portal',
       'intent.shield': 'Shields',
       // UI static
       'ui.byline': 'A game of',
@@ -462,7 +468,7 @@ const I18n = {
       'mystery.ambush.title': 'Ambush!',
       'mystery.ambush.sub': 'An enemy emerges from the shadows...',
 
-      // Relics — names & descriptions
+      // Relics – names & descriptions
       'relic.entropy.name': 'Entropy',
       'relic.entropy.desc': 'New tiles are always 4.',
       'relic.entropy.effect': '+50% tile value',
@@ -555,7 +561,7 @@ const I18n = {
       'relic.tax.desc': '-20% gold earned per room.',
       'relic.tax.effect': '-20% gold',
 
-      // Meta upgrades — names & descriptions & effects
+      // Meta upgrades – names & descriptions & effects
       'meta.extraMoves.name': 'Momentum',
       'meta.extraMoves.desc': 'Increases base moves in all rooms.',
       'meta.extraMoves.effect': '+{n} base moves',
