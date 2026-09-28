@@ -33,7 +33,7 @@
     <button class="btn-ghost" id="btnResetSave" style="margin-top:4px;color:var(--text-muted)" data-i18n="ui.btn.resetSave">↺ Tout effacer</button>
   </div>
   <div class="lang-toggle"><div id="langToggle"></div><button class="lang-btn" id="soundToggle" type="button"></button><button class="lang-btn" id="musicToggle" type="button"></button></div>
-  <div class="version-tag">v3.1.0</div>
+  <div class="version-tag">v3.2.0</div>
 </div>
 
 <!-- CODEX -->
@@ -61,40 +61,32 @@
     <div class="map-floor-label" id="mapFloorLabel">Étage 1/3</div>
     <div class="map-gold" id="mapGold">0</div>
   </div>
-  <div class="relics-bar card w-full">
-    <div class="text-xs text-dim" data-i18n="map.activeRelics">Reliques actives</div>
-    <div class="relics-list" id="mapRelics"></div>
-  </div>
+  <button class="relic-tray w-full" id="mapRelics" type="button"></button>
   <div class="floor-map w-full" id="floorMap"></div>
   <button class="btn mt-2" id="btnAbandon" data-icon="abandon" data-i18n="ui.btn.abandon">Abandonner</button>
 </div>
 
 <!-- GAME -->
 <div id="gameScreen" class="screen">
-  <div class="game-header w-full">
-    <div class="room-info">
-      <div class="room-name" id="roomName">–</div>
-      <div class="enemy-panel" id="enemyPanel">
-        <div class="enemy-row"><span id="enemyEmblem"></span><span id="enemyName"></span><span id="enemyHp" aria-live="polite"></span></div>
-        <div class="enemy-hp-track"><div id="enemyHpGhost"></div><div id="enemyHpFill"></div></div>
-        <div id="enemyIntent" class="enemy-intent" aria-live="polite"></div>
-        <div id="enemyPassive" class="enemy-passive"></div>
-      </div>
-    </div>
-    <div class="hud-pills">
-      <div class="hud-pill"><div class="hud-pill-val" id="hudScore">0</div><div class="hud-pill-label" data-i18n="hud.score">Score</div></div>
-      <div class="hud-pill"><div class="hud-pill-val" id="hudGold">0</div><div class="hud-pill-label" data-icon="gold" data-i18n="hud.gold">Or</div></div><div class="hud-hearts" id="hudHearts" aria-label="Hearts"></div><button class="btn-ghost hud-abandon" id="btnGameAbandon" data-icon="abandon" data-i18n="ui.btn.abandon">Abandonner</button>
-    </div>
+  <div class="combat-topbar w-full">
+    <div class="room-tag" id="roomName">–</div>
+    <div class="combat-gold" id="hudGold">0</div>
+    <div class="hud-hearts" id="hudHearts" aria-label="Hearts"></div>
+    <button class="combat-menu" id="btnCombatMenu" type="button" aria-label="Menu">⋯</button>
   </div>
-  <div class="moves-wrap w-full">
-    <div class="moves-label"><span data-i18n="hud.movesLeft">Coups restants</span><span id="comboLabel" aria-live="polite"></span><span id="invertTag"></span><span id="movesClock"><span id="movesText">0/0</span></span></div>
-    <div class="moves-track"><div class="moves-fill" id="movesFill" style="width:100%"></div></div>
+  <div class="enemy-panel w-full" id="enemyPanel">
+    <div id="enemyEmblem"></div>
+    <div class="enemy-main"><div class="enemy-row"><span id="enemyName"></span><span id="enemyHp" aria-live="polite"></span></div>
+      <div class="enemy-hp-track"><div id="enemyHpGhost"></div><div id="enemyHpFill"></div></div>
+      <button id="enemyIntent" class="enemy-intent" type="button" aria-label="Intent"></button>
+      <div id="enemyPassive" class="enemy-passive"></div><div id="phaseBanner"></div></div>
   </div>
-  <div class="spell-bar w-full" id="spellBar"></div>
-  <div class="spell-hint w-full" id="spellHint" aria-live="polite"></div>
-  <div class="active-relics" id="activeRelics"></div>
+  <div class="player-card w-full">
+    <div class="moves-row"><span data-i18n="hud.yourMoves">Tes coups</span><div class="moves-track"><div class="moves-fill" id="movesFill" style="width:100%"></div></div><span id="movesClock"><span id="movesText">0/0</span></span><span id="comboLabel" aria-live="polite"></span><span id="invertTag"></span></div>
+    <button class="relic-tray w-full" id="combatRelicTray" type="button"></button>
+  </div>
   <div class="grid-wrap w-full">
-    <div id="gameGrid"></div><div id="phaseBanner"></div>
+    <div id="gameGrid"></div>
     <div id="gameTiles"></div>
     <canvas class="fx-layer" aria-hidden="true"></canvas>
     <div class="room-overlay" id="roomOverlay" role="alertdialog" aria-labelledby="overlayTitle">
@@ -104,9 +96,27 @@
       <button class="btn btn-primary" id="overlayBtn" data-i18n="ui.btn.continue">Continuer</button>
     </div>
   </div>
+  <div class="spell-hint w-full" id="spellHint" aria-live="polite"></div>
+  <div class="spell-bar w-full" id="spellBar"></div>
   <div class="dpad" data-i18n-aria="hud.directions"><button data-dir="left" data-i18n-aria="hud.left">←</button><button data-dir="up" data-i18n-aria="hud.up">↑</button><button data-dir="down" data-i18n-aria="hud.down">↓</button><button data-dir="right" data-i18n-aria="hud.right">→</button></div>
 
 </div>
+
+<!-- COMBAT AND MAP DETAILS -->
+<div class="hud-scrim" id="hudScrim"></div>
+<section class="hud-sheet" id="relicSheet" role="dialog" aria-modal="true" aria-label="Reliques" tabindex="-1" inert>
+  <div class="sheet-handle"></div><div class="relic-sheet-list">
+    <div class="sheet-heading"><h2 id="relicSheetTitle"></h2><button type="button" data-close-hud></button></div>
+    <div class="relic-filters" id="relicFilters"></div><div class="relic-sheet-grid" id="relicSheetGrid"></div>
+  </div><div class="relic-sheet-detail" id="relicSheetDetail"></div>
+</section>
+<section class="hud-sheet hud-menu-sheet" id="combatMenuSheet" role="dialog" aria-modal="true" aria-label="Menu" tabindex="-1" inert>
+  <div class="sheet-handle"></div><div class="sheet-heading"><h2>Menu</h2><button type="button" data-close-hud></button></div>
+  <div class="menu-score" id="menuScore"></div><button type="button" class="menu-setting" id="menuSound"></button><button type="button" class="menu-setting" id="menuMusic"></button>
+  <button type="button" class="menu-abandon" id="btnGameAbandon"></button><button type="button" class="menu-close" data-close-hud></button>
+</section>
+<section class="hud-pop" id="intentPop" role="dialog" aria-label="Intent" tabindex="-1" inert></section>
+<section class="hud-pop" id="spellPop" role="dialog" aria-label="Spell" tabindex="-1" inert></section>
 
 <!-- MERCHANT -->
 <div id="shopScreen" class="screen">

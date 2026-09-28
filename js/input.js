@@ -21,6 +21,7 @@ const Input = {
       const dir = Math.abs(dx) > Math.abs(dy)
         ? (dx > 0 ? 'right' : 'left')
         : (dy > 0 ? 'down'  : 'up');
+      if (document.querySelector('.hud-scrim.show')) return;
       Audio2.unlock();
       const haptic = Controller.move(dir);
       if (haptic) Haptics.trigger(haptic);
@@ -38,6 +39,17 @@ const Input = {
       q:'left', z:'up',
     };
     window.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.querySelector('.hud-scrim.show')) { e.preventDefault(); Renderer.closeHud(); return; }
+      if (document.querySelector('.hud-scrim.show')) {
+        if (e.key === 'Tab') {
+          const panel = document.querySelector('.hud-sheet.show, .hud-pop.show');
+          const buttons = [...panel.querySelectorAll('button:not([disabled])')].filter(button => button.offsetParent !== null);
+          if (buttons.length && (document.activeElement === panel || (e.shiftKey && document.activeElement === buttons[0]) || (!e.shiftKey && document.activeElement === buttons.at(-1)))) {
+            e.preventDefault(); (e.shiftKey ? buttons.at(-1) : buttons[0]).focus();
+          }
+        }
+        return;
+      }
       if (e.key === 'Escape' && GameState.spellTarget) { e.preventDefault(); Controller.cancelSpell(); return; }
       if ((e.key === '1' || e.key === '2') && document.getElementById('gameScreen').classList.contains('active')) {
         e.preventDefault(); Controller.selectSpell(Number(e.key)-1); return;
@@ -53,10 +65,8 @@ const Input = {
         else Controller.confirmSpellCursor();
         return false;
       }
-      if (document.activeElement && document.activeElement.tagName === 'BUTTON') {
-        document.activeElement.blur();
-      }
       if (dir) {
+        if (document.activeElement?.tagName === 'BUTTON') document.activeElement.blur();
         e.preventDefault();
         e.stopImmediatePropagation();
         Audio2.unlock();
@@ -75,7 +85,9 @@ const Input = {
         Fx.resize();
         if (document.getElementById('gameScreen').classList.contains('active')) {
           Renderer.renderTiles();
+          Renderer.renderRelicTray('combatRelicTray');
         }
+        if (document.getElementById('mapScreen').classList.contains('active')) Renderer.renderRelicTray('mapRelics');
       }, 150);
     });
   },
@@ -125,15 +137,42 @@ function bindButtons() {
 
   // Game : abandon from game screen
   document.getElementById('btnGameAbandon').addEventListener('click', () => {
+    Renderer.closeHud(false);
     if (GameState.spellTarget) Controller.cancelSpell();
     document.getElementById('abandonModal').classList.add('show');
   });
+  document.getElementById('btnCombatMenu').addEventListener('click', e => Renderer.openMenu(e.currentTarget));
+  for (const id of ['combatRelicTray','mapRelics']) document.getElementById(id).addEventListener('click', e => Renderer.openRelicSheet(e.currentTarget));
+  document.getElementById('enemyIntent').addEventListener('click', e => Renderer.openIntent(e.currentTarget));
+  document.getElementById('hudScrim').addEventListener('click', () => Renderer.closeHud());
+  document.querySelectorAll('[data-close-hud]').forEach(button => button.addEventListener('click', () => Renderer.closeHud()));
+  document.getElementById('relicFilters').addEventListener('click', e => {
+    const filter = e.target.closest('[data-relic-filter]');
+    if (!filter) return;
+    Renderer._relicFilter = Renderer._relicFilter === filter.dataset.relicFilter ? '' : filter.dataset.relicFilter;
+    Renderer.renderRelicSheet();
+  });
+  document.getElementById('relicSheetGrid').addEventListener('click', e => {
+    const button = e.target.closest('[data-relic-detail]');
+    if (button) Renderer.showRelicDetail(button.dataset.relicDetail);
+  });
+  document.getElementById('relicSheetDetail').addEventListener('click', e => {
+    if (e.target.closest('[data-relic-back]')) { document.getElementById('relicSheet').classList.remove('show-detail'); document.getElementById('relicSheet').focus(); }
+  });
+  document.getElementById('intentPop').addEventListener('click', e => { if (e.target.closest('[data-close-hud]')) Renderer.closeHud(); });
+  document.getElementById('spellPop').addEventListener('click', e => {
+    if (e.target.closest('[data-close-hud]')) Renderer.closeHud();
+    const launch = e.target.closest('[data-launch-spell]');
+    if (launch) { const slot = Number(launch.dataset.launchSpell); Renderer.closeHud(); if (GameState.spellTarget?.slot === slot) Controller.cancelSpell(); Controller.selectSpell(slot); }
+  });
+  document.getElementById('menuSound').addEventListener('click', () => { document.getElementById('soundToggle').click(); Renderer.renderMenu(); });
+  document.getElementById('menuMusic').addEventListener('click', () => { document.getElementById('musicToggle').click(); Renderer.renderMenu(); });
 
   // Game overlay
   document.getElementById('overlayBtn').addEventListener('click', () => Controller.overlayAction());
   document.getElementById('spellBar').addEventListener('click', e => {
     const button = e.target.closest('[data-spell-slot]');
-    if (button) Controller.selectSpell(Number(button.dataset.spellSlot));
+    if (button) Renderer.openSpell(Number(button.dataset.spellSlot), button);
   });
   document.getElementById('spellHint').addEventListener('click', e => {
     if (e.target.closest('[data-accept-defeat]')) Controller._checkFailure(true);

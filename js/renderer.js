@@ -2,6 +2,7 @@
 
 const _screens = {};
 function showScreen(id) {
+  if (typeof Renderer !== 'undefined') Renderer.closeHud();
   // Cache screen elements on first use
   if (!_screens._all) {
     _screens._all = document.querySelectorAll('.screen');
@@ -10,6 +11,8 @@ function showScreen(id) {
   if (!_screens[id]) _screens[id] = document.getElementById(id);
   _screens[id].classList.add('active');
   _screens[id].scrollTop = 0;
+  if (id === 'gameScreen') Renderer.renderRelicTray('combatRelicTray');
+  if (id === 'mapScreen') Renderer.renderRelicTray('mapRelics');
   Scene.forScreen(id);
   if (typeof Music !== 'undefined') Music.forScreen(id);
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -18,6 +21,123 @@ function showScreen(id) {
 }
 
 const Renderer = {
+  hudReturnFocus: null,
+  trayVisibleCount(width, count) {
+    const contentWidth = Math.max(0, width - 16);
+    const capacity = Math.max(0, Math.floor((contentWidth + 2) / 27));
+    let visible = Math.min(count, capacity);
+    while (visible < count && visible > 0) {
+      const badgeWidth = Math.max(36, 14 + 9 * (1 + String(count - visible).length));
+      if (visible * 27 + badgeWidth <= contentWidth) break;
+      visible--;
+    }
+    return visible;
+  },
+  relicState(relic, room, run) {
+    const roomFlags = {shield:'_shieldUsed',tide:'_tideUsed',focus:'_focusUsed',vortex:'_vortexUsed'};
+    if (room?.relicState?.[roomFlags[relic.id]]) return 'usedRoom';
+    if (relic.id === 'phoenix') return run?._phoenixReady === false ? 'usedRun' : 'availableRun';
+    if (relic.id === 'wildcard') return 'wildcard';
+    return '';
+  },
+  renderRelicTray(id) {
+    const tray = document.getElementById(id), relics = GameState.run?.relics || [];
+    const width = tray.clientWidth;
+    if (!width) return;
+    const count = this.trayVisibleCount(width, relics.length);
+    tray.innerHTML = relics.length ? relics.slice(0, count).map(r => `<span class="tray-icon rarity-${r.rarity}" title="${I18n.t('relic.'+r.id+'.name')}">${Icons.svg(r.icon)}</span>`).join('')
+      + (relics.length > count ? `<span class="tray-more">+${relics.length-count}</span>` : '')
+      : `<span class="tray-empty">${I18n.t('map.noRelics')}</span>`;
+    tray.setAttribute('aria-label', `${I18n.t('hud.relics')} ${relics.length}`);
+  },
+  openHud(id, trigger) {
+    this.closeHud(false);
+    this.hudReturnFocus = trigger;
+    document.getElementById('hudScrim').classList.add('show');
+    const panel = document.getElementById(id);
+    panel.inert = false;
+    panel.classList.add('show');
+    panel.focus();
+  },
+  closeHud(restore = true) {
+    document.getElementById('hudScrim')?.classList.remove('show');
+    document.querySelectorAll('.hud-sheet.show, .hud-pop.show').forEach(el => { el.classList.remove('show'); el.inert = true; });
+    if (restore && this.hudReturnFocus?.isConnected) this.hudReturnFocus.focus();
+    this.hudReturnFocus = null;
+  },
+  openRelicSheet(trigger) {
+    this._relicFilter = '';
+    document.getElementById('relicSheet').classList.remove('show-detail');
+    this.renderRelicSheet();
+    this.openHud('relicSheet', trigger);
+  },
+  renderRelicSheet() {
+    const relics = GameState.run?.relics || [];
+    const room = document.getElementById('gameScreen').classList.contains('active') ? GameState.room : null;
+    document.getElementById('relicSheetTitle').textContent = `${I18n.t('hud.relics')} ${relics.length}`;
+    const tags = ['gold','small','tempo','control','spell','blast','chain','corner'];
+    document.getElementById('relicFilters').innerHTML = tags.map(tag => {
+      const count = relics.filter(r => r.tags?.includes(tag)).length;
+      return count ? `<button type="button" data-relic-filter="${tag}" aria-pressed="${this._relicFilter === tag}"><i class="family-dot fam-${tag}"></i>${I18n.t('family.'+tag)} ${count}</button>` : '';
+    }).join('');
+    document.getElementById('relicSheetGrid').innerHTML = relics.filter(r => !this._relicFilter || r.tags?.includes(this._relicFilter)).map(r => {
+      const used = ['usedRoom','usedRun'].includes(this.relicState(r,room,GameState.run));
+      return `<button type="button" data-relic-detail="${r.id}" class="${used ? 'used' : ''}"><span class="rarity-${r.rarity}">${Icons.svg(r.icon)}</span><span>${I18n.t('relic.'+r.id+'.name')}</span></button>`;
+    }).join('');
+    document.querySelectorAll('#relicSheet [data-close-hud]').forEach(b => b.textContent = I18n.t('hud.close'));
+  },
+  showRelicDetail(id) {
+    const relic = GameState.run?.relics.find(r => r.id === id);
+    if (!relic) return;
+    const room = document.getElementById('gameScreen').classList.contains('active') ? GameState.room : null;
+    const state = this.relicState(relic, room, GameState.run);
+    const stateText = state === 'wildcard' ? I18n.t('hud.wildcardState',{n:(GameState.run._wildcardMoves || 0)%12})
+      : state ? I18n.t('hud.relicState.'+state) : '';
+    document.getElementById('relicSheetDetail').innerHTML = `<button type="button" class="detail-back" data-relic-back>${I18n.t('hud.allRelics')}</button><div class="detail-icon rarity-${relic.rarity}">${Icons.svg(relic.icon)}</div><h3>${I18n.t('relic.'+id+'.name')}</h3><div class="detail-meta"><span class="relic-rarity rarity-${relic.rarity}">${I18n.t('rarity.'+relic.rarity)}</span>${this.familyChips(relic)}</div><p>${I18n.t('relic.'+id+'.desc')}</p>${stateText ? `<div class="detail-state">${stateText}</div>` : ''}`;
+    document.getElementById('relicSheet').classList.add('show-detail');
+    document.querySelector('[data-relic-back]').focus();
+  },
+  renderMenu() {
+    document.getElementById('menuScore').textContent = `${I18n.t('hud.score')} ${GameState.score}`;
+    document.getElementById('menuSound').textContent = I18n.t(GameState.meta.settings.sound === false ? 'settings.soundOff' : 'settings.soundOn');
+    document.getElementById('menuMusic').textContent = I18n.t(GameState.meta.settings.music === false ? 'settings.musicOff' : 'settings.musicOn');
+    document.getElementById('menuSound').setAttribute('aria-pressed', String(GameState.meta.settings.sound !== false));
+    document.getElementById('menuMusic').setAttribute('aria-pressed', String(GameState.meta.settings.music !== false));
+    document.getElementById('btnGameAbandon').textContent = I18n.t('hud.abandonRun');
+    document.querySelectorAll('#combatMenuSheet [data-close-hud]').forEach(b => b.textContent = I18n.t('hud.close'));
+  },
+  openMenu(trigger) {
+    this.renderMenu();
+    this.openHud('combatMenuSheet',trigger);
+  },
+  openIntent(trigger) {
+    const fight = GameState.room?.combat;
+    if (!fight) return;
+    const intent = Combat.intent(fight), base = intent === 'seal2' ? 'seal' : intent;
+    const params = this.intentHelpParams(intent, fight, GameState.room.floorIdx, GameState.run.tier);
+    const pop = document.getElementById('intentPop');
+    pop.innerHTML = `<h3>${Icons.svg('i-'+base)} ${I18n.t('intent.'+intent,params)} · ${I18n.t(fight.intentIn === 1 ? 'hud.inMoves' : 'hud.inMovesPlural',{n:fight.intentIn})}</h3><p>${I18n.t('intent.'+intent+'.help',params)}</p><div class="pop-actions"><button type="button" data-close-hud>${I18n.t('hud.understood')}</button></div>`;
+    pop.style.top = `${Math.min(window.innerHeight-pop.offsetHeight-16, document.getElementById('enemyPanel').getBoundingClientRect().bottom + 6)}px`;
+    this.openHud('intentPop',trigger);
+  },
+  openSpell(slot, trigger) {
+    const owned = GameState.run?.spells[slot];
+    if (!owned) return;
+    const def = SPELLS.find(s => s.id === owned.id), available = Controller.spellAvailable(owned);
+    const reason = owned.charges <= 0 ? I18n.t('hud.noCharges') : !available ? I18n.t(
+      owned.id === 'undo' ? 'hud.noUndo' : ['joker','catalyst'].includes(owned.id) ? 'hud.boardFull' : 'hud.spellUnavailable') : '';
+    const pop = document.getElementById('spellPop');
+    pop.innerHTML = `<h3>${Icons.svg(def.icon)} ${I18n.t('spell.'+owned.id)} <span>${owned.charges} / ${Controller.spellCapacity()} ${I18n.t('hud.charges')}</span></h3><p>${I18n.t('spell.desc.'+owned.id)}</p><small>${I18n.t('hud.spellFree')}${def.targets ? ' '+I18n.t(def.targets === 2 ? 'spell.pickTwo' : 'spell.pickOne')+'.' : ''}</small>${reason ? `<small class="pop-reason">${reason}</small>` : ''}<div class="pop-actions"><button type="button" data-close-hud>${I18n.t('ui.btn.cancel')}</button><button type="button" class="pop-go" data-launch-spell="${slot}" ${available ? '' : 'disabled'}>${I18n.t('hud.cast')}</button></div>`;
+    pop.style.bottom = `${window.innerHeight-document.getElementById('spellBar').getBoundingClientRect().top+6}px`;
+    this.openHud('spellPop',trigger);
+  },
+  intentHelpParams(intent, fight, floorIdx, tier, base = Board.base()) {
+    const rank = {seal:4,seal2:4,bomb:4,freeze:3,devour:1}[intent] || 1;
+    const n = intent === 'seal' || intent === 'seal2' ? (fight.id === 'jailer' ? 8 : 6)
+      : (floorIdx === 2 ? 3 : 2) + (tier >= 9 ? 1 : 0);
+    const arrow = fight.intentDirection ? {left:'←',right:'→',up:'↑',down:'↓'}[fight.intentDirection] : '';
+    return {n, v:base * 2 ** (rank - 1), arrow};
+  },
   tileClass(value) { return `t${Math.min(2 ** Board.rank(value), 2048)}`; },
   familyChips(relic) {
     return (relic.tags || []).map(tag => `<span class="family-chip">${I18n.t('family.'+tag)}</span>`).join('');
@@ -250,8 +370,7 @@ const Renderer = {
   // ── HUD ──
   updateHUD() {
     const gs = GameState;
-    document.getElementById('hudScore').textContent = gs.score;
-    document.getElementById('hudGold').textContent  = gs.run.gold;
+    document.getElementById('hudGold').innerHTML = `${Icons.svg('gold')} ${gs.run.gold}`;
     const pct = gs.movesMax > 0 ? (gs.movesLeft / gs.movesMax) * 100 : 0;
     const fill = document.getElementById('movesFill');
     fill.style.width = pct + '%';
@@ -267,18 +386,18 @@ const Renderer = {
     document.querySelector('.grid-wrap').classList.toggle('is-inverted', !!fight?.invertTurns);
     document.querySelectorAll('[data-dir]').forEach(btn => btn.classList.toggle('is-locked', !!fight && Combat.isLocked(fight, btn.dataset.dir)));
     this.renderSpells();
+    this.updateActiveRelics();
   },
 
   renderSpells() {
     const bar = document.getElementById('spellBar');
     if (!bar || !GameState.run) return;
     const target = GameState.run.spells[GameState.spellTarget?.slot] ? GameState.spellTarget : null;
-    bar.innerHTML = Array.from({length:2}, (_,i) => {
+    bar.innerHTML = Array.from({length:Math.max(2, GameState.run.spells.length)}, (_,i) => {
       const owned = GameState.run.spells[i];
-      if (!owned) return `<button class="spell-slot is-empty" disabled>${I18n.t('spell.empty')}</button>`;
+      if (!owned) return `<button class="spell-slot is-empty" type="button" disabled>${I18n.t('spell.empty')}</button>`;
       const def = SPELLS.find(s => s.id === owned.id);
-      const disabled = !Controller.spellAvailable(owned);
-      return `<button class="spell-slot ${target?.slot === i ? 'is-targeting' : ''}" data-spell-slot="${i}" ${disabled ? 'disabled' : ''}>${Icons.svg(def.icon)}<span>${I18n.t('spell.'+owned.id)}</span><span class="spell-dots">${Array.from({length:Controller.spellCapacity()},(_,n) => `<i class="${n < owned.charges ? 'filled' : ''}"></i>`).join('')}</span></button>`;
+      return `<button class="spell-slot ${target?.slot === i ? 'is-targeting' : ''}" type="button" data-spell-slot="${i}">${Icons.svg(def.icon)}<span>${I18n.t('spell.'+owned.id)}</span><span class="spell-dots">${Array.from({length:Controller.spellCapacity()},(_,n) => `<i class="${n < owned.charges ? 'filled' : ''}"></i>`).join('')}</span></button>`;
     }).join('');
     const hint = document.getElementById('spellHint');
     hint.innerHTML = '';
@@ -390,8 +509,7 @@ const Renderer = {
     document.getElementById('enemyEmblem').style.color = ROOM_DEFS[def.kind].color;
     document.getElementById('enemyName').textContent = I18n.t(def.kind === 'boss' ? 'enemy.' + def.id + '.name' : 'enemy.' + def.id);
     document.getElementById('enemyHp').innerHTML = `${fight.hp} / ${fight.maxHp}` +
-      (fight.block ? ` <span class="enemy-block">${Icons.svg('i-shield')} ${fight.block}</span>` : '') +
-      (fight.reviveAvailable ? ` <span class="phylactery" title="${I18n.t('combat.reviveAvailable')}">${Icons.svg('i-heal')}</span>` : '');
+      (fight.block ? ` <span class="enemy-block">${Icons.svg('i-shield')} ${fight.block}</span>` : '');
     const width = `${fight.hp / fight.maxHp * 100}%`;
     for (const id of ['enemyHpFill','enemyHpGhost']) {
       const el = document.getElementById(id);
@@ -400,11 +518,12 @@ const Renderer = {
       if (first) requestAnimationFrame(() => { el.style.transition = ''; });
     }
     const intent = Combat.intent(fight), base = intent === 'seal2' ? 'seal' : intent;
-    const arrow = fight.intentDirection ? { left:'←', right:'→', up:'↑', down:'↓' }[fight.intentDirection] : '';
+    const params = this.intentHelpParams(intent, fight, room.floorIdx, GameState.run.tier);
     const chip = document.getElementById('enemyIntent');
-    chip.innerHTML = `${Icons.svg('i-' + base)} <span>${I18n.t('intent.' + base, { n:(room.floorIdx === 2 ? 3 : 2) + (GameState.run.tier >= 9 ? 1 : 0), arrow })} · ${I18n.t('intent.in', { n:fight.intentIn })}</span>`;
+    chip.innerHTML = `${Icons.svg('i-' + base)}<span class="intent-text">${I18n.t('intent.' + intent, params)} · ${I18n.t(fight.intentIn === 1 ? 'hud.inMoves' : 'hud.inMovesPlural', { n:fight.intentIn })}</span><span class="intent-more" aria-hidden="true">?</span>`;
+    chip.setAttribute('aria-label', `${I18n.t('intent.' + intent, params)} · ${I18n.t(fight.intentIn === 1 ? 'hud.inMoves' : 'hud.inMovesPlural', { n:fight.intentIn })}`);
     const passive = def.id === 'colossus' ? 'gravity' : def.id === 'clockmaker' ? 'clock' : null;
-    document.getElementById('enemyPassive').textContent = passive ? I18n.t('combat.' + passive) : '';
+    document.getElementById('enemyPassive').innerHTML = [passive ? I18n.t('combat.' + passive) : '', fight.reviveAvailable ? `<span class="phylactery" title="${I18n.t('combat.reviveAvailable')}">${Icons.svg('i-heal')} ${I18n.t('combat.reviveAvailable')}</span>` : ''].filter(Boolean).join(' · ');
     chip.classList.toggle('is-imminent', fight.intentIn === 1);
   },
 
@@ -424,7 +543,7 @@ const Renderer = {
   strike(n) {
     const el = document.getElementById('movesText');
     el.classList.remove('is-struck'); void el.offsetWidth; el.classList.add('is-struck');
-    const label = document.querySelector('.moves-label');
+    const label = document.querySelector('.moves-row');
     const fl = document.createElement('span'); fl.className = 'fx-float strike-float'; fl.textContent = `−${n}`;
     label.appendChild(fl); setTimeout(() => fl.remove(), 950);
   },
@@ -432,6 +551,8 @@ const Renderer = {
     const el = document.getElementById('phaseBanner');
     el.textContent = I18n.t(key);
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    clearTimeout(this._phaseBannerTimer);
+    this._phaseBannerTimer = setTimeout(() => el.classList.remove('show'), 1200);
   },
 
   renderClock(fraction, remaining) {
@@ -453,10 +574,7 @@ const Renderer = {
   },
 
   updateActiveRelics() {
-    const el = document.getElementById('activeRelics');
-    el.innerHTML = GameState.run.relics
-      .map(r => `<div class="active-relic-icon rarity-${r.rarity}" title="${I18n.t('relic.' + r.id + '.name')}: ${I18n.t('relic.' + r.id + '.desc')}">${Icons.svg(r.icon)}${this.familyChips(r)}</div>`)
-      .join('');
+    this.renderRelicTray('combatRelicTray');
   },
 
   // ── Room overlay ──
@@ -497,21 +615,7 @@ const Renderer = {
     document.getElementById('mapGold').innerHTML = `${Icons.svg('gold')} ${gs.run.gold}`;
 
     // Relics
-    const relicsEl = document.getElementById('mapRelics');
-    if (gs.run.relics.length === 0) {
-      relicsEl.innerHTML = `<span class="text-sm text-muted">${I18n.t('map.noRelics')}</span>`;
-    } else {
-      relicsEl.innerHTML = '';
-      gs.run.relics.forEach(r => {
-        const chip = document.createElement('div');
-        chip.className = 'relic-chip rarity-' + r.rarity + (r.isCurse ? ' is-curse' : '');
-        const rName = I18n.t(`relic.${r.id}.name`);
-        const rDesc = I18n.t(`relic.${r.id}.desc`);
-        chip.innerHTML = `${Icons.svg(r.icon)} <span>${rName}</span>${this.familyChips(r)}`;
-        chip.addEventListener('click', () => this.showRelicTooltip(r.icon, rName, rDesc, r.rarity, r));
-        relicsEl.appendChild(chip);
-      });
-    }
+    this.renderRelicTray('mapRelics');
 
     // Map – connected node graph for current floor
     const mapEl = document.getElementById('floorMap');

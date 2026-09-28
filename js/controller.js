@@ -309,9 +309,9 @@ const Controller = {
         GameState.stuck = !!saved.stuck;
         const type = enemyDef.kind, def = ROOM_DEFS[type];
         const roomLabel = type === 'boss' ? I18n.t('enemy.' + enemyDef.id + '.name') : I18n.t('room.' + type);
-        document.getElementById('roomName').innerHTML = `<span style="color:${def.color}">${Icons.svg(def.icon)}</span> ${roomLabel}`;
+        document.getElementById('roomName').innerHTML = `<span style="color:${def.color}">${Icons.svg(def.icon)}</span> ${type === 'boss' ? '' : ['I','II','III'][saved.floorIdx] + ' · '}${roomLabel}`;
         Renderer.hideRoomOverlay(); Renderer.renderEnemy(true); Renderer.updateHUD();
-        Renderer.updateActiveRelics(); Renderer.buildGrid(); showScreen('gameScreen');
+        Renderer.buildGrid(); showScreen('gameScreen');
         this._startClock(saved.clockRemaining);
         requestAnimationFrame(() => { Fx.resize(); Renderer.renderTiles(); });
         return;
@@ -542,11 +542,10 @@ const Controller = {
     // Render room UI
     const def = ROOM_DEFS[type];
     const roomLabel = type === 'boss' ? I18n.t('enemy.' + enemy.id + '.name') : I18n.t('room.' + type);
-    document.getElementById('roomName').innerHTML = `<span style="color:${def.color}">${Icons.svg(def.icon)}</span> ${roomLabel}`;
+    document.getElementById('roomName').innerHTML = `<span style="color:${def.color}">${Icons.svg(def.icon)}</span> ${type === 'boss' ? '' : ['I','II','III'][floorIdx] + ' · '}${roomLabel}`;
     Renderer.renderEnemy(true);
     Renderer.hideRoomOverlay();
     Renderer.updateHUD();
-    Renderer.updateActiveRelics();
     Renderer.buildGrid();
 
     showScreen('gameScreen');
@@ -846,6 +845,7 @@ const Controller = {
     if (!def) return false;
     gs.spellTarget = def.targets ? {slot, targets:[], cursor:this._firstSpellCell(owned.id,[])} : null;
     if (!def.targets) return this._castSpell(slot,[]);
+    document.activeElement?.blur?.();
     Renderer.renderSpells();
     return true;
   },

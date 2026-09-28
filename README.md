@@ -10,7 +10,7 @@ A roguelike variant of 2048 with meta-progression, relics, difficulty tiers, ach
 
 ## How to Play
 
-Open `index.html` in a browser. Swipe or use arrow keys / WASD / ZQSD to move tiles.
+Open `index.html` in a browser. Swipe or use arrow keys / WASD / ZQSD to move tiles. The v3.2.0 combat layout puts the moves and relic tray above the grid, spells below it, and the score and settings in the top-right menu.
 
 Each **run** spans 3 floors. Each floor has a branching node map with battles, elite rooms, mystery events, rest stops, a merchant, and one boss drawn from a pool of three. The map reveals the boss before you reach it. Merge tiles to damage enemies before your moves run out. Enemy intents show what happens next and when; three hearts let you survive failed rooms.
 
@@ -28,7 +28,8 @@ Each **run** spans 3 floors. Each floor has a branching node map with battles, e
 - **Result card**: share or download a 1080 × 1350 PNG, or copy a short text summary with floor squares.
 - **Mystery rooms** – eight events with visible choices, risks, and rewards
 - **Special tiles**: gold tiles pay on merges; ice blocks until two adjacent merges thaw it; jokers merge with numbered tiles; ×2 doubles a numbered tile. Obstacles block movement, bombs halve adjacent numbers and destroy jokers or ×2 tiles, and floor III battles place paired portals. Prophet and Herald can freeze numbered tiles. Gold, joker and ×2 are fully implemented; spells can create joker and ×2 tiles.
-- **Spells**: two slots and three charges each, or four with Grimoire. Choose Alchemist, Artificer, or Monk to start with their relic and spell at two charges; a consumed move with at least three merges restores one charge to the first non-full spell. Use 1 or 2 to cast a slot. While targeting, arrows or WASD/ZQSD move the cursor, Enter or Space selects, and Escape cancels. A rescue spell can save a board with no legal slide before defeat is finalized.
+- **Spells**: two slots and three charges each, or four with Grimoire. Choose Alchemist, Artificer, or Monk to start with their relic and spell at two charges; a consumed move with at least three merges restores one charge to the first non-full spell. Tap a spell under the grid to read its details and cast, or use 1 or 2 to cast a slot directly. While targeting, arrows or WASD/ZQSD move the cursor, Enter or Space selects, and Escape cancels. A rescue spell can save a board with no legal slide before defeat is finalized.
+- **Combat details**: tap the intent chip for its effect, or the relic tray on the map or in combat for family filters and individual relic details. Escape closes any open sheet or popover.
 - **Merchant**: one per floor on row 2 or 3; spend run gold on relics, spells, healing, recharge or curse removal. Remaining run gold is banked at the end.
 - **Rest rooms**: choose a relic, heal or meditate to recharge spells.
 - **Combat**: enemy HP, combo damage, block, temporary seals, telegraphed intents and boss phases. New boss mechanics include devouring tiles, a one-time revive, gravity, a move clock, board flips, and a moving void

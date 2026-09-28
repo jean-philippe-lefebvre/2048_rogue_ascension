@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Feature** (new mechanic, new relics, UI change) → bump minor: `v1.0.0` → `v1.1.0`
 - **Major** (user-requested big upgrade) → bump major: `v1.0.0` → `v2.0.0`
 
-Current version: **v3.1.0** (`index.html` title screen, bottom)
+Current version: **v3.2.0** (`index.html` title screen, bottom)
 
 ## Development
 
@@ -25,6 +25,8 @@ No linter or dependencies.
 ## Architecture
 
 **Single-page app with 10 screens** managed by CSS `.active` class toggling (`showScreen()` in `renderer.js`). Screens: title, codex, character choice, map, game (2048 grid), relic choice, merchant, event, end, meta (permanent upgrades). Screen refs are cached for performance.
+
+Combat UI: a compact top bar shows room, gold, hearts and menu; the enemy card has an intent button with a help popover; the player card contains moves and a relic tray. The grid is followed by the targeting hint, horizontal spell row and d-pad. Tapping a spell opens its cast popover, while keys 1 and 2 cast directly. The map and combat trays share a filterable relic bottom sheet with detail pages. The combat menu contains score, sound, music and abandon controls.
 
 **Script load order matters** (declared in `index.html`):
 `haptics → i18n → icons → rng → constants → storage → state → board → combat → spells → fx → scene → audio → music → renderer → controller → share → input`
