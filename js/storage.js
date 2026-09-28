@@ -12,7 +12,7 @@ const Storage = {
         meta.tierUnlocked = Math.min(MAX_TIER, Math.max(0, 3 * (meta.ascension ?? meta.ascensionLevel ?? 0)));
       const oldTier = Math.min(MAX_TIER, Math.max(0, meta.tierUnlocked));
       meta.tiers = { ...meta.tiers, ...Object.fromEntries(CHARACTERS.map(({id}) => [id,
-        Math.min(MAX_TIER, Math.max(0, meta.tiers?.[id] ?? oldTier))])) };
+        Math.min(MAX_TIER, Math.max(0, meta.tiers?.[id] ?? (['cartographer','usurer'].includes(id) ? 0 : oldTier)))])) };
       delete meta.tierUnlocked;
       meta.codex ??= { relics:[], enemies:{}, runs:[] };
       meta.codex.relics ??= [];
@@ -21,6 +21,8 @@ const Storage = {
       meta.records = { tile:0, hit:0, gold:0, ...meta.records };
       meta.progress = { bombs:0, spells:0, ...meta.progress };
       meta.achievements ??= [];
+      meta.skins = [...new Set((Array.isArray(meta.skins) ? meta.skins : []).filter(id => ['obsidian','ember','frost'].includes(id)))];
+      meta.skin = meta.skins.includes(meta.skin) ? meta.skin : null;
       // Only infer achievements from persisted evidence. Older aggregate counters do not
       // establish which boss, character or tier produced them.
       for (const entry of meta.codex.runs) {
@@ -45,6 +47,8 @@ const Storage = {
       }
       delete meta.ascension;
       delete meta.ascensionLevel;
+      for (const [character,skin] of Object.entries({alchemist:'obsidian',artificer:'ember',monk:'frost'}))
+        if (meta.codex.runs.some(run => run.result === 'victory' && !run.daily && run.tier >= 10 && run.character === character) && !meta.skins.includes(skin)) meta.skins.push(skin);
       return meta;
     } catch { return null; }
   },
@@ -110,6 +114,6 @@ const Storage = {
     } catch { return false; }
   },
   clearRun() { try { localStorage.removeItem(this.RUN_KEY); } catch {} },
-  defaultMeta: () => ({ totalRuns:0, bestFloor:0, totalGold:0, permanentGold:0, upgrades:{}, tiers:Object.fromEntries(CHARACTERS.map(({id}) => [id,0])), daily:null,
+  defaultMeta: () => ({ totalRuns:0, bestFloor:0, totalGold:0, permanentGold:0, upgrades:{}, tiers:Object.fromEntries(CHARACTERS.map(({id}) => [id,0])), skins:[], skin:null, daily:null,
     codex:{relics:[],enemies:{},runs:[]}, records:{tile:0,hit:0,gold:0}, progress:{bombs:0,spells:0}, achievements:[], settings:{sound:true,music:true} }),
 };

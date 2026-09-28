@@ -177,6 +177,8 @@ body {
 
 .lang-toggle, #langToggle { display: flex; gap: 8px; justify-content: center; }
 .lang-toggle { margin-top: 8px; flex-wrap: wrap; }
+.skin-setting { margin-top:8px; text-align:center; font:11px 'Courier Prime',monospace; color:var(--text-dim); }
+#skinToggle { display:flex; justify-content:center; flex-wrap:wrap; gap:8px; margin-top:6px; }
 .lang-btn { background: none; border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; font-size: 10px; letter-spacing: 1px; color: var(--text-dim); cursor: pointer; font-family: 'Courier Prime', monospace; transition: border-color 0.15s, color 0.15s; }
 .lang-btn:hover { border-color: var(--gold); color: var(--gold); }
 .lang-btn.active { border-color: var(--gold); color: var(--gold); }
@@ -189,6 +191,11 @@ body {
 .map-gold { display: flex; align-items: center; gap: 6px; font-family: 'Cinzel', serif; font-size: 16px; font-weight: 700; color: var(--gold); }
 
 .floor-map { width: 100%; display: flex; flex-direction: column; gap: 4px; padding-bottom:16px; }
+.map-floor-section { display:flex; flex-direction:column; gap:4px; width:100%; }
+.map-floor-section.is-future { opacity:.55; pointer-events:none; }
+.map-floor-section + .map-floor-section { margin-top:20px; }
+.map-enemy-emblem .ico, .map-enemy-emblem svg { width:16px; height:16px; }
+.room-node.has-enemy-emblem { height:68px; }
 .floor-row { display: flex; gap: 6px; justify-content: center; }
 .floor-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); text-align: center; margin-top: 4px; }
 .floor-separator { width: 40px; height: 1px; background: linear-gradient(90deg, transparent, var(--gold-dim), transparent); margin: 10px auto; }
@@ -752,6 +759,9 @@ body {
 .relic-filters button[aria-pressed="true"] { border-color:var(--gold); color:var(--gold); }
 .family-dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
 .fam-gold { background:#d4a843; } .fam-small { background:#9fb3c8; } .fam-tempo { background:#3fd29a; } .fam-control { background:#5b8cff; } .fam-spell { background:#b48cff; } .fam-blast { background:#ff8a3d; } .fam-chain { background:#ff5d6c; } .fam-corner { background:#f0b429; }
+.fam-ascension { background:#d4a843; margin-right:4px; }
+.spell-cost { font-size:9px; color:var(--gold); }
+.spell-slot:disabled .spell-cost { color:var(--text-muted); }
 .relic-sheet-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; overflow-y:auto; }
 .relic-sheet-grid button { display:flex; flex-direction:column; align-items:center; gap:3px; min-width:0; padding:8px 2px 6px; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--text-dim); font:9px 'Courier Prime',monospace; cursor:pointer; }
 .relic-sheet-grid button > span:first-child .ico { width:22px; height:22px; }
@@ -825,3 +835,20 @@ body {
 #mapScreen.is-summit .boss-name { font: 700 15px 'Cinzel', serif; color: #f5d97a; letter-spacing: .04em; white-space: nowrap; }
 #mapScreen.is-summit .floor-map::after { content: attr(data-summit-hint); margin-top: 38px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); }
 #mapScreen.is-summit svg.map-lines { display: none; }
+
+/* Character list: compact rows (icon left, text right) so five characters and the start button fit one screen. */
+#characterScreen .character-card { display: grid; grid-template-columns: 44px 1fr; grid-auto-rows: min-content; column-gap: 12px; row-gap: 1px;
+  align-items: center; text-align: left; padding: 10px 44px 10px 12px; }
+#characterScreen .character-icon { grid-row: 1 / span 4; align-self: center; display: grid; place-items: center; }
+#characterScreen .character-icon .ico { width: 34px; height: 34px; }
+#characterScreen .character-name { font-size: 15px; line-height: 1.2; }
+#characterScreen .character-detail { font-size: 11.5px; line-height: 1.35; }
+#characterScreen .character-tier-badge { top: 50%; transform: translateY(-50%); }
+#characterScreen .character-card.is-locked .character-icon .ico { width: 26px; height: 26px; }
+
+/* Future floors on the Cartographer's map are previews: no "available" glow. */
+.map-floor-section.is-future .room-node.available { border-color: var(--border); box-shadow: none; animation: none; }
+/* Tier chips A0 to A10 on one row. */
+#characterScreen .tier-options { flex-wrap: nowrap; gap: 3px; justify-content: center; }
+#characterScreen .tier-option { min-width: 0; flex: 1 1 0; max-width: 34px; padding: 5px 0; font-size: 10px; }
+#characterScreen .character-card { padding-top: 8px; padding-bottom: 8px; }

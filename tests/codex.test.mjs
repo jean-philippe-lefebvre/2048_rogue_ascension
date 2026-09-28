@@ -29,11 +29,13 @@ test('all achievement conditions have a threshold and rewards unlock their inten
     tile2048:{event:'record',rank:11}, rich:{event:'gold',gold:200}, flawless:{event:'run',win:true,hearts:3},
     pyro:{event:'bomb',count:10}, scholar:{event:'spell',count:50},
     ascetic:{event:'run',win:true,tier:5}, legend:{event:'run',win:true,tier:10},
+    cartographer:{event:'run',win:true,tier:3}, usurer:{event:'run',win:true,tier:6},
   };
-  assert.equal(ACHIEVEMENTS.length,13);
+  assert.equal(ACHIEVEMENTS.length,15);
   for (const def of ACHIEVEMENTS) {
     const fact = facts[def.id];
     assert.ok(fact && achievementMet(def,fact),def.id);
+    GameState.meta.achievements = GameState.meta.achievements.filter(id => id !== def.id);
     assert.equal(Controller.checkAchievements(fact).includes(def.id),true,def.id);
     assert.equal(Controller.checkAchievements(fact).includes(def.id),false,`${def.id} repeats`);
     if (def.reward) assert.equal(UNLOCKS[def.reward],def.id);

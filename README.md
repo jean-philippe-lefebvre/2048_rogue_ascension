@@ -10,29 +10,30 @@ A roguelike variant of 2048 with meta-progression, relics, difficulty tiers, ach
 
 ## How to Play
 
-Open `index.html` in a browser. Swipe or use arrow keys / WASD / ZQSD to move tiles. The v3.3.0 combat layout puts the moves and relic tray above the grid, spells below it, and the score and settings in the top-right menu.
+Open `index.html` in a browser. Swipe or use arrow keys / WASD / ZQSD to move tiles. The v3.4.0 combat layout puts the moves and relic tray above the grid, spells below it, and the score and settings in the top-right menu.
 
 Each **run** spans 3 floors, with a hidden fourth floor at A9+. The first three floors have branching node maps with battles, elite rooms, mystery events, rest stops, a merchant, and a boss. A6+ puts the Threshold Warden on floor II. Floor IV holds the Ascendant. Merge tiles to damage enemies before your moves run out. Enemy intents show what happens next and when, except under A4+ fog; three hearts let you survive failed rooms, or two at A5+.
 
 ## Features
 
 - **Roguelike runs** – 3 floors of connected nodes with branching paths and a hidden final boss floor at A9+
-- **41 relics** – 7 common, 10 rare, 9 epic, 9 legendary, 6 curses. Eight build families increase the weight of related offers by 30%
+- **45 relics** – 7 common, 10 rare, 9 epic, 13 legendary, 6 curses. Eight build families increase the weight of related offers by 30%
 - **Rule relics** – Expanse gives battle rooms a 5×5 board and four more moves; Trinity changes tiles to 3, 6, 12... while enemies gain 40% HP. Both start with the next battle room. Tile rank counts upward from 2 or 3 as rank 1, so existing relic thresholds follow either series.
 - **Hook-based relic system** – adding a relic is a single entry in `constants.js`, no other files to touch
 - **Meta-progression** – spend gold on permanent upgrades in the Forge of Fate
 - **Codex**: browse discovered relics, defeated enemies, achievements and the latest 20 runs. Best tile, hit and gold records persist between runs.
-- **Achievements**: 13 long-term goals unlock the Artificer, Monk and four relics. Earlier saves retain earned unlocks when their run history proves eligibility.
+- **Achievements**: 15 long-term goals unlock the Artificer, Monk, Cartographer, Usurer and four relics. Earlier saves retain earned unlocks when their run history proves eligibility.
 - **Difficulty tiers**: each character has an independent A0 to A10 ladder. A2 changes a rest to a fight on each floor; A3 gives elites an affix; A4 hides enemy intents; A5 starts with two hearts; A6 brings the Threshold Warden; A7 traps mystery rooms; A8 adds a starting curse; A9 opens floor IV; A10 gives every boss a third phase. Enemies gain 2% HP per tier (affixed elites keep 85% of their HP), and banked gold grows by 10% per tier.
 - **Daily challenge**: one local attempt per UTC day, with a shared date seed, rotating character and tier A3. Permanent upgrades are ignored for the challenge.
 - **Result card**: share or download a 1080 × 1350 PNG, or copy a short text summary with floor squares.
 - **Mystery rooms** – eight events with visible choices, risks, and rewards
 - **Special tiles**: gold tiles pay on merges; ice blocks until two adjacent merges thaw it; jokers merge with numbered tiles; ×2 doubles a numbered tile. Obstacles block movement, bombs halve adjacent numbers and destroy jokers or ×2 tiles, and floor III battles place paired portals. Prophet and Herald can freeze numbered tiles. Gold, joker and ×2 are fully implemented; spells can create joker and ×2 tiles.
-- **Spells**: two slots and three charges each, or four with Grimoire. Choose Alchemist, Artificer, or Monk to start with their relic and spell at two charges; a consumed move with at least three merges restores one charge to the first non-full spell. Tap a spell under the grid to read its details and cast, or use 1 or 2 to cast a slot directly. While targeting, arrows or WASD/ZQSD move the cursor, Enter or Space selects, and Escape cancels. A rescue spell can save a board with no legal slide before defeat is finalized.
+- **Spells**: two slots and three charges each, or four with Grimoire. Choose Alchemist, Artificer, Monk, Cartographer, or Usurer to start with their relic and spell at two charges; a consumed move with at least three merges restores one charge to the first non-full spell. Tap a spell under the grid to read its details and cast, or use 1 or 2 to cast a slot directly. While targeting, arrows or WASD/ZQSD move the cursor, Enter or Space selects, and Escape cancels. A rescue spell can save a board with no legal slide before defeat is finalized.
 - **Combat details**: tap the intent chip for its effect, or the relic tray on the map or in combat for family filters and individual relic details. Escape closes any open sheet or popover.
 - **Merchant**: one per floor on row 2 or 3; spend run gold on relics, spells, healing, recharge or curse removal. Remaining run gold is banked at the end.
 - **Rest rooms**: choose a relic, heal or meditate to recharge spells.
 - **Combat**: enemy HP, combo damage, block, temporary seals, telegraphed intents and boss phases. New boss mechanics include devouring tiles, a one-time revive, gravity, a move clock, board flips, and a moving void
+- **Tier rewards**: Win at A3 to unlock the Cartographer and reveal future maps and enemy emblems. Win at A6 to unlock the Usurer, who can cast empty spells for 25 gold. Four ascension relics enter offers at A5+. A10 victories with Alchemist, Artificer, and Monk unlock Obsidian, Ember, and Frost tile skins respectively.
 - **Bilingual** – French and English, switchable from the title screen
 - **Mobile-first** – touch swipe controls, 440px max width, responsive
 - **Sensation** – gem tiles, merge particles, floating values, shake, and screen motion
@@ -43,7 +44,7 @@ Each **run** spans 3 floors, with a hidden fourth floor at A9+. The first three 
 
 ## Tech Stack
 
-Vanilla JS, single CSS file, no dependencies:
+Vanilla JS, two CSS files, no dependencies:
 
 ```
 haptics → i18n → icons → rng → constants → storage → state → board → combat → spells → fx → scene → audio → music → renderer → controller → share → input

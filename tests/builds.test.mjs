@@ -70,7 +70,7 @@ test('repurposed relics and each character start and passive',()=>{
   assert.equal(gs.board[0][0],0); assert.equal(gs.board[0][1],TILE.BOMB);
   gs.board[1][0]=TILE.BOMB; RelicHooks.fire('onEnemyIntent',{effect:{intent:'bomb',cells:[[1,0]]},board:gs.board,bombTimers:{'1,0':3}});
   assert.equal(gs.board[1][0],TILE.BOMB);
-  assert.deepEqual(plain(CHARACTERS.map(c=>c.id)),['alchemist','artificer','monk']);
+  assert.deepEqual(plain(CHARACTERS.map(c=>c.id)),['alchemist','artificer','monk','cartographer','usurer']);
   for(const character of CHARACTERS) {
     GameState.meta=Storage.defaultMeta(); Controller._generateFloors=()=>[];
     Controller._beginRun(character.id);
@@ -105,4 +105,22 @@ test('Undo restores the Wild Card move counter', () => {
   assert.equal(gs.run._wildcardMoves, 12);
   Spells.restore(gs, snap);
   assert.equal(gs.run._wildcardMoves, 11);
+});
+
+test('the Usurer cannot pay for Undo with gold that Undo takes back', () => {
+  // Any display or sound call the cast makes is a no-op here; keep existing stubs.
+  const lenient = obj => new Proxy(obj || {}, { get: (t, k) => (k in t ? t[k] : () => null) });
+  for (const key of ['Audio2', 'Fx', 'Renderer', 'Music']) context[key] = lenient(context[key]);
+  const gs = setup();
+  gs.run.character = 'usurer'; gs.run.spells = [{ id:'undo', charges:0 }]; gs.run.gold = 30;
+  gs.movesLeft = 10; gs.score = 0; gs.mergeCount = 0; gs.portals = []; gs.bombTimers = {}; gs.obstacleAge = {};
+  gs.room.combat = vm.runInContext('Combat.create(ENEMIES[0])', context); gs.room.data = { type:'normal' }; gs.run.totalScore = 0; gs.run.lastTileVal = 0; gs.run.hearts = 3;
+  gs.board[0][0] = 2; gs.board[0][1] = 2;
+  const Spells = vm.runInContext('Spells', context);
+  gs.run.gold = 5; gs.room.undo = Spells.snapshot(gs); gs.run.gold = 30;
+  assert.equal(Controller._castSpell(0, []), false);
+  assert.equal(gs.run.gold, 30);
+  gs.run.gold = 40; gs.room.undo = Spells.snapshot(gs); gs.run.gold = 60;
+  assert.equal(Controller._castSpell(0, []), true);
+  assert.equal(gs.run.gold, 15);
 });

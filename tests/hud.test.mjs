@@ -105,7 +105,7 @@ test('Enter and Space confirm a target even if a button has focus', () => {
 test('spell card separates the free cast note and targeting hint with a period', () => {
   const pop = {innerHTML:'',style:{}};
   context.GameState = {run:{spells:[{id:'swap',charges:4}]}};
-  context.Controller = {spellAvailable:()=>true,spellCapacity:()=>4};
+  context.Controller = {spellAvailable:()=>true,canGoldCast:()=>false,spellCapacity:()=>4};
   context.SPELLS = [{id:'swap',icon:'s-swap',targets:2}];
   context.Icons = {svg:()=>'<svg></svg>'};
   context.document = {getElementById:id=>id === 'spellPop' ? pop : {getBoundingClientRect:()=>({top:500})}};
@@ -136,4 +136,56 @@ test('fog chip and its help conceal the intent until two moves remain', () => {
   vm.runInContext('Renderer.renderEnemy(); Renderer.openIntent(null)',context);
   assert.match(elements.enemyIntent.innerHTML,/Frappe/);
   assert.match(elements.intentPop.innerHTML,/Tu perds 2 coups/);
+});
+
+test('Cartographer map renders current and future floors with enemy emblems', () => {
+  const element = () => ({children:[],dataset:{},style:{},innerHTML:'',textContent:'',className:'',
+    classList:{toggle(){}},appendChild(child){this.children.push(child);},addEventListener(){},setAttribute(){}});
+  const ids=Object.fromEntries(['mapFloorLabel','mapGold','mapScreen','floorMap'].map(id=>[id,element()]));
+  context.document={getElementById:id=>ids[id],createElement:element,createElementNS:element};
+  context.Icons={svg:id=>`<svg data-icon="${id}"></svg>`};
+  context.ROOM_DEFS={normal:{icon:'sword',color:'#fff'},boss:{icon:'eye',color:'#f00'}};
+  context.ENEMIES=[{id:'rat',floor:0,kind:'normal'},{id:'salamander',floor:1,kind:'normal'},{id:'larva',floor:2,kind:'normal'}];
+  context.Controller={enterRoom(){}};
+  const floors=['rat','salamander','larva'].map((enemyId,fi)=>[[{type:'normal',enemyId,available:fi===0,completed:false,connections:[]}]]);
+  context.GameState={run:{character:'cartographer',floorIdx:0,gold:0,relics:[],floors}};
+  vm.runInContext('Renderer.renderRelicTray=()=>{}; Renderer.renderMap()',context);
+  assert.equal(ids.floorMap.children.length,3);
+  assert.match(ids.floorMap.children[0].children[1].children[0].innerHTML,/e-rat/);
+  assert.match(ids.floorMap.children[1].className,/is-future/);
+  assert.match(ids.floorMap.children[2].children[1].children[0].innerHTML,/e-larva/);
+  context.GameState.run.character='alchemist';
+  ids.floorMap.children=[];
+  vm.runInContext('Renderer.renderMap()',context);
+  assert.equal(ids.floorMap.children.length,1);
+});
+
+test('Void Eye cancels A4 fog and exposes two future intents', () => {
+  const fight={id:'rat',pattern:['strike','seal','gnaw'],patternIndex:0,intentIn:4};
+  const pop={innerHTML:'',offsetHeight:40,style:{}};
+  context.GameState={run:{tier:4,relics:[{id:'voideye'}]},room:{combat:fight,floorIdx:0}};
+  context.Combat={intent:()=> 'strike'};
+  context.Board={base:()=>2};
+  context.Icons={svg:()=>'<svg></svg>'};
+  context.document={getElementById:id=>id==='intentPop' ? pop : {getBoundingClientRect:()=>({bottom:100})}};
+  context.window={innerHeight:600};
+  assert.equal(vm.runInContext('Renderer.intentVisible(GameState.room.combat,4)',context),true);
+  vm.runInContext('Renderer.openHud=()=>{}; Renderer.openIntent(null)',context);
+  assert.match(pop.innerHTML,/Intention suivante 1/);
+  assert.match(pop.innerHTML,/Intention suivante 2/);
+});
+
+test('Usurer empty spell card shows its price and disables below 25 gold', () => {
+  const bar={innerHTML:''}, hint={innerHTML:''};
+  context.GameState={run:{character:'usurer',gold:24,spells:[{id:'swap',charges:0}]},spellTarget:null,stuck:false};
+  context.Controller={spellCapacity:()=>3};
+  context.SPELLS=[{id:'swap',icon:'s-swap',targets:2}];
+  context.Icons={svg:()=>'<svg></svg>'};
+  context.document={getElementById:id=>id==='spellBar' ? bar : hint,querySelectorAll:()=>[]};
+  vm.runInContext('Renderer.renderSpells()',context);
+  assert.match(bar.innerHTML,/Lancer · 25 or/);
+  assert.match(bar.innerHTML,/data-spell-slot="0" disabled/);
+  context.GameState.run.gold=25;
+  vm.runInContext('Renderer.renderSpells()',context);
+  assert.doesNotMatch(bar.innerHTML,/data-spell-slot="0" disabled/);
 });

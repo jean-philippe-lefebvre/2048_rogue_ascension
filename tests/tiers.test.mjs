@@ -53,7 +53,7 @@ test('character ladders unlock independently and old saves migrate for every cha
   assert.equal(Controller.selectedTier,1);
   saved.set(Storage.KEY,JSON.stringify({tierUnlocked:6,upgrades:{extraMoves:3},permanentGold:1000}));
   const migrated=Storage.load();
-  assert.deepEqual(Object.fromEntries(Object.entries(migrated.tiers)),{alchemist:6,artificer:6,monk:6});
+  assert.deepEqual(Object.fromEntries(Object.entries(migrated.tiers)),{alchemist:6,artificer:6,monk:6,cartographer:0,usurer:0});
   assert.equal(migrated.tierUnlocked,undefined);
   GameState.meta={...Storage.defaultMeta(),...migrated};
   Controller.buyUpgrade('singularity');
@@ -265,4 +265,96 @@ test('Shield neutralises the first bomb a Pyro elite plants, whatever its intent
   })()`, context);
   assert.equal(out.cell, 0);
   assert.equal(out.timer, null);
+});
+
+test('A3 and A6 victories unlock the new characters and announce them once', () => {
+  const shown=[];
+  renderer.showAchievement=id=>shown.push(id);
+  let run=fresh(2); Controller._endRun(true);
+  assert.equal(Controller.characterUnlocked('cartographer'),false);
+  run=fresh(3); Controller._endRun(true);
+  assert.equal(Controller.characterUnlocked('cartographer'),true);
+  assert.equal(Controller.characterUnlocked('usurer'),false);
+  assert.equal(shown.filter(id=>id==='cartographer').length,1);
+  run=fresh(6); Controller._endRun(true);
+  assert.equal(Controller.characterUnlocked('usurer'),true);
+  assert.equal(shown.filter(id=>id==='usurer').length,1);
+  delete renderer.showAchievement;
+});
+
+test('Cartographer map enemy draws persist and both new starts use their relic and two charges', () => {
+  for (const [id,relic,spell] of [['cartographer','compass','smash'],['usurer','greed','swap']]) {
+    GameState.meta=Storage.defaultMeta();
+    Controller.selectedTier=0;
+    Controller._beginRun(id);
+    assert.equal(GameState.run.relics[0].id,relic);
+    assert.equal(GameState.run.spells[0].id,spell);
+    assert.equal(GameState.run.spells[0].charges,2);
+  }
+  const run=GameState.run;
+  assert.equal(run.floors.length,3);
+  for(const [floorIdx,floor] of run.floors.entries()) for(const row of floor) for(const node of row)
+    if(['normal','elite'].includes(node.type)) assert.ok(ENEMIES.some(enemy=>enemy.id===node.enemyId && enemy.floor===floorIdx && enemy.kind===node.type));
+  assert.equal(Storage.loadRun().floors[0][0][0].enemyId,run.floors[0][0][0].enemyId);
+});
+
+test('Ascension relics only enter A5+ pools and apply their battle rules', () => {
+  let run=fresh(4);
+  assert.equal(Controller._getUnownedRelics().some(r=>r.ascension),false);
+  run=fresh(5);
+  assert.equal(Controller._getUnownedRelics().filter(r=>r.ascension).length,4);
+  const relic=id=>vm.runInContext('RELICS',context).find(r=>r.id===id);
+  Controller._grantRelic(relic('crownthorns'));
+  assert.equal(run.hearts,3);
+  assert.equal(Controller.maxHearts(),4);
+  const fight={id:'rat',hp:100,maxHp:100,block:0,invertTurns:0};
+  GameState.room={combat:fight,relicState:{}};
+  vm.runInContext('RelicHooks.fire("onRoomStart",{board:[],type:"normal",run:GameState.run})',context);
+  assert.equal(fight.maxHp,111);
+  run.relics=[relic('crackedglass')]; vm.runInContext('RelicHooks.invalidate()',context);
+  GameState.room.relicState={};
+  for(let i=0;i<5;i++) {
+    vm.runInContext('RelicHooks.fire("onMoveCommitted",{board:[],result:{merges:[]}})',context);
+    assert.equal(Controller.damage({id:'rat',hp:100,maxHp:100,block:0,invertTurns:0},[{val:8}]).raw,16);
+  }
+  vm.runInContext('RelicHooks.fire("onMoveCommitted",{board:[],result:{merges:[]}})',context);
+  assert.equal(Controller.damage({id:'rat',hp:100,maxHp:100,block:0,invertTurns:0},[{val:8}]).raw,8);
+  run.relics=[relic('wardenseal')]; vm.runInContext('RelicHooks.invalidate()',context);
+  assert.equal(Controller.damage({id:'guardian',hp:100,maxHp:100,block:0,invertTurns:0},[{val:8}]).raw,8);
+  assert.equal(Controller.damage({id:'guardian',hp:100,maxHp:100,block:0,invertTurns:0},[{val:16}]).raw,20);
+});
+
+test('Usurer pays 25 gold for an empty spell and refuses it below the price', () => {
+  const run=fresh(0); run.character='usurer'; run.gold=24;
+  const owned={id:'swap',charges:0}; run.spells=[owned];
+  assert.equal(Controller.canGoldCast(owned),false);
+  run.gold=25; assert.equal(Controller.canGoldCast(owned),true);
+  const spells=vm.runInContext('Spells',context), oldApply=spells.apply, oldCheck=Controller._checkFailure;
+  spells.apply=()=>true; Controller._checkFailure=()=>false;
+  renderer.renderSpells=()=>{}; renderer.renderTiles=()=>{};
+  renderer.renderPortals=()=>{}; renderer.updateHUD=()=>{};
+  context.Audio2.relic=()=>{};
+  GameState.room={combat:{id:'rat'},relicState:{}};
+  try {
+    assert.equal(Controller._castSpell(0,[]),true);
+    assert.equal(run.gold,0);
+    assert.equal(owned.charges,0);
+    assert.equal(Controller.canGoldCast(owned),false);
+  } finally { spells.apply=oldApply; Controller._checkFailure=oldCheck; }
+});
+
+test('A10 skin unlocks follow the winning character and survive save migration', () => {
+  for(const [character,skin] of [['alchemist','obsidian'],['artificer','ember'],['monk','frost']]) {
+    const run=fresh(10); run.character=character;
+    Controller._endRun(true);
+    assert.deepEqual(Array.from(GameState.meta.skins),[skin]);
+    GameState.meta.skin=skin; Storage.save(GameState.meta);
+    assert.equal(Storage.load().skin,skin);
+  }
+  saved.set(Storage.KEY,JSON.stringify({tiers:{alchemist:4},codex:{runs:[]}}));
+  const migrated=Storage.load();
+  assert.deepEqual(Array.from(migrated.skins),[]);
+  assert.equal(migrated.skin,null);
+  assert.equal(migrated.tiers.cartographer,0);
+  assert.equal(migrated.tiers.usurer,0);
 });

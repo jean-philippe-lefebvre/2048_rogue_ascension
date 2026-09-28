@@ -63,12 +63,12 @@ const Controller = {
     return changed;
   },
 
-  damage(fight, merges) {
+  damage(fight, merges, consumed = true) {
     const ctx = { merges:merges.map(m => ({...m,damageMultiplier:1})), multiplier:1,
-      comboStep:GameState.run.character === 'monk' ? 0.35 : 0.25 };
+      consumed, comboStep:GameState.run.character === 'monk' ? 0.35 : 0.25 };
     RelicHooks.fire('onDamageCalc',ctx);
     const combo = 1 + ctx.comboStep * Math.max(0,merges.length-1);
-    const raw = Math.floor(ctx.merges.reduce((sum,m) => sum + Combat.mergeDamage(fight,m)*m.damageMultiplier,0) * combo *
+    const raw = Math.floor(ctx.merges.reduce((sum,m) => sum + (ctx.guardianRank3 && fight.id === 'guardian' && Board.rank(m.val) === 3 ? m.val : Combat.mergeDamage(fight,m))*m.damageMultiplier,0) * combo *
       (fight.invertTurns>0 ? 1.25 : 1) * ctx.multiplier);
     const absorbed = Math.min(raw,fight.block);
     fight.block -= absorbed;
@@ -143,6 +143,8 @@ const Controller = {
 
   characterUnlocked(id) { return !UNLOCKS[id] || GameState.meta.achievements.includes(UNLOCKS[id]); },
   relicUnlocked(id) {
+    const relic = RELICS.find(r => r.id === id);
+    if (relic?.ascension && (GameState.run?.tier ?? 0) < 5) return false;
     return !UNLOCKS[id] || GameState.meta.achievements.includes(UNLOCKS[id])
       || !!GameState.run?.relics.some(relic => relic.id === id);
   },
@@ -396,6 +398,11 @@ const Controller = {
 
       if (tier >= 7) for (const row of rows.slice(0,-1)) for (const node of row)
         if (node.type === 'mystery') node.ambush = Rng.int(3) === 0;
+      for (const row of rows) for (const node of row)
+        if (node.type === 'normal' || node.type === 'elite') {
+          const pool = ENEMIES.filter(enemy => enemy.floor === floorIdx && enemy.kind === node.type);
+          node.enemyId = pool[Rng.int(pool.length)].id;
+        }
       return rows;
     });
     if (tier >= 9) {
@@ -498,7 +505,7 @@ const Controller = {
     GameState.stuck = false;
 
     const bossId = GameState.run.floors?.[floorIdx]?.bossId || GameState.room.data?.bossId || ['jailer','smith','eye'][floorIdx];
-    const enemy = GameState.room.enemyDef || (type === 'boss' ? ENEMIES.find(e => e.id === bossId) : Combat.pick(floorIdx, type));
+    const enemy = GameState.room.enemyDef || (type === 'boss' ? ENEMIES.find(e => e.id === bossId) : ENEMIES.find(e => e.id === GameState.room.data?.enemyId) || Combat.pick(floorIdx, type));
     GameState.room.enemyDef = enemy;
     GameState.room.combat = Combat.create(enemy);
     const fight = GameState.room.combat;
@@ -607,7 +614,7 @@ const Controller = {
   },
 
   pickRestHeal() {
-    GameState.run.hearts = Math.min(3, GameState.run.hearts + 1);
+    GameState.run.hearts = Math.min(this.maxHearts(), GameState.run.hearts + 1);
     Storage.saveRun(GameState.run);
     const cb = GameState._restDone;
     GameState._restDone = null;
@@ -650,7 +657,7 @@ const Controller = {
     if (offer.bought || run.gold < offer.price) return false;
     if (offer.type === 'spell') return run.spells.length < 2 && !run.spells.some(s => s.id === offer.id);
     if (offer.type === 'charge') return run.spells.some(s => s.charges < this.spellCapacity());
-    if (offer.type === 'heal') return run.hearts < 3;
+    if (offer.type === 'heal') return run.hearts < this.maxHearts();
     if (offer.type === 'cleanse') return run.relics.some(r => r.isCurse);
     return this.relicUnlocked(offer.id) && !run.relics.some(r => r.id === offer.id);
   },
@@ -744,7 +751,7 @@ const Controller = {
       }
       if (option === 'sell') { run.hearts--; this.earnedGold(this.roomGold(40)); }
     } else if (id === 'fountain') {
-      if (option === 'drink') { if (run.hearts < 3) { run.hearts++; outcome = 'fountain.healed'; } else { this.earnedGold(this.roomGold(15)); outcome = 'fountain.gold'; } }
+      if (option === 'drink') { if (run.hearts < this.maxHearts()) { run.hearts++; outcome = 'fountain.healed'; } else { this.earnedGold(this.roomGold(15)); outcome = 'fountain.gold'; } }
       if (option === 'toss') { run.gold -= 10; outcome = Rng.next() < .5 && this._eventRelic('common') ? 'fountain.found' : 'fountain.empty'; }
     } else if (id === 'chest') {
       if (option === 'force' || option === 'disarm') this.earnedGold(this.roomGold(30));
@@ -845,9 +852,11 @@ const Controller = {
   _rescueIds() { return GameState.movesLeft > 0 ? ['smash','swap','undo'] : ['undo']; },
 
   spellAvailable(owned) {
-    return !!owned && owned.charges > 0 && Spells.canCast(GameState,owned.id)
+    return !!owned && (owned.charges > 0 || this.canGoldCast(owned)) && Spells.canCast(GameState,owned.id)
       && (!GameState.stuck || this._rescueIds().includes(owned.id));
   },
+  canGoldCast(owned) { return !!owned && owned.charges === 0 && GameState.run?.character === 'usurer' && GameState.run.gold >= 25; },
+  maxHearts() { return GameState.run?.relics.some(r => r.id === 'crownthorns') ? 4 : 3; },
 
   _firstSpellCell(id, targets) {
     for (let r = 0; r < GameState.size; r++) for (let c = 0; c < GameState.size; c++)
@@ -909,7 +918,11 @@ const Controller = {
     const bombsBefore = spell?.id === 'smash' ? gs.board.flat().filter(value => value === TILE.BOMB).length : 0;
     const undoStats = spell?.id === 'undo' ? gs.room.undo?.runStats : null;
     if (gs.roomFinished || (typeof document !== 'undefined' && document.querySelector?.('.modal-backdrop.show, .room-overlay.show'))) return false;
-    if (!spell || spell.charges <= 0 || !Spells.apply(gs,spell.id,targets)) return false;
+    if (!spell || (spell.charges <= 0 && !this.canGoldCast(spell))) return false;
+    // Undo rolls gold back to before the move, so a paid Undo must be affordable from that balance.
+    if (spell.charges <= 0 && spell.id === 'undo' && (gs.room.undo?.gold ?? 0) < 25) return false;
+    if (!Spells.apply(gs,spell.id,targets)) return false;
+    if (spell.charges === 0) gs.run.gold -= 25;
     if (spell.id === 'smash') {
       const defused = bombsBefore - gs.board.flat().filter(value => value === TILE.BOMB).length;
       if (defused > 0) {
@@ -1017,7 +1030,7 @@ const Controller = {
       const at = Fx.cellCenter(consumed.r,consumed.c);
       if (at) Fx.burst(at.x,at.y,'#9a6ae0',12);
     }
-    const hit = this.damage(fight, result.merges);
+    const hit = this.damage(fight, result.merges, !moveCtx.freeMove);
     this.recordMoveStats(gs.board, hit.dealt);
     if (hit.dealt > 0) Renderer.enemyHit(hit.dealt);
     const phaseChanged = this.advancePhase(fight, gs.room.enemyDef);
@@ -1094,7 +1107,7 @@ const Controller = {
       Renderer.updateHUD();
       return false;
     }
-    if (!force && gs.run.spells.some(spell => spell.charges > 0 && this._rescueIds().includes(spell.id)
+    if (!force && gs.run.spells.some(spell => (spell.charges > 0 || this.canGoldCast(spell)) && this._rescueIds().includes(spell.id)
       && Spells.canCast(gs,spell.id))) {
       gs.stuck = true;
       Renderer.renderSpells();
@@ -1291,6 +1304,10 @@ const Controller = {
     if (win && !r.daily) (m.tiers ??= {})[r.character] = Math.max(characterTier(m,r.character), Math.min(MAX_TIER, (r.tier || 0) + 1));
     if (r.daily) m.daily = { date:r.daily, result:win ? 'victory' : 'defeat', score:r.totalScore, floor:r.floorIdx + 1 };
     this.checkAchievements({event:'run',win,hearts:r.hearts,tier:r.tier});
+    if (win && !r.daily && r.tier >= 10) {
+      const skin = {alchemist:'obsidian',artificer:'ember',monk:'frost'}[r.character];
+      if (skin && !m.skins.includes(skin)) { m.skins.push(skin); Renderer.showSkinUnlock?.(skin); }
+    }
     this.recordRun(win ? 'victory' : 'defeat');
     m.bestFloor      = Math.max(m.bestFloor, r.floorIdx + 1);
     Storage.save(m);

@@ -119,7 +119,11 @@ const Renderer = {
     const intent = Combat.intent(fight), base = hidden ? 'hidden' : intent === 'seal2' ? 'seal' : intent;
     const params = this.intentHelpParams(intent, fight, GameState.room.floorIdx, GameState.run.tier);
     const pop = document.getElementById('intentPop');
-    pop.innerHTML = `<h3>${Icons.svg('i-'+base)} ${hidden ? '???' : I18n.t('intent.'+intent,params)} · ${I18n.t(fight.intentIn === 1 ? 'hud.inMoves' : 'hud.inMovesPlural',{n:fight.intentIn})}</h3><p>${hidden ? I18n.t('intent.hidden.help') : I18n.t('intent.'+intent+'.help',params)}</p>${fight.affix ? `<p>${I18n.t('affix.'+fight.affix+'.rule',{v:Board.base()*4})}</p>` : ''}<div class="pop-actions"><button type="button" data-close-hud>${I18n.t('hud.understood')}</button></div>`;
+    const next = GameState.run.relics?.some(r => r.id === 'voideye') ? [1,2].map(offset => {
+      const future = fight.pattern[(fight.patternIndex + offset) % fight.pattern.length];
+      return `<p>${I18n.t('intent.next',{n:offset})}${I18n.t('ui.colon')}${I18n.t('intent.'+future,this.intentHelpParams(future,fight,GameState.room.floorIdx,GameState.run.tier))}</p>`;
+    }).join('') : '';
+    pop.innerHTML = `<h3>${Icons.svg('i-'+base)} ${hidden ? '???' : I18n.t('intent.'+intent,params)} · ${I18n.t(fight.intentIn === 1 ? 'hud.inMoves' : 'hud.inMovesPlural',{n:fight.intentIn})}</h3><p>${hidden ? I18n.t('intent.hidden.help') : I18n.t('intent.'+intent+'.help',params)}</p>${next}${fight.affix ? `<p>${I18n.t('affix.'+fight.affix+'.rule',{v:Board.base()*4})}</p>` : ''}<div class="pop-actions"><button type="button" data-close-hud>${I18n.t('hud.understood')}</button></div>`;
     pop.style.top = `${Math.min(window.innerHeight-pop.offsetHeight-16, document.getElementById('enemyPanel').getBoundingClientRect().bottom + 6)}px`;
     this.openHud('intentPop',trigger);
   },
@@ -127,10 +131,10 @@ const Renderer = {
     const owned = GameState.run?.spells[slot];
     if (!owned) return;
     const def = SPELLS.find(s => s.id === owned.id), available = Controller.spellAvailable(owned);
-    const reason = owned.charges <= 0 ? I18n.t('hud.noCharges') : !available ? I18n.t(
+    const reason = owned.charges <= 0 && !Controller.canGoldCast(owned) ? I18n.t(GameState.run.character === 'usurer' ? 'hud.noGoldCast' : 'hud.noCharges') : !available ? I18n.t(
       owned.id === 'undo' ? 'hud.noUndo' : ['joker','catalyst'].includes(owned.id) ? 'hud.boardFull' : 'hud.spellUnavailable') : '';
     const pop = document.getElementById('spellPop');
-    pop.innerHTML = `<h3>${Icons.svg(def.icon)} ${I18n.t('spell.'+owned.id)} <span>${owned.charges} / ${Controller.spellCapacity()} ${I18n.t('hud.charges')}</span></h3><p>${I18n.t('spell.desc.'+owned.id)}</p><small>${I18n.t('hud.spellFree')}${def.targets ? ' '+I18n.t(def.targets === 2 ? 'spell.pickTwo' : 'spell.pickOne')+'.' : ''}</small>${reason ? `<small class="pop-reason">${reason}</small>` : ''}<div class="pop-actions"><button type="button" data-close-hud>${I18n.t('ui.btn.cancel')}</button><button type="button" class="pop-go" data-launch-spell="${slot}" ${available ? '' : 'disabled'}>${I18n.t('hud.cast')}</button></div>`;
+    pop.innerHTML = `<h3>${Icons.svg(def.icon)} ${I18n.t('spell.'+owned.id)} <span>${owned.charges} / ${Controller.spellCapacity()} ${I18n.t('hud.charges')}</span></h3><p>${I18n.t('spell.desc.'+owned.id)}</p><small>${I18n.t('hud.spellFree')}${def.targets ? ' '+I18n.t(def.targets === 2 ? 'spell.pickTwo' : 'spell.pickOne')+'.' : ''}</small>${reason ? `<small class="pop-reason">${reason}</small>` : ''}<div class="pop-actions"><button type="button" data-close-hud>${I18n.t('ui.btn.cancel')}</button><button type="button" class="pop-go" data-launch-spell="${slot}" ${available ? '' : 'disabled'}>${owned.charges === 0 ? I18n.t('hud.castGold') : I18n.t('hud.cast')}</button></div>`;
     pop.style.bottom = `${window.innerHeight-document.getElementById('spellBar').getBoundingClientRect().top+6}px`;
     this.openHud('spellPop',trigger);
   },
@@ -141,10 +145,10 @@ const Renderer = {
     const arrow = fight.intentDirection ? {left:'←',right:'→',up:'↑',down:'↓'}[fight.intentDirection] : '';
     return {n, v:base * 2 ** (rank - 1), arrow};
   },
-  intentVisible(fight, tier) { return tier < 4 || fight.intentIn <= 2; },
+  intentVisible(fight, tier) { return (typeof GameState !== 'undefined' && GameState.run?.relics?.some(r => r.id === 'voideye')) || tier < 4 || fight.intentIn <= 2; },
   tileClass(value) { return `t${Math.min(2 ** Board.rank(value), 2048)}`; },
   familyChips(relic) {
-    return (relic.tags || []).map(tag => `<span class="family-chip">${I18n.t('family.'+tag)}</span>`).join('');
+    return (relic.ascension ? `<span class="family-chip"><i class="family-dot fam-ascension"></i>${I18n.t('family.ascension')}</span>` : '') + (relic.tags || []).map(tag => `<span class="family-chip">${I18n.t('family.'+tag)}</span>`).join('');
   },
   renderCharacters() {
     this.renderTierSelector();
@@ -156,7 +160,7 @@ const Renderer = {
       card.className='character-card' + (locked ? ' is-locked' : character.id === (Controller.selectedCharacter || 'alchemist') ? ' is-selected' : '');
       card.disabled = locked;
       card.innerHTML=locked
-        ? `<span class="character-tier-badge">A${characterTier(GameState.meta,character.id)}</span><span class="character-icon">${Icons.svg('lock')}</span><span class="character-name">${I18n.t('character.'+character.id+'.name')}</span><span class="character-detail">${I18n.t('codex.unlock')}${I18n.t('ui.colon')}${I18n.t('achievement.'+UNLOCKS[character.id]+'.name')}</span>`
+        ? `<span class="character-tier-badge">A${characterTier(GameState.meta,character.id)}</span><span class="character-icon">${Icons.svg('lock')}</span><span class="character-name">${I18n.t('character.'+character.id+'.name')}</span><span class="character-detail">${I18n.t('achievement.'+UNLOCKS[character.id]+'.condition')}</span>`
         : `<span class="character-tier-badge">A${characterTier(GameState.meta,character.id)}</span><span class="character-icon">${Icons.svg(character.icon)}</span><span class="character-name">${I18n.t('character.'+character.id+'.name')}</span><span class="character-detail">${I18n.t('character.relic')}${I18n.t('ui.colon')}${I18n.t('relic.'+character.relic+'.name')}</span><span class="character-detail">${I18n.t('character.spell')}${I18n.t('ui.colon')}${I18n.t('spell.'+character.spell)}</span><span class="character-detail">${I18n.t('character.'+character.id+'.passive')}</span>`;
       if (!locked) card.addEventListener('click',()=>Controller.selectCharacter(character.id));
       container.appendChild(card);
@@ -388,7 +392,7 @@ const Renderer = {
     const hearts = document.getElementById('hudHearts');
     const count = gs.run.hearts ?? 3;
     hearts.setAttribute('aria-label', I18n.t('hud.hearts', { n:count }));
-    hearts.innerHTML = Array.from({ length:3 }, (_, i) => `<span class="hud-heart ${i < count ? 'full' : 'empty'} ${this._prevHearts !== undefined && i === count && count < this._prevHearts ? 'is-lost' : ''}">${Icons.svg('heart')}</span>`).join('');
+    hearts.innerHTML = Array.from({ length:Controller.maxHearts() }, (_, i) => `<span class="hud-heart ${i < count ? 'full' : 'empty'} ${this._prevHearts !== undefined && i === count && count < this._prevHearts ? 'is-lost' : ''}">${Icons.svg('heart')}</span>`).join('');
     this._prevHearts = count;
     const fight = gs.room?.combat;
     document.getElementById('invertTag').textContent = fight?.invertTurns ? I18n.t('hud.inverted', { n:fight.invertTurns }) : '';
@@ -406,7 +410,8 @@ const Renderer = {
       const owned = GameState.run.spells[i];
       if (!owned) return `<button class="spell-slot is-empty" type="button" disabled>${I18n.t('spell.empty')}</button>`;
       const def = SPELLS.find(s => s.id === owned.id);
-      return `<button class="spell-slot ${target?.slot === i ? 'is-targeting' : ''}" type="button" data-spell-slot="${i}">${Icons.svg(def.icon)}<span>${I18n.t('spell.'+owned.id)}</span><span class="spell-dots">${Array.from({length:Controller.spellCapacity()},(_,n) => `<i class="${n < owned.charges ? 'filled' : ''}"></i>`).join('')}</span></button>`;
+      const goldCast = GameState.run.character === 'usurer' && owned.charges === 0;
+      return `<button class="spell-slot ${target?.slot === i ? 'is-targeting' : ''}" type="button" data-spell-slot="${i}" ${goldCast && GameState.run.gold < 25 ? 'disabled' : ''}>${Icons.svg(def.icon)}<span>${I18n.t('spell.'+owned.id)}</span>${goldCast ? `<span class="spell-cost">${I18n.t('hud.castGold')}</span>` : `<span class="spell-dots">${Array.from({length:Controller.spellCapacity()},(_,n) => `<i class="${n < owned.charges ? 'filled' : ''}"></i>`).join('')}</span>`}</button>`;
     }).join('');
     const hint = document.getElementById('spellHint');
     hint.innerHTML = '';
@@ -639,8 +644,8 @@ const Renderer = {
     const mapEl = document.getElementById('floorMap');
     mapEl.innerHTML = '';
 
-    const fi    = gs.run.floorIdx;
-    const floor = gs.run.floors[fi];
+    const cartographer = gs.run.character === 'cartographer';
+    const currentFloor = gs.run.floorIdx;
 
     const NODE_W   = 52;
     const NODE_GAP = 6;
@@ -648,7 +653,7 @@ const Renderer = {
     const totalW   = COLS * NODE_W + (COLS - 1) * NODE_GAP;
     const colX     = col => col * (NODE_W + NODE_GAP) + NODE_W / 2;
 
-    const makeNode = (roomData, rowIdx, nodeIdx) => {
+    const makeNode = (roomData, rowIdx, nodeIdx, fi) => {
       const def = ROOM_DEFS[roomData.type];
       const node = document.createElement('div');
       const cls = ['room-node'];
@@ -656,12 +661,13 @@ const Renderer = {
       if (roomData.completed)                                  cls.push('completed');
       if (!roomData.available && !roomData.completed)          cls.push('locked');
       if (roomData.type === 'boss')                            cls.push('boss');
+      if (cartographer && ['normal','elite'].includes(roomData.type)) cls.push('has-enemy-emblem');
       node.className = cls.join(' ');
       const bossId = roomData.type === 'boss' ? roomData.bossId || ['jailer','smith','eye'][fi] : null;
       node.innerHTML = bossId
         ? `<span class="boss-emblem">${roomData.completed ? '✓' : Icons.svg('e-' + bossId)}</span><span class="room-label boss-name">${I18n.t('enemy.' + bossId + '.name')}</span>`
-        : `<span style="color:${def.color}">${roomData.completed ? '✓' : Icons.svg(def.icon)}</span><span class="room-label" style="color:${def.color}">${I18n.t('room.' + roomData.type)}</span>`;
-      if (roomData.available) node.addEventListener('click', () => Controller.enterRoom(fi, rowIdx, nodeIdx));
+        : `<span style="color:${def.color}">${roomData.completed ? '✓' : Icons.svg(def.icon)}</span><span class="room-label" style="color:${def.color}">${I18n.t('room.' + roomData.type)}</span>${cartographer && ['normal','elite'].includes(roomData.type) ? `<span class="map-enemy-emblem">${Icons.svg('e-'+(roomData.enemyId || ENEMIES.find(e => e.floor === fi && e.kind === roomData.type).id))}</span>` : ''}`;
+      if (fi === currentFloor && roomData.available) node.addEventListener('click', () => Controller.enterRoom(fi, rowIdx, nodeIdx));
       return node;
     };
 
@@ -689,19 +695,31 @@ const Renderer = {
       return svg;
     };
 
-    floor.forEach((row, rowIdx) => {
-      // Node row
-      const rowDiv = document.createElement('div');
-      rowDiv.className = 'floor-row';
-      row.forEach((roomData, nodeIdx) => rowDiv.appendChild(makeNode(roomData, rowIdx, nodeIdx)));
-      mapEl.appendChild(rowDiv);
-
-      // Connection SVG to next row
-      if (rowIdx < floor.length - 1) {
-        const isBossNext = floor[rowIdx + 1].length === 1 && floor[rowIdx + 1][0].type === 'boss';
-        mapEl.appendChild(makeSVG(row, isBossNext));
+    const visibleFloors = cartographer ? gs.run.floors.map((floor,fi) => ({floor,fi})).slice(currentFloor,currentFloor === 3 ? 4 : 3) : [{floor:gs.run.floors[currentFloor],fi:currentFloor}];
+    for (const {floor,fi} of visibleFloors) {
+      const section = document.createElement('div');
+      section.className = 'map-floor-section' + (fi > currentFloor ? ' is-future' : '');
+      if (cartographer) {
+        const label = document.createElement('div');
+        label.className = 'floor-label';
+        label.textContent = fi === 3 ? I18n.t('map.summit') : `${I18n.t('map.floor',{n:fi+1})} · ${I18n.t('floor.name.'+fi)}`;
+        section.appendChild(label);
       }
-    });
+      floor.forEach((row, rowIdx) => {
+        // Node row
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'floor-row';
+        row.forEach((roomData, nodeIdx) => rowDiv.appendChild(makeNode(roomData, rowIdx, nodeIdx, fi)));
+        section.appendChild(rowDiv);
+
+        // Connection SVG to next row
+        if (rowIdx < floor.length - 1) {
+          const isBossNext = floor[rowIdx + 1].length === 1 && floor[rowIdx + 1][0].type === 'boss';
+          section.appendChild(makeSVG(row, isBossNext));
+        }
+      });
+      mapEl.appendChild(section);
+    }
   },
 
   // ── Title ──
@@ -712,6 +730,21 @@ const Renderer = {
     document.getElementById('s-gold').textContent = m.totalGold;
     I18n.renderSoundToggle();
     I18n.renderMusicToggle();
+    if (m.skin) document.body.dataset.skin = m.skin;
+    else delete document.body.dataset.skin;
+    const skinToggle = document.getElementById('skinToggle');
+    if (skinToggle) {
+      skinToggle.innerHTML = [{id:'',name:'gems'},...m.skins.map(id => ({id,name:id}))].map(({id,name}) => `<button type="button" class="lang-btn ${m.skin === (id || null) ? 'active' : ''}" data-select-skin="${id}" aria-pressed="${m.skin === (id || null)}">${I18n.t('skin.'+name)}</button>`).join('');
+      skinToggle.onclick = event => {
+        const button = event.target.closest('[data-select-skin]');
+        if (!button) return;
+        const selected = button.dataset.selectSkin;
+        if (selected && !m.skins.includes(selected)) return;
+        m.skin = selected || null;
+        Storage.save(m);
+        this.renderTitle();
+      };
+    }
 
     // Highest unlocked tier
     const ascBadge = document.getElementById('ascensionBadge');
@@ -858,7 +891,7 @@ const Renderer = {
     document.querySelector('#relicScreen .relic-screen-title').textContent = I18n.t('room.rest');
 
     const container = document.getElementById('relicChoices');
-    if ((GameState.run.hearts ?? 3) < 3) {
+    if ((GameState.run.hearts ?? 3) < Controller.maxHearts()) {
       const healCard = document.createElement('div');
       healCard.className = 'relic-card rest-heal-card';
       healCard.innerHTML = `<div class="relic-card-header"><div class="relic-icon">${Icons.svg('heart')}</div><div class="relic-name">${I18n.t('rest.healName')}</div></div><div class="relic-desc">${I18n.t('rest.healDesc')}</div>`;
@@ -936,7 +969,7 @@ const Renderer = {
     const meta = GameState.meta;
     const tabs = document.getElementById('codexTabs');
     tabs.innerHTML = '';
-    for (const id of ['relics','bestiary','achievements','history']) {
+    for (const id of ['relics','bestiary','characters','achievements','history']) {
       const button = document.createElement('button');
       button.className = 'codex-tab' + (id === tab ? ' is-active' : '');
       button.textContent = I18n.t('codex.tab.'+id);
@@ -956,8 +989,8 @@ const Renderer = {
         const card = document.createElement('div');
         card.className = 'codex-card' + (seen ? '' : ' is-unknown');
         card.innerHTML = seen
-          ? `<div class="codex-icon">${Icons.svg(relic.icon)}</div><div class="codex-name">${I18n.t('relic.'+relic.id+'.name')}</div><div class="relic-rarity rarity-${relic.rarity}">${I18n.t('rarity.'+relic.rarity)}</div><div class="codex-families">${this.familyChips(relic)}</div>`
-          : `<div class="codex-icon">${Icons.svg('lock')}</div><div class="codex-name">???</div>${UNLOCKS[relic.id] ? `<div class="codex-hint">${I18n.t('achievement.'+UNLOCKS[relic.id]+'.name')}</div>` : ''}`;
+          ? `<div class="codex-icon">${Icons.svg(relic.icon)}</div><div class="codex-name">${I18n.t('relic.'+relic.id+'.name')}</div><div class="relic-rarity rarity-${relic.rarity}">${I18n.t('rarity.'+relic.rarity)}</div><div class="codex-families">${this.familyChips(relic)}</div>${relic.ascension ? `<div class="codex-hint">${I18n.t('relic.ascensionGate')}</div>` : ''}`
+          : `<div class="codex-icon">${Icons.svg('lock')}</div><div class="codex-name">???</div>${relic.ascension ? `<div class="codex-hint">${I18n.t('relic.ascensionGate')}</div>` : UNLOCKS[relic.id] ? `<div class="codex-hint">${I18n.t('achievement.'+UNLOCKS[relic.id]+'.name')}</div>` : ''}`;
         list.appendChild(card);
       }
     } else if (tab === 'bestiary') {
@@ -968,12 +1001,21 @@ const Renderer = {
         card.innerHTML = `<span class="codex-icon">${Icons.svg(count ? 'e-'+enemy.id : 'lock')}</span><span class="codex-row-main"><strong>${count ? I18n.t(enemy.kind === 'boss' ? 'enemy.'+enemy.id+'.name' : 'enemy.'+enemy.id) : '???'}</strong><small>${I18n.t('codex.floor',{n:enemy.floor+1})}</small></span><span>${count ? I18n.t('codex.defeated',{n:count}) : ''}</span>`;
         list.appendChild(card);
       }
+    } else if (tab === 'characters') {
+      list.className = 'codex-content';
+      for (const character of CHARACTERS) {
+        const unlocked = !UNLOCKS[character.id] || meta.achievements.includes(UNLOCKS[character.id]);
+        const card = document.createElement('div');
+        card.className = 'codex-row' + (unlocked ? '' : ' is-unknown');
+        card.innerHTML = `<span class="codex-icon">${Icons.svg(unlocked ? character.icon : 'lock')}</span><span class="codex-row-main"><strong>${I18n.t('character.'+character.id+'.name')}</strong><small>${unlocked ? I18n.t('character.'+character.id+'.passive') : I18n.t('achievement.'+UNLOCKS[character.id]+'.condition')}</small></span><span>A${characterTier(meta,character.id)}</span>`;
+        list.appendChild(card);
+      }
     } else if (tab === 'achievements') {
       list.className = 'codex-content';
       for (const achievement of ACHIEVEMENTS) {
         const earned = meta.achievements.includes(achievement.id);
         const card = document.createElement('div'); card.className = 'codex-row' + (earned ? ' is-earned' : ' is-unknown');
-        card.innerHTML = `<span class="codex-icon">${Icons.svg('trophy')}</span><span class="codex-row-main"><strong>${I18n.t('achievement.'+achievement.id+'.name')}</strong><small>${I18n.t('achievement.'+achievement.id+'.condition')}</small>${achievement.reward ? `<small>${I18n.t('codex.reward')}${I18n.t('ui.colon')}${I18n.t(achievement.reward === 'artificer' || achievement.reward === 'monk' ? 'character.'+achievement.reward+'.name' : 'relic.'+achievement.reward+'.name')}</small>` : ''}</span>`;
+        card.innerHTML = `<span class="codex-icon">${Icons.svg('trophy')}</span><span class="codex-row-main"><strong>${I18n.t('achievement.'+achievement.id+'.name')}</strong><small>${I18n.t('achievement.'+achievement.id+'.condition')}</small>${achievement.reward ? `<small>${I18n.t('codex.reward')}${I18n.t('ui.colon')}${CHARACTERS.some(c => c.id === achievement.reward) ? I18n.t('character.'+achievement.reward+'.name') : I18n.t('relic.'+achievement.reward+'.name')}</small>` : ''}</span>`;
         list.appendChild(card);
       }
     } else {
@@ -998,10 +1040,13 @@ const Renderer = {
       if (!current) { this._achievementShowing = false; return; }
       this._achievementShowing = true;
       const banner = document.getElementById('achievementToast');
-      banner.innerHTML = `${Icons.svg('trophy')} <span>${I18n.t('achievement.'+current+'.name')}</span>`;
+      banner.innerHTML = `${Icons.svg('trophy')} <span>${current.startsWith('skin.') ? I18n.t('settings.skin')+I18n.t('ui.colon')+I18n.t(current) : I18n.t('achievement.'+current+'.name')}</span>`;
       banner.classList.add('show');
       setTimeout(() => { banner.classList.remove('show'); setTimeout(next,220); },2620);
     };
     next();
+  },
+  showSkinUnlock(skin) {
+    this.showAchievement('skin.'+skin);
   },
 };

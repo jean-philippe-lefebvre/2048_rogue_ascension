@@ -26,9 +26,11 @@ const CHARACTERS = [
   { id:'alchemist', icon:'c-alchemist', relic:'magnet', spell:'swap' },
   { id:'artificer', icon:'c-artificer', relic:'catring', spell:'catalyst' },
   { id:'monk', icon:'c-monk', relic:'focus', spell:'pivot' },
+  { id:'cartographer', icon:'c-cartographer', relic:'compass', spell:'smash' },
+  { id:'usurer', icon:'c-usurer', relic:'greed', spell:'swap' },
 ];
 
-const UNLOCKS = { artificer:'jailbreak', monk:'gaze', chainreact:'chain5', cornerstone:'tile1024', philosopher:'rich', wildcard:'scholar' };
+const UNLOCKS = { artificer:'jailbreak', monk:'gaze', cartographer:'cartographer', usurer:'usurer', chainreact:'chain5', cornerstone:'tile1024', philosopher:'rich', wildcard:'scholar' };
 
 const ACHIEVEMENTS = [
   {id:'firstblood', event:'fight'},
@@ -42,6 +44,8 @@ const ACHIEVEMENTS = [
   {id:'flawless', event:'run', minHearts:3},
   {id:'pyro', event:'bomb', minCount:10},
   {id:'scholar', event:'spell', minCount:50, reward:'wildcard'},
+  {id:'cartographer', event:'run', minTier:3, reward:'cartographer'},
+  {id:'usurer', event:'run', minTier:6, reward:'usurer'},
   {id:'ascetic', event:'run', minTier:5},
   {id:'legend', event:'run', minTier:10},
 ];
@@ -182,6 +186,15 @@ const RELICS = [
     hooks: { onMovesCalc: ctx => { ctx.bonus += 4; } } },
   { id:'trinity', icon:'trinity', rarity:'legendary',
     hooks: { onRoomStart: (ctx,run,gs) => { const fight=gs.room.combat; fight.maxHp=Math.ceil(fight.maxHp*1.4); fight.hp=fight.maxHp; } } },
+  { id:'crownthorns', icon:'crownthorns', rarity:'legendary', ascension:true,
+    hooks:{ onRunStart:(ctx,run) => { run.hearts=Math.min(4,run.hearts+1); },
+      onRoomStart:(ctx,run,gs) => { const fight=gs.room.combat; fight.maxHp=Math.ceil(fight.maxHp*1.1); fight.hp=fight.maxHp; } } },
+  { id:'crackedglass', icon:'crackedglass', rarity:'legendary', ascension:true,
+    hooks:{ onMoveCommitted:(ctx,run,gs) => { gs.room.relicState.crackedMoves=(gs.room.relicState.crackedMoves || 0)+1; },
+      onDamageCalc:(ctx,run,gs) => { if(ctx.consumed && gs.room.relicState.crackedMoves>0 && gs.room.relicState.crackedMoves<=5) ctx.multiplier*=2; } } },
+  { id:'voideye', icon:'voideye', rarity:'legendary', ascension:true, hooks:{} },
+  { id:'wardenseal', icon:'wardenseal', rarity:'legendary', ascension:true,
+    hooks:{ onDamageCalc:ctx => { ctx.guardianRank3=true; for(const m of ctx.merges) if(Board.rank(m.val)>=4) m.damageMultiplier*=1.25; } } },
 
   { id:'philosopher', icon:'philosopher', rarity:'legendary', hooks:{ onAfterMove:(ctx,run,gs) => { for(const m of ctx.result.merges) if(Board.rank(m.val)>=6 && gs.kinds?.[m.r]) gs.kinds[m.r][m.c]='gold'; } } },
   { id:'powder', icon:'powder', rarity:'epic', hooks:{ onBombExplosion:ctx => { ctx.damage += Math.floor(ctx.fight.maxHp*0.1); } } },
@@ -215,6 +228,7 @@ const RELIC_TAGS = {
   phoenix:['tempo'], transmute:['control'], darkpact:['gold','tempo'], eclipse:['small'], berserker:['tempo'], expanse:['control'], trinity:['small'],
   philosopher:['gold'], powder:['blast'], chainreact:['chain'], cornerstone:['corner'], swarm:['small'],
   catring:['blast'], wildcard:['control'], frostbite:['control'], grimoire:['spell'],
+  crownthorns:['tempo'], crackedglass:['chain'], voideye:['control'], wardenseal:['small'],
 };
 for (const relic of RELICS) relic.tags = RELIC_TAGS[relic.id] || [];
 
