@@ -22,6 +22,12 @@ const SPELLS = [
   { id:'catalyst', icon:'s-catalyst', targets:0 },
 ];
 
+const CHARACTERS = [
+  { id:'alchemist', icon:'c-alchemist', relic:'magnet', spell:'swap' },
+  { id:'artificer', icon:'c-artificer', relic:'catring', spell:'catalyst' },
+  { id:'monk', icon:'c-monk', relic:'focus', spell:'pivot' },
+];
+
 const EVENTS = [
   { id:'altar', icon:'ev-altar', options:['take','pray','leave'] },
   { id:'peddler', icon:'merchant', options:['buy','sell','leave'] },
@@ -79,10 +85,10 @@ const RELICS = [
     hooks: { onTileSpawn: ctx => { ctx.value = Math.max(ctx.value, 4); } } },
   { id:'greed',     icon:'greed', name:'Avidité',        rarity:'common', desc:'Chaque fusion rapporte +1 or.',                   effect:'+1 or par fusion',
     hooks: { onGoldCalc: ctx => { ctx.gold += ctx.merges.length; } } },
-  { id:'haste',     icon:'haste', name:'Hâte',           rarity:'common', desc:'+5 coups dans toutes les salles.',                effect:'+5 coups max',
-    hooks: { onMovesCalc: ctx => { ctx.bonus += 5; } } },
-  { id:'shield',    icon:'shield', name:'Bouclier',       rarity:'common', desc:'Les bombes ennemies sont neutralisées dès leur apparition.', effect:'Bombes désactivées',
-    hooks: { onEnemyIntent: ctx => { if(ctx.effect?.intent !== 'bomb') return; for(const [r,c] of ctx.effect.cells) { ctx.board[r][c]=0; delete ctx.bombTimers[`${r},${c}`]; } } } },
+  { id:'haste',     icon:'haste', name:'Hâte',           rarity:'common', desc:'+4 coups dans toutes les salles.',                effect:'+4 coups max',
+    hooks: { onMovesCalc: ctx => { ctx.bonus += 4; } } },
+  { id:'shield',    icon:'shield', name:'Bouclier',       rarity:'common', desc:'La première bombe ennemie de chaque salle est neutralisée.', effect:'Première bombe neutralisée',
+    hooks: { onEnemyIntent: (ctx, run, gs) => { if(ctx.effect?.intent !== 'bomb' || !ctx.effect.cells?.length || gs.room?.relicState?._shieldUsed) return; gs.room.relicState._shieldUsed=true; const [r,c]=ctx.effect.cells[0]; ctx.board[r][c]=0; delete ctx.bombTimers[`${r},${c}`]; } } },
   { id:'sprout',    icon:'sprout', name:'Germination',    rarity:'common', desc:'+1 tuile de départ dans chaque salle.',           effect:'3 tuiles au départ',
     hooks: { onRoomStart: ctx => { Board.addRandom(ctx.board, false, 0); } } },
   { id:'collector', icon:'collector', name:'Collecteur',     rarity:'common', desc:'+3 or à chaque salle terminée.',                  effect:'+3 or/salle',
@@ -93,14 +99,14 @@ const RELICS = [
   // ══════ RARE ══════
   { id:'echo',      icon:'echo', name:'Écho',           rarity:'rare', desc:'Après chaque fusion, une tuile apparaît aléatoirement.', effect:'Tuile bonus par fusion',
     hooks: { onAfterMove: ctx => { if(ctx.result.merges.length>0) Board.addRandom(ctx.board, false, 0); } } },
-  { id:'magnet',    icon:'magnet', name:'Aimant',         rarity:'rare', desc:'+3 coups au début de chaque salle.',               effect:'+3 coups/salle',
-    hooks: { onMovesCalc: ctx => { ctx.bonus += 3; } } },
+  { id:'magnet',    icon:'magnet', name:'Aimant',         rarity:'rare', desc:'10 % des nouvelles tuiles sont dorées.',               effect:'10 % tuiles dorées',
+    hooks: { onTileSpawn: ctx => { if(Rng.next()<0.1) ctx.kind='gold'; } } },
   { id:'tide',      icon:'tide', name:'Marée',          rarity:'rare', desc:'1×/salle : le premier coup sans fusion est gratuit.', effect:'1 coup gratuit/salle',
     hooks: { onAfterMove: (ctx, run, gs) => { const rs=gs.room?.relicState; if(rs && !rs._tideUsed && ctx.result.merges.length===0) { rs._tideUsed=true; ctx.freeMove=true; } } } },
   { id:'blade',     icon:'blade', name:'Lame double',    rarity:'rare', desc:'Les fusions 2+2 donnent 8 au lieu de 4.',          effect:'2+2 → 8',
     hooks: { onAfterMove: ctx => { for(const m of ctx.result.merges) { if(m.normal && m.val===4 && ctx.board[m.r][m.c]>0) { ctx.board[m.r][m.c]=8; m.val=8; } } } } },
-  { id:'focus',     icon:'focus', name:'Focus',          rarity:'rare', desc:'+20% de coups dans les salles élite.',              effect:'+20% coups élite',
-    hooks: { onMovesCalc: ctx => { if(ctx.type==='elite') ctx.bonus+=Math.floor(ctx.base*0.2); } } },
+  { id:'focus',     icon:'focus', name:'Focus',          rarity:'rare', desc:'Le premier coup avec 2 fusions ou plus inflige ×2 dégâts.',              effect:'Premier combo ×2 dégâts',
+    hooks: { onDamageCalc: (ctx, run, gs) => { const rs=gs.room?.relicState; if(rs && !rs._focusUsed && ctx.merges.length>=2) { rs._focusUsed=true; ctx.multiplier*=2; } } } },
   { id:'recycle',   icon:'recycle', name:'Recyclage',      rarity:'rare', desc:'Quand tu rates une salle, récupère la moitié de l\'or.', effect:'50% or sur défaite',
     hooks: { onRoomEnd: ctx => { if(!ctx.won) ctx.goldBonus+=Math.floor(ctx.roomReward/2); } } },
 
@@ -131,6 +137,16 @@ const RELICS = [
   { id:'berserker', icon:'berserker', name:'Berserker',      rarity:'legendary', desc:'+15 coups max, mais les fusions ne rapportent aucun or.', effect:'+15 coups, 0 or',
     hooks: { onMovesCalc: ctx => { ctx.bonus += 15; }, onGoldCalc: ctx => { ctx.gold = 0; } } },
 
+  { id:'philosopher', icon:'philosopher', rarity:'legendary', hooks:{ onAfterMove:(ctx,run,gs) => { for(const m of ctx.result.merges) if(m.val>=64 && gs.kinds?.[m.r]) gs.kinds[m.r][m.c]='gold'; } } },
+  { id:'powder', icon:'powder', rarity:'epic', hooks:{ onBombExplosion:ctx => { ctx.damage += Math.floor(ctx.fight.maxHp*0.1); } } },
+  { id:'chainreact', icon:'chainreact', rarity:'legendary', hooks:{ onDamageCalc:ctx => { ctx.comboStep=0.5; } } },
+  { id:'cornerstone', icon:'cornerstone', rarity:'epic', hooks:{ onDamageCalc:ctx => { for(const m of ctx.merges) if((m.r===0||m.r===GRID_SIZE-1)&&(m.c===0||m.c===GRID_SIZE-1)) m.damageMultiplier*=2; } } },
+  { id:'swarm', icon:'swarm', rarity:'rare', hooks:{ onDamageCalc:ctx => { for(const m of ctx.merges) if(m.val===4||m.val===8) m.damageMultiplier*=3; } } },
+  { id:'catring', icon:'catring', rarity:'rare', hooks:{ onRoomStart:ctx => { Board.placeValue(ctx.board,TILE.MULT); } } },
+  { id:'wildcard', icon:'wildcard', rarity:'epic', hooks:{ onMoveCommitted:(ctx,run) => { if((run._wildcardMoves=(run._wildcardMoves||0)+1)%12===0) Board.placeValue(ctx.board,TILE.JOKER); } } },
+  { id:'frostbite', icon:'frostbite', rarity:'rare', hooks:{ onIceThaw:ctx => { for(const {r,c} of ctx.result.cracked) { ctx.kinds[r][c]=null; delete ctx.iceHits[`${r},${c}`]; ctx.result.thawed.push({r,c}); } ctx.result.cracked=[]; } } },
+  { id:'grimoire', icon:'grimoire', rarity:'rare', hooks:{ onRoomStart:ctx => { const spell=ctx.run.spells.find(s=>s.charges<4); if(spell) spell.charges++; } } },
+
   // ══════ CURSES (malus) ══════
   { id:'web',       icon:'web', name:'Toile',          rarity:'curse', isCurse:true, desc:'-3 coups dans toutes les salles.',   effect:'-3 coups max',
     hooks: { onMovesCalc: ctx => { ctx.bonus -= 3; } } },
@@ -145,6 +161,16 @@ const RELICS = [
   { id:'tax',       icon:'tax', name:'Taxe',           rarity:'curse', isCurse:true, desc:'-20% de l\'or gagné dans chaque salle.', effect:'-20% or',
     hooks: { onGoldCalc: ctx => { ctx.gold = Math.floor(ctx.gold * 0.8); } } },
 ];
+
+const RELIC_TAGS = {
+  entropy:['small'], greed:['gold'], haste:['tempo'], shield:['control'], sprout:['small'], collector:['gold'], compass:['corner'],
+  echo:['small'], magnet:['gold'], tide:['tempo'], blade:['small'], focus:['chain'], recycle:['gold'],
+  crystal:['corner'], mirror:['small'], hourglass:['tempo'], vortex:['tempo'], crown:['gold'], dupli:['small'],
+  phoenix:['tempo'], transmute:['control'], darkpact:['gold','tempo'], eclipse:['small'], berserker:['tempo'],
+  philosopher:['gold'], powder:['blast'], chainreact:['chain'], cornerstone:['corner'], swarm:['small'],
+  catring:['blast'], wildcard:['control'], frostbite:['control'], grimoire:['spell'],
+};
+for (const relic of RELICS) relic.tags = RELIC_TAGS[relic.id] || [];
 
 const ASCENSION_COSTS = [200, 500, 1000];
 const MAX_ASCENSION   = ASCENSION_COSTS.length;

@@ -2,8 +2,53 @@
 
 const Controller = {
 
+  spellCapacity() { return GameState.run?.relics.some(r => r.id === 'grimoire') ? 4 : 3; },
+  chargeSpell() {
+    const spell = GameState.run.spells.find(s => s.charges < this.spellCapacity());
+    if (!spell) return false;
+    spell.charges++; return true;
+  },
+  chargeAllSpells() {
+    let changed = false;
+    for (const spell of GameState.run.spells) if (spell.charges < this.spellCapacity()) { spell.charges++; changed=true; }
+    return changed;
+  },
+
+  damage(fight, merges) {
+    const ctx = { merges:merges.map(m => ({...m,damageMultiplier:1})), multiplier:1,
+      comboStep:GameState.run.character === 'monk' ? 0.35 : 0.25 };
+    RelicHooks.fire('onDamageCalc',ctx);
+    const combo = 1 + ctx.comboStep * Math.max(0,merges.length-1);
+    const raw = Math.floor(ctx.merges.reduce((sum,m) => sum + m.val*m.damageMultiplier,0) * combo *
+      (fight.invertTurns>0 ? 1.25 : 1) * ctx.multiplier);
+    const absorbed = Math.min(raw,fight.block);
+    fight.block -= absorbed;
+    fight.hp = Math.max(0,fight.hp-(raw-absorbed));
+    return {raw,dealt:raw-absorbed,absorbed,combo};
+  },
+
+  breakHazards(fight, board, merges, bombTimers) {
+    const broken=Combat.breakHazards(fight,board,merges,bombTimers);
+    if (GameState.run.character === 'artificer') for (const merge of merges) if (merge.val >= 8)
+      for (const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const r=merge.r+dr,c=merge.c+dc;
+        if (board[r]?.[c] === TILE.BOMB) { board[r][c]=0; delete bombTimers[`${r},${c}`]; broken.push({r,c,kind:'bomb'}); }
+      }
+    return broken;
+  },
+
+  shopPrice(value) { return GameState.run.character === 'alchemist' ? Math.floor(value*0.8) : value; },
+
   // ── Run ──
-  startRun() {
+  startRun() { Renderer.renderCharacters(); showScreen('characterScreen'); },
+
+  chooseCharacter(characterId) {
+    if (!CHARACTERS.some(c => c.id === characterId)) return false;
+    this._beginRun(characterId);
+    return true;
+  },
+
+  _beginRun(characterId) {
     const m = GameState.meta;
     const seed = new Uint32Array(1);
     if (globalThis.crypto?.getRandomValues) crypto.getRandomValues(seed);
@@ -25,7 +70,9 @@ const Controller = {
       hearts: 3,
       totalScore: 0,
       relics: [],
-      spells: [{ id:'smash', charges:2 }],
+      character: characterId,
+      spells: [{ id:CHARACTERS.find(c => c.id === characterId).spell, charges:2 }],
+      _wildcardMoves: 0,
       seenEvents: [],
       bossHpMult: 1,
       lastTileVal: 0,
@@ -33,6 +80,8 @@ const Controller = {
       singularityReady: !!(m.upgrades.singularity),
       floors: this._generateFloors(),
     };
+
+    this._grantRelic(RELICS.find(r => r.id === CHARACTERS.find(c => c.id === characterId).relic));
 
     if (m.upgrades.startRelic) {
       const commons = RELICS.filter(r => r.rarity === 'common');
@@ -197,6 +246,7 @@ const Controller = {
     const picks = [];
     const fi = Math.min(floorIdx ?? GameState.run?.floorIdx ?? 0, 2);
     const synergyLvl = GameState.meta?.upgrades?.synergy || 0;
+    const ownedTags = new Set(GameState.run?.relics.flatMap(r => r.tags || []) || []);
     const n = Math.min(count, remaining.length);
     for (let i = 0; i < n; i++) {
       const weights = remaining.map(r => {
@@ -205,7 +255,7 @@ const Controller = {
         if (synergyLvl > 0 && (r.rarity === 'epic' || r.rarity === 'legendary')) {
           base += synergyLvl * 10;
         }
-        return base;
+        return base * (r.tags?.some(tag => ownedTags.has(tag)) ? 1.3 : 1);
       });
       const total = weights.reduce((s, w) => s + w, 0);
       let roll = Rng.next() * total;
@@ -361,7 +411,7 @@ const Controller = {
   },
 
   pickRestMeditate() {
-    if (!Spells.chargeAll(GameState.run)) return;
+    if (!this.chargeAllSpells()) return;
     const cb = GameState._restDone;
     GameState._restDone = null;
     if (cb) cb();
@@ -371,13 +421,14 @@ const Controller = {
     const run = GameState.run;
     run.pendingRoom = {floorIdx:GameState.room.floorIdx,rowIdx:GameState.room.rowIdx,nodeIdx:GameState.room.nodeIdx};
     const relics = this._pickRandom(this._getUnownedRelics().filter(r => !r.isCurse), 3);
+    const price = value => this.shopPrice(value);
     const spells = SPELLS.filter(s => !run.spells.some(owned => owned.id === s.id));
     run.pendingShop = [
-      ...relics.map(r => ({ type:'relic', id:r.id, price:{ common:35, rare:55, epic:80, legendary:120 }[r.rarity], bought:false })),
-      ...(spells.length ? [{ type:'spell', id:Rng.pick(spells).id, price:45, bought:false }] : []),
-      { type:'charge', price:20, bought:false },
-      { type:'heal', price:40, bought:false },
-      { type:'cleanse', price:60, bought:false },
+      ...relics.map(r => ({ type:'relic', id:r.id, price:price({ common:35, rare:55, epic:80, legendary:120 }[r.rarity]), bought:false })),
+      ...(spells.length ? [{ type:'spell', id:Rng.pick(spells).id, price:price(45), bought:false }] : []),
+      { type:'charge', price:price(20), bought:false },
+      { type:'heal', price:price(40), bought:false },
+      { type:'cleanse', price:price(60), bought:false },
     ];
     Storage.saveRun(run);
     this._showShop();
@@ -393,7 +444,7 @@ const Controller = {
     const run = GameState.run;
     if (offer.bought || run.gold < offer.price) return false;
     if (offer.type === 'spell') return run.spells.length < 2 && !run.spells.some(s => s.id === offer.id);
-    if (offer.type === 'charge') return run.spells.some(s => s.charges < 3);
+    if (offer.type === 'charge') return run.spells.some(s => s.charges < this.spellCapacity());
     if (offer.type === 'heal') return run.hearts < 3;
     if (offer.type === 'cleanse') return run.relics.some(r => r.isCurse);
     return !run.relics.some(r => r.id === offer.id);
@@ -405,7 +456,7 @@ const Controller = {
     run.gold -= offer.price;
     if (offer.type === 'relic') this._grantRelic(RELICS.find(r => r.id === offer.id));
     if (offer.type === 'spell') run.spells.push({ id:offer.id, charges:2 });
-    if (offer.type === 'charge') Spells.chargeAll(run);
+    if (offer.type === 'charge') this.chargeAllSpells();
     if (offer.type === 'heal') run.hearts++;
     if (offer.type === 'cleanse') {
       const index = run.relics.findLastIndex(r => r.isCurse);
@@ -453,7 +504,7 @@ const Controller = {
     if (id === 'ambush' && option === 'flee' && run.gold < 15) return 'gold';
     if (id === 'dice' && option === 'betGold' && run.gold < 20) return 'gold';
     if (id === 'dice' && option === 'betHeart' && run.hearts < 1) return 'hearts';
-    if (id === 'altar' && option === 'pray' && !run.spells.some(s => s.charges < 3)) return 'charges';
+    if (id === 'altar' && option === 'pray' && !run.spells.some(s => s.charges < this.spellCapacity())) return 'charges';
     return null;
   },
 
@@ -480,7 +531,7 @@ const Controller = {
         const curses = RELICS.filter(r => r.isCurse && !run.relics.some(x => x.id === r.id));
         if (curses.length) this._grantRelic(Rng.pick(curses));
       }
-      if (option === 'pray') Spells.chargeAll(run);
+      if (option === 'pray') this.chargeAllSpells();
     } else if (id === 'peddler') {
       if (option === 'buy') {
         const pool = SPELLS.filter(s => !run.spells.some(x => x.id === s.id));
@@ -513,7 +564,7 @@ const Controller = {
           pending.spells = this._pickEventSpells(pool,2);
           Storage.saveRun(run); this._showEvent(); return true;
         }
-        Spells.chargeAll(run);
+        this.chargeAllSpells();
       }
     } else if (id === 'pact') {
       if (option === 'sign') { this._eventRelic('epic'); run.bossHpMult = Math.max(run.bossHpMult || 1,1.15); }
@@ -688,6 +739,7 @@ const Controller = {
       if (!Combat.hasLegalMove(fight, gs.board, gs.kinds)) this._checkFailure();
       return 'buzz';
     }
+    RelicHooks.fire('onIceThaw',{kinds:gs.kinds,iceHits:gs.room.iceHits,result});
     gs.score += result.score;
     gs.mergeCount += result.merges.length;
     gs.run.totalScore += result.score;
@@ -698,7 +750,8 @@ const Controller = {
     gs.movesLeft += moveCtx.addMove;
     if (!moveCtx.freeMove) {
       gs.room.undo = before;
-      if (result.merges.length >= 3 && Spells.charge(gs.run)) {
+      RelicHooks.fire('onMoveCommitted', { result, board: gs.board });
+      if (result.merges.length >= 3 && this.chargeSpell()) {
         const at = Fx.cellCenter(result.merges[0].r,result.merges[0].c);
         if (at) { Fx.float(at.x,at.y,'1 ✦'); const label = document.querySelector('.grid-wrap .fx-float:last-of-type'); if (label) label.style.color = '#d4a843'; }
       }
@@ -721,13 +774,13 @@ const Controller = {
     }
 
     Board.remapBombTimers(gs.bombTimers, result.bombMoves);
-    const broken = Combat.breakHazards(fight, gs.board, result.merges, gs.bombTimers);
+    const broken = this.breakHazards(fight, gs.board, result.merges, gs.bombTimers);
     for (const { r,c,kind } of broken) {
       const at = Fx.cellCenter(r,c);
       if (at) Fx.burst(at.x, at.y, kind === 'bomb' ? '#c44a3a' : '#9fb3c8', 14);
     }
     result.teleported = Board.applyPortals(gs.board, gs.kinds, gs.bombTimers, gs.portals);
-    const hit = Combat.damage(fight, result.merges);
+    const hit = this.damage(fight, result.merges);
     if (hit.dealt > 0) Renderer.enemyHit(hit.dealt);
     const phaseChanged = Combat.phase(fight, gs.room.enemyDef);
     if (phaseChanged) Renderer.phaseBanner();
@@ -738,7 +791,12 @@ const Controller = {
     }
 
     const exploded = Board.tickBombs(gs.board, gs.bombTimers, gs.kinds);
-    for (let i = 0; i < exploded; i++) Combat.bombExploded(fight);
+    for (let i = 0; i < exploded; i++) {
+      Combat.bombExploded(fight);
+      const bombCtx={fight,damage:0}; RelicHooks.fire('onBombExplosion',bombCtx);
+      fight.hp=Math.max(0,fight.hp-bombCtx.damage);
+    }
+    if (fight.hp <= 0) { this._winRoom(result,dir); return 'buzz'; }
     const transCtx = { board: gs.board, obstacleAge: gs.obstacleAge, active:false };
     RelicHooks.fire('onTransmute', transCtx);
     if (transCtx.active) {

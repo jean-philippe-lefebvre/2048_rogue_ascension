@@ -10,7 +10,7 @@ const Spells = {
       score:gs.score, mergeCount:gs.mergeCount, gold:gs.run.gold,
       totalScore:gs.run.totalScore, lastTileVal:gs.run.lastTileVal,
       spells:gs.run.spells, rngState:Rng._state,
-      singularityReady:gs.run.singularityReady, phoenixReady:gs.run._phoenixReady });
+      singularityReady:gs.run.singularityReady, phoenixReady:gs.run._phoenixReady, wildcardMoves:gs.run._wildcardMoves || 0 });
   },
   restore(gs, value) {
     const s = this.copy(value);
@@ -20,6 +20,7 @@ const Spells = {
     gs.run.spells = s.spells;
     gs.run.singularityReady = s.singularityReady;
     gs.run._phoenixReady = s.phoenixReady;
+    gs.run._wildcardMoves = s.wildcardMoves || 0;
     Rng._state = s.rngState;
   },
   movable(gs, r, c) {

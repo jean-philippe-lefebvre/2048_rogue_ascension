@@ -17,6 +17,21 @@ function showScreen(id) {
 }
 
 const Renderer = {
+  familyChips(relic) {
+    return (relic.tags || []).map(tag => `<span class="family-chip">${I18n.t('family.'+tag)}</span>`).join('');
+  },
+  renderCharacters() {
+    const container=document.getElementById('characterChoices');
+    container.innerHTML='';
+    for(const character of CHARACTERS) {
+      const card=document.createElement('button');
+      card.className='character-card';
+      card.innerHTML=`<span class="character-icon">${Icons.svg(character.icon)}</span><span class="character-name">${I18n.t('character.'+character.id+'.name')}</span><span class="character-detail">${I18n.t('character.relic')}${I18n.t('ui.colon')}${I18n.t('relic.'+character.relic+'.name')}</span><span class="character-detail">${I18n.t('character.spell')}${I18n.t('ui.colon')}${I18n.t('spell.'+character.spell)}</span><span class="character-detail">${I18n.t('character.'+character.id+'.passive')}</span>`;
+      card.addEventListener('click',()=>Controller.chooseCharacter(character.id));
+      container.appendChild(card);
+    }
+    document.getElementById('btnCharacterBack').onclick=()=>showScreen('titleScreen');
+  },
   // ── Grid ──
   buildGrid() {
     this._geoCache = null;
@@ -227,7 +242,7 @@ const Renderer = {
       if (!owned) return `<button class="spell-slot is-empty" disabled>${I18n.t('spell.empty')}</button>`;
       const def = SPELLS.find(s => s.id === owned.id);
       const disabled = !Controller.spellAvailable(owned);
-      return `<button class="spell-slot ${target?.slot === i ? 'is-targeting' : ''}" data-spell-slot="${i}" ${disabled ? 'disabled' : ''}>${Icons.svg(def.icon)}<span>${I18n.t('spell.'+owned.id)}</span><span class="spell-dots">${Array.from({length:3},(_,n) => `<i class="${n < owned.charges ? 'filled' : ''}"></i>`).join('')}</span></button>`;
+      return `<button class="spell-slot ${target?.slot === i ? 'is-targeting' : ''}" data-spell-slot="${i}" ${disabled ? 'disabled' : ''}>${Icons.svg(def.icon)}<span>${I18n.t('spell.'+owned.id)}</span><span class="spell-dots">${Array.from({length:Controller.spellCapacity()},(_,n) => `<i class="${n < owned.charges ? 'filled' : ''}"></i>`).join('')}</span></button>`;
     }).join('');
     const hint = document.getElementById('spellHint');
     hint.innerHTML = '';
@@ -298,7 +313,7 @@ const Renderer = {
       const card = document.createElement('button');
       card.className = `relic-card shop-offer ${run.gold < offer.price ? 'is-unaffordable' : ''}`;
       card.disabled = !Controller.shopAvailable(offer);
-      card.innerHTML = `<div class="relic-card-header"><div class="relic-icon">${Icons.svg(icon)}</div><div><div class="relic-name">${name}</div></div></div><div class="relic-desc">${desc}</div><div class="shop-price ${run.gold < offer.price ? 'is-red' : ''}">${offer.bought ? I18n.t('shop.sold') : unavailable || `${Icons.svg('gold')} ${offer.price}`}</div>`;
+      card.innerHTML = `<div class="relic-card-header"><div class="relic-icon">${Icons.svg(icon)}</div><div><div class="relic-name">${name}</div></div></div><div class="relic-desc">${desc}</div>${offer.type === 'relic' ? this.familyChips(data) : ''}<div class="shop-price ${run.gold < offer.price ? 'is-red' : ''}">${offer.bought ? I18n.t('shop.sold') : unavailable || `${Icons.svg('gold')} ${offer.price}`}</div>`;
       card.addEventListener('click',() => Controller.buyShop(index));
       container.appendChild(card);
     });
@@ -381,7 +396,7 @@ const Renderer = {
   updateActiveRelics() {
     const el = document.getElementById('activeRelics');
     el.innerHTML = GameState.run.relics
-      .map(r => `<div class="active-relic-icon rarity-${r.rarity}" title="${I18n.t('relic.' + r.id + '.name')}: ${I18n.t('relic.' + r.id + '.desc')}">${Icons.svg(r.icon)}</div>`)
+      .map(r => `<div class="active-relic-icon rarity-${r.rarity}" title="${I18n.t('relic.' + r.id + '.name')}: ${I18n.t('relic.' + r.id + '.desc')}">${Icons.svg(r.icon)}${this.familyChips(r)}</div>`)
       .join('');
   },
 
@@ -433,8 +448,8 @@ const Renderer = {
         chip.className = 'relic-chip rarity-' + r.rarity + (r.isCurse ? ' is-curse' : '');
         const rName = I18n.t(`relic.${r.id}.name`);
         const rDesc = I18n.t(`relic.${r.id}.desc`);
-        chip.innerHTML = `${Icons.svg(r.icon)} <span>${rName}</span>`;
-        chip.addEventListener('click', () => this.showRelicTooltip(r.icon, rName, rDesc, r.rarity));
+        chip.innerHTML = `${Icons.svg(r.icon)} <span>${rName}</span>${this.familyChips(r)}`;
+        chip.addEventListener('click', () => this.showRelicTooltip(r.icon, rName, rDesc, r.rarity, r));
         relicsEl.appendChild(chip);
       });
     }
@@ -625,10 +640,11 @@ const Renderer = {
           <div class="relic-icon">${Icons.svg(relic.icon)}</div>
           <div>
             <div class="relic-name">${I18n.t('relic.' + relic.id + '.name')}</div>
-            <div class="relic-rarity rarity-${relic.rarity}">${relic.rarity}</div>
+            <div class="relic-rarity rarity-${relic.rarity}">${I18n.t('rarity.' + relic.rarity)}</div>
           </div>
         </div>
         <div class="relic-desc">${I18n.t('relic.' + relic.id + '.desc')}</div>
+        <div class="relic-family-list">${this.familyChips(relic)}</div>
         <div class="relic-effect">→ ${I18n.t('relic.' + relic.id + '.effect')}</div>`;
       card.addEventListener('click', () => Controller.pickRelic(relic));
       container.appendChild(card);
@@ -665,7 +681,7 @@ const Renderer = {
       this.animateRelicCard(healCard, choices.length + 1);
     }
 
-    if (GameState.run.spells.some(spell => spell.charges < 3)) {
+    if (GameState.run.spells.some(spell => spell.charges < Controller.spellCapacity())) {
       const card = document.createElement('button');
       card.className = 'relic-card';
       card.innerHTML = `<div class="relic-card-header"><div class="relic-icon">${Icons.svg('s-catalyst')}</div><div class="relic-name">${I18n.t('rest.meditate')}</div></div>`;
@@ -701,11 +717,12 @@ const Renderer = {
   },
 
   // ── Relic tooltip ──
-  showRelicTooltip(icon, name, desc, rarity) {
+  showRelicTooltip(icon, name, desc, rarity, relic) {
     document.getElementById('relicTTIcon').className = `relic-tt-icon rarity-${rarity}`;
     document.getElementById('relicTTIcon').innerHTML = Icons.svg(icon);
     document.getElementById('relicTTName').textContent = name;
     document.getElementById('relicTTDesc').textContent = desc;
+    document.getElementById('relicTTFamilies').innerHTML = relic ? this.familyChips(relic) : '';
     const el = document.getElementById('relicTooltip');
     el.classList.add('show');
     el.addEventListener('click', () => el.classList.remove('show'), { once: true });

@@ -25,6 +25,9 @@ const Board = {
     const ctx = { value, position, board, empty };
     RelicHooks.fire('onTileSpawn', ctx);
     board[ctx.position[0]][ctx.position[1]] = ctx.value;
+    // A kind (Magnet's gold) is applied once every hook has settled the final position.
+    const kinds = typeof GameState !== 'undefined' && GameState.board === board ? GameState.kinds : null;
+    if (ctx.kind && kinds) kinds[ctx.position[0]][ctx.position[1]] = ctx.kind;
     return ctx.position;
   },
 

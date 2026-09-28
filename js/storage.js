@@ -15,10 +15,11 @@ const Storage = {
       const raw = localStorage.getItem(this.RUN_KEY);
       if (!raw) return null;
       const run = JSON.parse(raw);
+      run.character ??= 'alchemist';
       run.hearts ??= 3;
       run.spells = (run.spells ?? [{ id:'smash', charges:2 }])
         .filter(spell => SPELLS.some(def => def.id === spell.id)).slice(0,2)
-        .map(spell => ({ id:spell.id, charges:Math.min(3,Math.max(0,spell.charges ?? 0)) }));
+        .map(spell => ({ id:spell.id, charges:Math.min((run.relics || []).some(r => (r?.id || r) === 'grimoire') ? 4 : 3,Math.max(0,spell.charges ?? 0)) }));
       run.seenEvents ??= [];
       run.bossHpMult ??= 1;
       run.relics = (run.relics || []).map(value => RELICS.find(r => r.id === (value?.id || value))).filter(Boolean);
