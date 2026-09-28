@@ -6,17 +6,18 @@ const Spells = {
   snapshot(gs) {
     return this.copy({ board:gs.board, kinds:gs.kinds, portals:gs.portals,
       bombTimers:gs.bombTimers, obstacleAge:gs.obstacleAge, iceHits:gs.room.iceHits,
-      combat:gs.room.combat, relicState:gs.room.relicState, movesLeft:gs.movesLeft,
+      combat:gs.room.combat, relicState:gs.room.relicState, size:gs.size || gs.board.length, base:gs.base || 2, movesLeft:gs.movesLeft,
       score:gs.score, mergeCount:gs.mergeCount, gold:gs.run.gold,
-      totalScore:gs.run.totalScore, lastTileVal:gs.run.lastTileVal,
+      totalScore:gs.run.totalScore, lastTileVal:gs.run.lastTileVal, lastTileRank:gs.run.lastTileRank,
       spells:gs.run.spells, rngState:Rng._state,
       singularityReady:gs.run.singularityReady, phoenixReady:gs.run._phoenixReady, wildcardMoves:gs.run._wildcardMoves || 0 });
   },
   restore(gs, value) {
     const s = this.copy(value);
     for (const key of ['board','kinds','portals','bombTimers','obstacleAge','movesLeft','score','mergeCount']) gs[key] = s[key];
+    gs.size = s.size || s.board.length; gs.base = s.base || 2;
     for (const key of ['iceHits','combat','relicState']) gs.room[key] = s[key];
-    for (const key of ['gold','totalScore','lastTileVal']) gs.run[key] = s[key];
+    for (const key of ['gold','totalScore','lastTileVal','lastTileRank']) gs.run[key] = s[key];
     gs.run.spells = s.spells;
     gs.run.singularityReady = s.singularityReady;
     gs.run._phoenixReady = s.phoenixReady;
@@ -28,7 +29,7 @@ const Spells = {
     return (value > 0 && gs.kinds[r][c] !== 'ice') || [TILE.JOKER,TILE.MULT,TILE.BOMB].includes(value);
   },
   valid(gs, id, r, c, targets = []) {
-    if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) return false;
+    if (r < 0 || r >= gs.board.length || c < 0 || c >= gs.board.length) return false;
     if (id === 'smash') return gs.board[r][c] !== 0;
     if (id === 'swap') return this.movable(gs,r,c) && !targets.some(([tr,tc]) => tr === r && tc === c);
     return false;
@@ -37,17 +38,17 @@ const Spells = {
     if (id === 'undo') return !!gs.room?.undo;
     if (id === 'joker' || id === 'catalyst') return Board.getEmpty(gs.board).length > 0;
     if (id === 'smash') return gs.board.some(row => row.some(v => v !== 0));
-    if (id === 'swap') return gs.board.flat().filter((_,i) => this.movable(gs,Math.floor(i/GRID_SIZE),i%GRID_SIZE)).length >= 2;
+    if (id === 'swap') return gs.board.flat().filter((_,i) => this.movable(gs,Math.floor(i/gs.board.length),i%gs.board.length)).length >= 2;
     return true;
   },
   rotateGrid(grid) {
-    return Array.from({length:GRID_SIZE}, (_,r) => Array.from({length:GRID_SIZE}, (_,c) => grid[GRID_SIZE-1-c][r]));
+    return Array.from({length:grid.length}, (_,r) => Array.from({length:grid.length}, (_,c) => grid[grid.length-1-c][r]));
   },
-  rotateKeys(object) {
+  rotateKeys(object, size = typeof GameState !== 'undefined' ? (GameState.size || GRID_SIZE) : GRID_SIZE) {
     const result = {};
     for (const [key,value] of Object.entries(object || {})) {
       const [r,c] = key.split(',').map(Number);
-      result[`${c},${GRID_SIZE-1-r}`] = value;
+      result[`${c},${size-1-r}`] = value;
     }
     return result;
   },
@@ -76,14 +77,14 @@ const Spells = {
       this.restore(gs,gs.room.undo); gs.room.undo = null;
     } else if (id === 'pivot') {
       gs.board = this.rotateGrid(gs.board); gs.kinds = this.rotateGrid(gs.kinds);
-      gs.room.combat.seals = this.rotateKeys(gs.room.combat.seals);
-      gs.bombTimers = this.rotateKeys(gs.bombTimers);
-      gs.obstacleAge = this.rotateKeys(gs.obstacleAge);
-      gs.room.iceHits = this.rotateKeys(gs.room.iceHits);
-      gs.portals = gs.portals.map(([r,c]) => [c,GRID_SIZE-1-r]);
+      gs.room.combat.seals = this.rotateKeys(gs.room.combat.seals,gs.board.length);
+      gs.bombTimers = this.rotateKeys(gs.bombTimers,gs.board.length);
+      gs.obstacleAge = this.rotateKeys(gs.obstacleAge,gs.board.length);
+      gs.room.iceHits = this.rotateKeys(gs.room.iceHits,gs.board.length);
+      gs.portals = gs.portals.map(([r,c]) => [c,gs.board.length-1-r]);
       if (gs.room.combat.voidCell) {
         const [r,c] = gs.room.combat.voidCell;
-        gs.room.combat.voidCell = [c,GRID_SIZE-1-r];
+        gs.room.combat.voidCell = [c,gs.board.length-1-r];
       }
     } else if (id === 'joker' || id === 'catalyst') {
       const empty = Board.getEmpty(gs.board);

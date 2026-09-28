@@ -17,7 +17,8 @@ Each **run** spans 3 floors. Each floor has a branching node map with battles, e
 ## Features
 
 - **Roguelike runs** – 3 floors of connected nodes with branching paths
-- **38 relics** – 7 common, 10 rare, 9 epic, 6 legendary, 6 curses. Eight build families increase the weight of related offers by 30%
+- **40 relics** – 7 common, 10 rare, 9 epic, 8 legendary, 6 curses. Eight build families increase the weight of related offers by 30%
+- **Rule relics** – Expanse gives battle rooms a 5×5 board and four more moves; Trinity changes tiles to 3, 6, 12... while enemies gain 40% HP. Both start with the next battle room. Tile rank counts upward from 2 or 3 as rank 1, so existing relic thresholds follow either series.
 - **Hook-based relic system** – adding a relic is a single entry in `constants.js`, no other files to touch
 - **Meta-progression** – spend gold on permanent upgrades in the Forge of Fate
 - **Ascension system** – 3 prestige tiers that reset upgrades and unlock new passives
@@ -51,7 +52,7 @@ haptics → i18n → icons → rng → constants → storage → state → board
 | `constants.js` | Game data: relics, upgrades, enemies, hook runner |
 | `storage.js` | localStorage persistence for meta progression and active runs |
 | `state.js` | Runtime game state singleton |
-| `board.js` | 4×4 grid logic: slide, merge, obstacles, bombs |
+| `board.js` | Dynamic 4×4 or 5×5 grid logic, ranked tile values, obstacles and bombs |
 | `combat.js` | Pure combat rules: HP, intents, phases, seals and hearts |
 | `spells.js` | Pure spell effects, one-move undo, charges and rotation |
 | `fx.js` | Canvas particles and DOM feedback |
@@ -60,10 +61,10 @@ haptics → i18n → icons → rng → constants → storage → state → board
 | `controller.js` | Game flow: runs, rooms, moves, relics, ascension |
 | `input.js` | Touch, keyboard, button bindings, boot |
 
-Run `npm test` for board and combat checks. Run `npm run balance` for the 300-seed-per-enemy greedy bot report.
+Run `npm test` for board and combat checks. Run `npm run balance` for the 300-seed-per-enemy greedy bot report. Use `npm run balance -- --relic expanse` or `--relic trinity` for informative relic reports.
 
 ## License
 
 MIT
 
-The board keeps numeric tile values and a parallel `kinds` grid for gold and ice. `Board.applyMove(board, dir, { kinds, iceHits })` moves both and returns merge payouts and a shared movement map for bomb timers. Active battles save kinds, portal cells and ice cracks; older saves resume with empty defaults.
+The board keeps numeric tile values and a parallel `kinds` grid for gold and ice. `Board.applyMove(board, dir, { kinds, iceHits })` moves both and returns merge payouts and a shared movement map for bomb timers. Active battles save room size, number base, kinds, portal cells and ice cracks; older saves resume at 4×4/base 2 with empty defaults.

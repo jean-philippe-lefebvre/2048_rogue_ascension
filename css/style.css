@@ -369,7 +369,7 @@ body {
 
 #gameGrid {
   display: grid;
-  grid-template-columns: repeat(4,1fr);
+  grid-template-columns: repeat(var(--n),1fr);
   gap: var(--gap);
   position: relative;
   touch-action: none; user-select: none;

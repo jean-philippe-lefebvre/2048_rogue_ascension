@@ -1,5 +1,8 @@
 'use strict';
 
+GameState.size ??= GRID_SIZE;
+GameState.base ??= 2;
+
 const Controller = {
   clockNow: () => performance.now(),
   _clockTimer: null,
@@ -75,7 +78,7 @@ const Controller = {
 
   breakHazards(fight, board, merges, bombTimers) {
     const broken=Combat.breakHazards(fight,board,merges,bombTimers);
-    if (GameState.run.character === 'artificer') for (const merge of merges) if (merge.val >= 8)
+    if (GameState.run.character === 'artificer') for (const merge of merges) if (Board.rank(merge.val) >= 3)
       for (const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
         const r=merge.r+dr,c=merge.c+dc;
         if (board[r]?.[c] === TILE.BOMB) { board[r][c]=0; delete bombTimers[`${r},${c}`]; broken.push({r,c,kind:'bomb'}); }
@@ -102,6 +105,8 @@ const Controller = {
     Rng.seed(seed[0]);
     GameState._shopReturnToMap = false;
     GameState.room = null;
+    GameState.size = GRID_SIZE;
+    GameState.base = 2;
     GameState.kinds = Board.emptyKinds();
     GameState.portals = [];
     GameState.roomFinished = false;
@@ -186,6 +191,8 @@ const Controller = {
         GameState.room = { floorIdx:saved.floorIdx, rowIdx:saved.rowIdx, nodeIdx:saved.nodeIdx,
           data, enemyDef, combat:saved.combat, relicState:saved.relicState || {}, iceHits:saved.iceHits || {}, undo:saved.undo || null };
         GameState.board = saved.board;
+        GameState.size = saved.size || saved.board.length || GRID_SIZE;
+        GameState.base = saved.base || 2;
         GameState.kinds = saved.kinds || Board.emptyKinds();
         GameState.portals = saved.portals || [];
         GameState.obstacleAge = saved.obstacleAge || {};
@@ -359,6 +366,8 @@ const Controller = {
   _startBattleRoom(type, floorIdx) {
     const run = GameState.run;
     const m   = GameState.meta;
+    GameState.size = run.relics.some(r => r.id === 'expanse') ? 5 : GRID_SIZE;
+    GameState.base = run.relics.some(r => r.id === 'trinity') ? 3 : 2;
     GameState.spellTarget = null;
     GameState.stuck = false;
 
@@ -403,7 +412,7 @@ const Controller = {
 
     // Meta: start tile upgrade
     const stLvl = m.upgrades.startTile || 0;
-    if (stLvl > 0) Board.placeValue(GameState.board, [4, 8, 16][stLvl - 1]);
+    if (stLvl > 0) Board.placeValue(GameState.board, GameState.base * 2 ** stLvl);
 
     // Relic hooks modify board at room start (crystal, mirror, germination, curses, etc.)
     RelicHooks.fire('onRoomStart', { board: GameState.board, type, floorIdx, run });
@@ -698,7 +707,7 @@ const Controller = {
   },
 
   _firstSpellCell(id, targets) {
-    for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++)
+    for (let r = 0; r < GameState.size; r++) for (let c = 0; c < GameState.size; c++)
       if (Spells.valid(GameState,id,r,c,targets)) return [r,c];
     return null;
   },
@@ -726,8 +735,8 @@ const Controller = {
     const target = GameState.spellTarget;
     if (!target?.cursor) return false;
     const [dr,dc] = {left:[0,-1],right:[0,1],up:[-1,0],down:[1,0]}[dir] || [0,0];
-    target.cursor = [Math.max(0,Math.min(GRID_SIZE-1,target.cursor[0]+dr)),
-      Math.max(0,Math.min(GRID_SIZE-1,target.cursor[1]+dc))];
+    target.cursor = [Math.max(0,Math.min(GameState.size-1,target.cursor[0]+dr)),
+      Math.max(0,Math.min(GameState.size-1,target.cursor[1]+dc))];
     Renderer.renderSpells();
     return true;
   },
@@ -797,7 +806,11 @@ const Controller = {
     gs.score += result.score;
     gs.mergeCount += result.merges.length;
     gs.run.totalScore += result.score;
-    if (result.merges.length) gs.run.lastTileVal = result.merges[result.merges.length - 1].val;
+    if (result.merges.length) {
+      gs.run.lastTileVal = result.merges[result.merges.length - 1].val;
+      // Mirror copies by rank, so the tile still fits if Trinity changes the base.
+      gs.run.lastTileRank = Math.round(Board.rank(gs.run.lastTileVal));
+    }
 
     const moveCtx = { result, board: gs.board, movesLeft: gs.movesLeft, addMove: 0, freeMove: false };
     RelicHooks.fire('onAfterMove', moveCtx);
@@ -812,7 +825,7 @@ const Controller = {
     }
 
     const goldFromTiles = result.merges.reduce((sum, merge) => {
-      if (merge.gold) merge.gold = Math.max(1, Math.floor(merge.val / 8));
+      if (merge.gold) merge.gold = Math.max(1, Math.floor(merge.val / (4 * (gs.base || 2))));
       return sum + merge.gold;
     }, 0);
     const goldCtx = { gold: Math.floor(result.score / 100) + goldFromTiles, merges: result.merges,
@@ -821,9 +834,9 @@ const Controller = {
     goldCtx.gold += (gs.meta.upgrades.goldBonus || 0) * 2 * (result.merges.length > 0 ? 1 : 0);
     gs.run.gold += goldCtx.gold;
 
-    if (gs.run.singularityReady && result.merges.some(m => m.val >= 128)) {
+    if (gs.run.singularityReady && result.merges.some(m => Board.rank(m.val) >= 7)) {
       gs.run.singularityReady = false;
-      for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++)
+      for (let r = 0; r < gs.size; r++) for (let c = 0; c < gs.size; c++)
         if (gs.board[r][c] > 0) gs.board[r][c] *= 2;
     }
 
@@ -864,13 +877,13 @@ const Controller = {
     const transCtx = { board: gs.board, obstacleAge: gs.obstacleAge, active:false };
     RelicHooks.fire('onTransmute', transCtx);
     if (transCtx.active) {
-      for (let r=0;r<GRID_SIZE;r++) for (let c=0;c<GRID_SIZE;c++)
+      for (let r=0;r<gs.size;r++) for (let c=0;c<gs.size;c++)
         if (gs.board[r][c] === TILE.OBSTACLE && !(`${r},${c}` in fight.seals))
           gs.obstacleAge[`${r},${c}`] ??= 0;
       for (const key of Object.keys(gs.obstacleAge)) {
         if (++gs.obstacleAge[key] >= 3) {
           const [r,c] = key.split(',').map(Number);
-          if (gs.board[r][c] === TILE.OBSTACLE) gs.board[r][c] = 4;
+          if (gs.board[r][c] === TILE.OBSTACLE) gs.board[r][c] = gs.base * 2;
           delete gs.obstacleAge[key];
         }
       }

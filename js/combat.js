@@ -27,11 +27,11 @@ const Combat = {
   intent(fight) { return fight.pattern[fight.patternIndex % fight.pattern.length]; },
   direction(fight, input) { return fight.invertTurns > 0 ? this.opposite[input] : input; },
   isLocked(fight, input) { return fight.lockTurns > 0 && fight.locked === input; },
-  hasLegalMove(fight, board, kinds = Board.emptyKinds()) {
+  hasLegalMove(fight, board, kinds = Board.emptyKinds(board.length)) {
     for (const input of this.directions) {
       if (this.isLocked(fight, input)) continue;
       const dir = this.direction(fight, input);
-      for (let i = 0; i < GRID_SIZE; i++) {
+      for (let i = 0; i < board.length; i++) {
         const row = dir === 'left' ? board[i] : dir === 'right' ? [...board[i]].reverse()
           : dir === 'up' ? board.map(r => r[i]) : board.map(r => r[i]).reverse();
         const tags = dir === 'left' ? kinds[i] : dir === 'right' ? [...kinds[i]].reverse()
@@ -80,7 +80,7 @@ const Combat = {
   breakHazards(fight, board, merges, bombTimers) {
     const broken = [];
     for (const merge of merges) {
-      if (merge.val < 16) continue;
+      if (Board.rank(merge.val) < 4) continue;
       for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
         const r = merge.r + dr, c = merge.c + dc, key = `${r},${c}`;
         if (key in fight.seals && board[r]?.[c] === TILE.OBSTACLE) {
@@ -112,7 +112,7 @@ const Combat = {
     }
     return false;
   },
-  resolve(fight, board, bombTimers, floor, kinds = Board.emptyKinds(), portals = [], iceHits = {}, obstacleAge = {}) {
+  resolve(fight, board, bombTimers, floor, kinds = Board.emptyKinds(board.length), portals = [], iceHits = {}, obstacleAge = {}) {
     if (fight.intentIn > 0 || fight.hp <= 0) return null;
     const intent = this.intent(fight);
     const effect = { intent, cells:[], strike:0 };
@@ -131,16 +131,16 @@ const Combat = {
       }
     } else if (intent === 'freeze') {
       const numbered = [];
-      for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++)
+      for (let r = 0; r < board.length; r++) for (let c = 0; c < board.length; c++)
         if (board[r][c] > 0 && kinds[r][c] !== 'ice') numbered.push([r,c]);
-      const strong = numbered.filter(([r,c]) => board[r][c] >= 8);
+      const strong = numbered.filter(([r,c]) => Board.rank(board[r][c]) >= 3);
       const pool = strong.length ? strong : numbered;
       if (pool.length) { const [r,c] = pool[Rng.int(pool.length)]; kinds[r][c] = 'ice'; effect.cells.push([r,c]); }
     } else if (intent === 'gnaw') {
       let best = 0, at = null;
-      for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++)
+      for (let r = 0; r < board.length; r++) for (let c = 0; c < board.length; c++)
         if (board[r][c] > best) { best = board[r][c]; at = [r,c]; }
-      if (at) { board[at[0]][at[1]] = Math.max(2, best / 2); effect.cells.push(at); }
+      if (at) { board[at[0]][at[1]] = Math.max(Board.base(), best / 2); effect.cells.push(at); }
     } else if (intent === 'strike') {
       effect.strike = floor === 2 ? 3 : 2;
     } else if (intent === 'lock') {
@@ -153,8 +153,8 @@ const Combat = {
       fight.block = Math.floor(fight.maxHp * 0.08);
     } else if (intent === 'devour') {
       // The Glutton eats up to two smallest tiles (reading order, not frozen): it takes away merge material.
-      for (let r=0;r<GRID_SIZE;r++) for (let c=0;c<GRID_SIZE;c++)
-        if (effect.cells.length < 2 && board[r][c] === 2 && kinds[r][c] !== 'ice') { board[r][c]=0; kinds[r][c]=null; effect.cells.push([r,c]); }
+      for (let r=0;r<board.length;r++) for (let c=0;c<board.length;c++)
+        if (effect.cells.length < 2 && Board.rank(board[r][c]) === 1 && kinds[r][c] !== 'ice') { board[r][c]=0; kinds[r][c]=null; effect.cells.push([r,c]); }
     } else if (intent === 'flip' || intent === 'flipv') {
       fight.voidCell = Board.flip(board,kinds,fight.seals,bombTimers,iceHits,portals,
         intent === 'flip' ? 'horizontal' : 'vertical',obstacleAge,fight.voidCell);

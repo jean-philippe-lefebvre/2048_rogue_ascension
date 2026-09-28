@@ -128,7 +128,7 @@ function bindButtons() {
   });
   document.getElementById('gameGrid').addEventListener('click', e => {
     const cell = e.target.closest('.gcell');
-    if (cell && GameState.spellTarget) Controller.targetSpell(Math.floor([...cell.parentNode.children].indexOf(cell)/GRID_SIZE),[...cell.parentNode.children].indexOf(cell)%GRID_SIZE);
+    if (cell && GameState.spellTarget) Controller.targetSpell(Math.floor([...cell.parentNode.children].indexOf(cell)/GameState.size),[...cell.parentNode.children].indexOf(cell)%GameState.size);
   });
   document.getElementById('btnLeaveShop').addEventListener('click', () => Controller.leaveShop());
   document.getElementById('btnEventContinue').addEventListener('click', () => Controller.continueEvent());

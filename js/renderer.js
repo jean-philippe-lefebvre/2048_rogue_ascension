@@ -17,6 +17,7 @@ function showScreen(id) {
 }
 
 const Renderer = {
+  tileClass(value) { return `t${Math.min(2 ** Board.rank(value), 2048)}`; },
   familyChips(relic) {
     return (relic.tags || []).map(tag => `<span class="family-chip">${I18n.t('family.'+tag)}</span>`).join('');
   },
@@ -42,15 +43,16 @@ const Renderer = {
     Fx.clear();
     const grid = document.getElementById('gameGrid');
     grid.innerHTML = '';
-    for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+    grid.style.setProperty('--n',GameState.size || GRID_SIZE);
+    for (let i = 0; i < GameState.size * GameState.size; i++) {
       const cell = document.createElement('div');
       cell.className = 'gcell';
-      if (GameState.portals?.some(([r,c]) => r * GRID_SIZE + c === i)) {
+      if (GameState.portals?.some(([r,c]) => r * GameState.size + c === i)) {
         cell.classList.add('is-portal');
         cell.setAttribute('aria-label', I18n.t('tile.portal'));
       }
-      if (GameState.room?.combat?.voidCell?.[0] === Math.floor(i/GRID_SIZE)
-        && GameState.room.combat.voidCell[1] === i%GRID_SIZE) cell.classList.add('is-void');
+      if (GameState.room?.combat?.voidCell?.[0] === Math.floor(i/GameState.size)
+        && GameState.room.combat.voidCell[1] === i%GameState.size) cell.classList.add('is-void');
       grid.appendChild(cell);
     }
     Fx.resize();
@@ -71,7 +73,7 @@ const Renderer = {
     const cellSize = cellRect.width;
     const originX = cellRect.left - gridRect.left;
     const originY = cellRect.top - gridRect.top;
-    const gap = GRID_SIZE > 1 ? (grid.querySelector('.gcell:nth-child(2)').getBoundingClientRect().left - cellRect.right) : GRID_GAP;
+    const gap = GameState.size > 1 ? (grid.querySelector('.gcell:nth-child(2)').getBoundingClientRect().left - cellRect.right) : GRID_GAP;
     this._geoCache = {
       cellSize,
       left: (c) => originX + c * (cellSize + gap),
@@ -143,7 +145,7 @@ const Renderer = {
         }
         else if (val === TILE.JOKER) { cls += 't-joker'; label = '★'; }
         else if (val === TILE.MULT) { cls += 't-mult'; label = '×2'; }
-        else { cls += `t${Math.min(val, 2048)}`; }
+        else { cls += this.tileClass(val); }
 
         if (kind === 'gold') cls += ' is-gold';
         if (kind === 'ice') cls += ' is-ice' + (GameState.room?.iceHits?.[key] ? ' is-cracked' : '');
@@ -153,18 +155,20 @@ const Renderer = {
         if (newPositions.has(key))    cls += ' is-new';
         if (mergedPositions.has(key)) cls += ' is-merged';
 
-        const fs = val >= 1024 ? cellSize * 0.28
-                 : val >= 128  ? cellSize * 0.34
-                 :               cellSize * 0.42;
+        const rank = Board.rank(val);
+        const scale = GameState.size === 5 ? 0.82 : 1;
+        const fs = (rank >= 10 ? cellSize * 0.28
+                 : rank >= 7  ? cellSize * 0.34
+                 :              cellSize * 0.42) * scale;
 
         // Find source position: search in opposite direction of move
         let srcR = r, srcC = c;
         if (srcBoard && searchOffset && !newPositions.has(key) && val !== TILE.OBSTACLE) {
           const [dr, dc] = searchOffset;
-          for (let step = 0; step < GRID_SIZE; step++) {
+          for (let step = 0; step < GameState.size; step++) {
             const sr = r + dr * step;
             const sc = c + dc * step;
-            if (sr < 0 || sr >= GRID_SIZE || sc < 0 || sc >= GRID_SIZE) break;
+            if (sr < 0 || sr >= GameState.size || sc < 0 || sc >= GameState.size) break;
             if (srcBoard[sr][sc] === TILE.OBSTACLE) break;
             if (srcBoard[sr][sc] !== 0) {
               srcR = sr;
@@ -192,7 +196,7 @@ const Renderer = {
         // transition:none prevents the reused pool tile from animating the initial offset
         tile.style.cssText = `width:${cellSize}px;height:${cellSize}px;left:${finalLeft}px;top:${finalTop}px;font-size:${fs}px;transition:none;`
           + (dx || dy ? `transform:translate(${dx}px,${dy}px);` : '');
-        tile.style.setProperty('--glow', val >= 64 ? `${Math.min(22, Math.log2(val) * 2)}px` : '0px');
+        tile.style.setProperty('--glow', rank >= 6 ? `${Math.min(22, rank * 2)}px` : '0px');
       });
     });
 
@@ -270,7 +274,7 @@ const Renderer = {
       hint.appendChild(accept);
     }
     document.querySelectorAll('#gameGrid .gcell').forEach((cell,i) => {
-      const r = Math.floor(i/GRID_SIZE), c = i%GRID_SIZE;
+      const r = Math.floor(i/GameState.size), c = i%GameState.size;
       cell.classList.toggle('spell-valid',!!target && Spells.valid(GameState,GameState.run.spells[target.slot].id,r,c,target.targets));
       cell.classList.toggle('spell-cursor',!!target && target.cursor?.[0] === r && target.cursor?.[1] === c);
       if (target) cell.setAttribute('aria-label',I18n.t('spell.cell',{r:r+1,c:c+1}));
@@ -281,10 +285,10 @@ const Renderer = {
 
   renderPortals() {
     document.querySelectorAll('#gameGrid .gcell').forEach((cell,i) => {
-      const active = GameState.portals?.some(([r,c]) => r * GRID_SIZE + c === i);
+      const active = GameState.portals?.some(([r,c]) => r * GameState.size + c === i);
       cell.classList.toggle('is-portal',!!active);
-      cell.classList.toggle('is-void',GameState.room?.combat?.voidCell?.[0] === Math.floor(i/GRID_SIZE)
-        && GameState.room.combat.voidCell[1] === i%GRID_SIZE);
+      cell.classList.toggle('is-void',GameState.room?.combat?.voidCell?.[0] === Math.floor(i/GameState.size)
+        && GameState.room.combat.voidCell[1] === i%GameState.size);
       if (active) cell.setAttribute('aria-label',I18n.t('tile.portal'));
       else cell.removeAttribute('aria-label');
     });
@@ -411,7 +415,7 @@ const Renderer = {
     const geo = this.getTileGeometry();
     if (!geo) return;
     const tile = document.createElement('div');
-    tile.className = `tile t${Math.min(value,2048)} is-void-consumed`;
+    tile.className = `tile ${this.tileClass(value)} is-void-consumed`;
     tile.style.cssText = `left:${geo.left(c)}px;top:${geo.top(r)}px;width:${geo.cellSize}px;height:${geo.cellSize}px;z-index:24;pointer-events:none`;
     tile.innerHTML = `<div class="tile-face">${value}</div>`;
     document.querySelector('.grid-wrap').appendChild(tile);

@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Feature** (new mechanic, new relics, UI change) → bump minor: `v1.0.0` → `v1.1.0`
 - **Major** (user-requested big upgrade) → bump major: `v1.0.0` → `v2.0.0`
 
-Current version: **v2.4.0** (`index.html` title screen, bottom)
+Current version: **v2.5.0** (`index.html` title screen, bottom)
 
 ## Development
 
@@ -39,7 +39,7 @@ Each file exposes a global singleton object. Dependencies flow left-to-right.
 | `i18n.js` | French and English translations |
 | `icons.js` | Hand-authored "Gravure fine" SVG icon set (24px grid, 1.5px round stroke, soft fills); icons are ids, never emojis |
 | `rng.js` | Seeded mulberry32 random stream for game decisions |
-| `constants.js` | Game data: room types, enemies, **RelicHooks system**, relic definitions (38 relics), meta-upgrades, ascension costs, rarity weights |
+| `constants.js` | Game data: room types, enemies, **RelicHooks system**, relic definitions (40 relics), meta-upgrades, ascension costs, rarity weights |
 | `storage.js` | localStorage wrapper (keys: `2048rogue_v2`, `2048rogue_run_v2`). Persists meta-progression, sound, active run and hearts |
 | `state.js` | `GameState` singleton – holds meta, run, room, board, score, moves |
 | `board.js` | Pure line merge model, kinds and bomb move map, ice thaw, portals, tile placement. Fires `onTileSpawn` in `addRandom()` |
@@ -76,8 +76,8 @@ Per-room state for 1x/room relics: `GameState.room.relicState = {}`
 - **Meta-progression**: permanent gold + upgrades + **ascension system** (3 tiers, resets upgrades, unlocks new passifs). Persisted in localStorage
 - **Run**: 3 floors (étages). Each floor has a **Slay-the-Spire-style node map**: 5 rows of 3 connected nodes + 1 boss. Nodes have connections to 1-2 nodes in the next row. Each floor has a seeded `bossId`, persisted on its boss node because JSON arrays do not serialize custom properties. The map shows its emblem and name. Older runs default to jailer, smith, eye. Only the current floor is shown
 - **Room types**: normal/elite/boss (HP combat with telegraphed enemy intents), rest (relic, healing or spell recharge), shop (run gold purchases), mystery (eight choice events)
-- **Relics**: 38 total (7 common, 10 rare, 9 epic, 6 legendary, 6 curses). Rarity-weighted drops that scale by floor. Curses enter through mystery events and can be removed by the merchant
-- **Board**: 4×4 numeric grid with negative values for obstacles (`-1`), bombs (`-2`), ×2 (`-3`) and jokers (`-4`). `GameState.kinds` is a parallel grid of `null | gold | ice` for numbered tiles. `GameState.portals` stores a cell pair in floor III battle rooms; `room.iceHits` tracks cracks. All three are saved with battle snapshots. Bombs halve adjacent numbered tiles without removing their kind, and destroy adjacent jokers and ×2 tiles. Adjacent merges ≥16 defuse bombs and temporary seals.
+- **Relics**: 40 total (7 common, 10 rare, 9 epic, 8 legendary, 6 curses). Rarity-weighted drops that scale by floor. Expanse makes the next battle board 5×5 with 4 more moves; Trinity uses the 3, 6, 12... tile series and raises enemy HP by 40%. Curses enter through mystery events and can be removed by the merchant
+- **Board**: 4×4 by default, 5×5 with Expanse. `GameState.size` and `GameState.base` belong to the room and are saved with battles and Undo. All numbered tiles follow `base × 2^k`; `Board.rank(value)` maps either series to shared thresholds and colours. Negative values represent obstacles (`-1`), bombs (`-2`), ×2 (`-3`) and jokers (`-4`). `GameState.kinds` is a parallel grid of `null | gold | ice` for numbered tiles. `GameState.portals` stores a cell pair in floor III battle rooms; `room.iceHits` tracks cracks. Bombs halve adjacent numbered tiles without removing their kind, and destroy adjacent jokers and ×2 tiles. Adjacent rank 4+ merges defuse bombs and temporary seals.
 - **Spells**: two slots, three charges maximum, starting Smash at two charges. Three merges on a consumed move recharge the first non-full spell. Undo restores the last consumed move of the current room. A stuck battle remains open while Smash, Swap or Undo can rescue it; at zero moves only Undo can rescue. Keyboard targeting uses directional keys, Enter or Space, and Escape.
 - **Merchant and events**: one merchant on row 2 or 3 of every floor; offers and active choices survive reload. Event risks are shown before selection. Run gold remaining at the end is banked.
 - **Difficulty scaling**: enemy HP, moves, obstacles and intent cadence vary by floor. Each floor draws from three bosses. Glutton devours, Necromancer revives once, Colossus applies gravity, Clockmaker drains moves over time, Mirror flips the board, and Star Eater moves a tile-eating void. Failed rooms cost one of three hearts; bosses restart on a surviving failure.

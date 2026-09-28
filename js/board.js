@@ -1,13 +1,15 @@
 'use strict';
 
 const Board = {
-  empty() { return Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0)); },
+  base() { return typeof GameState !== 'undefined' ? (GameState.base || 2) : 2; },
+  rank(value, base = this.base()) { return value > 0 ? Math.log2(value / base) + 1 : 0; },
+  empty(size = typeof GameState !== 'undefined' ? (GameState.size || GRID_SIZE) : GRID_SIZE) { return Array.from({ length:size }, () => Array(size).fill(0)); },
 
   getEmpty(board, excluded = null) {
     excluded ??= typeof GameState !== 'undefined' && GameState.board === board ? GameState.room?.combat?.voidCell : null;
     const cells = [];
-    for (let r = 0; r < GRID_SIZE; r++)
-      for (let c = 0; c < GRID_SIZE; c++)
+    for (let r = 0; r < board.length; r++)
+      for (let c = 0; c < board.length; c++)
         if (board[r][c] === 0 && !(excluded && excluded[0] === r && excluded[1] === c)) cells.push([r, c]);
     return cells;
   },
@@ -19,9 +21,9 @@ const Board = {
     const position = empty[Rng.int(empty.length)];
     let value;
     if (forgedEntropyLvl >= 1) {
-      value = [4, 8, 16][forgedEntropyLvl - 1];
+      value = this.base() * 2 ** (forgedEntropyLvl + 1);
     } else {
-      value = (useEntropy || Rng.next() < 0.1) ? 4 : 2;
+      value = (useEntropy || Rng.next() < 0.1) ? this.base() * 2 : this.base();
     }
     // Let relics modify tile value and position
     const ctx = { value, position, board, empty };
@@ -43,19 +45,19 @@ const Board = {
 
   doubleMax(board) {
     let max = 0, mr = -1, mc = -1;
-    for (let r = 0; r < GRID_SIZE; r++)
-      for (let c = 0; c < GRID_SIZE; c++)
+    for (let r = 0; r < board.length; r++)
+      for (let c = 0; c < board.length; c++)
         if (board[r][c] > max) { max = board[r][c]; mr = r; mc = c; }
     if (mr >= 0) board[mr][mc] = max * 2;
   },
 
-  emptyKinds() { return Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null)); },
+  emptyKinds(size = typeof GameState !== 'undefined' ? (GameState.size || GRID_SIZE) : GRID_SIZE) { return Array.from({ length:size }, () => Array(size).fill(null)); },
 
   gravity(board, kinds, timers = {}) {
     const moves = [], nextTimers = {};
-    for (let c = 0; c < GRID_SIZE; c++) {
-      let bottom = GRID_SIZE - 1;
-      for (let r = GRID_SIZE - 1; r >= 0; r--) {
+    for (let c = 0; c < board.length; c++) {
+      let bottom = board.length - 1;
+      for (let r = board.length - 1; r >= 0; r--) {
         const value = board[r][c], kind = kinds[r][c];
         if (value === TILE.OBSTACLE || kind === 'ice') { bottom = r - 1; continue; }
         if (!value) continue;
@@ -74,10 +76,11 @@ const Board = {
   },
 
   flip(board, kinds, seals, timers, iceHits, portals, axis = 'horizontal', obstacleAge = {}, voidCell = null) {
-    const point = ([r,c]) => axis === 'horizontal' ? [r,GRID_SIZE-1-c] : [GRID_SIZE-1-r,c];
+    const size = board.length;
+    const point = ([r,c]) => axis === 'horizontal' ? [r,size-1-c] : [size-1-r,c];
     for (const grid of [board,kinds]) {
       const source = grid.map(row => [...row]);
-      for (let r=0;r<GRID_SIZE;r++) for (let c=0;c<GRID_SIZE;c++) { const [sr,sc] = point([r,c]); grid[r][c] = source[sr][sc]; }
+      for (let r=0;r<size;r++) for (let c=0;c<size;c++) { const [sr,sc] = point([r,c]); grid[r][c] = source[sr][sc]; }
     }
     for (const object of [seals,timers,iceHits,obstacleAge]) {
       const entries = Object.entries(object || {});
@@ -103,14 +106,14 @@ const Board = {
         const joker = (a === TILE.JOKER && (b > 0 || b === TILE.JOKER)) || (b === TILE.JOKER && a > 0);
         const mult = (a === TILE.MULT && b > 0) || (b === TILE.MULT && a > 0);
         if (last && !last.merged && (normal || joker || mult)) {
-          let value = normal ? a * 2 : a === TILE.JOKER && b === TILE.JOKER ? 4 : 2 * Math.max(a, b);
+          let value = normal ? a * 2 : a === TILE.JOKER && b === TILE.JOKER ? 2 * this.base() : 2 * Math.max(a, b);
           if (deepForgeChance > 0 && Rng.next() < deepForgeChance) value *= 2;
           last.value = value;
           last.kind = last.kind === 'gold' || entry.kind === 'gold' ? 'gold' : null;
           last.merged = true;
           last.origins.push(...entry.origins);
           score += value;
-          const payout = last.kind === 'gold' ? Math.max(1, Math.floor(value / 8)) : 0;
+          const payout = last.kind === 'gold' ? Math.max(1, Math.floor(value / (4 * this.base()))) : 0;
           gold += payout;
           merges.push({ index:output.length + placed.length - 1, val:value, gold:payout, normal });
         } else placed.push({ ...entry, origins:[...entry.origins], merged:false });
@@ -123,7 +126,7 @@ const Board = {
       }
     };
     let segment = [];
-    for (let i = 0; i < GRID_SIZE; i++) {
+    for (let i = 0; i < values.length; i++) {
       const value = values[i], kind = kinds[i];
       if (value === TILE.OBSTACLE || kind === 'ice') {
         flush(segment); segment = [];
@@ -135,7 +138,7 @@ const Board = {
     return { output, merges, moveMap, score, gold };
   },
 
-  slideRow(row, deepForgeChance = 0, kinds = Array(GRID_SIZE).fill(null)) {
+  slideRow(row, deepForgeChance = 0, kinds = Array(row.length).fill(null)) {
     const sources = row.map((_, i) => i);
     const line = this._moveLine(row, kinds, sources, deepForgeChance);
     return { row:line.output.map(e => e.value), kinds:line.output.map(e => e.kind),
@@ -146,18 +149,19 @@ const Board = {
   // including both contributors to a merge, so auxiliary state can follow it.
   applyMove(board, dir, mods = {}) {
     const { useEntropy = false, forgedEntropyLvl = 0, deepForgeChance = 0 } = mods;
-    const kinds = mods.kinds || this.emptyKinds();
+    const size = board.length;
+    const kinds = mods.kinds || this.emptyKinds(size);
     const iceHits = mods.iceHits || {};
     const sourceBoard = board.map(row => [...row]);
     const sourceKinds = kinds.map(row => [...row]);
     const coordinate = (line, index) => ({
-      r: dir === 'up' ? index : dir === 'down' ? GRID_SIZE - 1 - index : line,
-      c: dir === 'left' ? index : dir === 'right' ? GRID_SIZE - 1 - index : line,
+      r: dir === 'up' ? index : dir === 'down' ? size - 1 - index : line,
+      c: dir === 'left' ? index : dir === 'right' ? size - 1 - index : line,
     });
     let score = 0, gold = 0;
     const merges = [], moveMap = [], bombMoves = [];
-    for (let lineIndex = 0; lineIndex < GRID_SIZE; lineIndex++) {
-      const positions = Array.from({ length:GRID_SIZE }, (_, i) => coordinate(lineIndex, i));
+    for (let lineIndex = 0; lineIndex < size; lineIndex++) {
+      const positions = Array.from({ length:size }, (_, i) => coordinate(lineIndex, i));
       const values = positions.map(({r,c}) => sourceBoard[r][c]);
       const tags = positions.map(({r,c}) => sourceKinds[r][c]);
       const line = this._moveLine(values, tags, positions, deepForgeChance);
@@ -172,13 +176,13 @@ const Board = {
         if (sourceBoard[from.r][from.c] === TILE.BOMB) bombMoves.push({ from,to });
       });
     }
-    const nextKinds = this.emptyKinds();
+    const nextKinds = this.emptyKinds(size);
     for (const {from,to} of moveMap) {
       const kind = sourceKinds[from.r][from.c];
       if (kind === 'gold' || (kind === 'ice' && nextKinds[to.r][to.c] !== 'gold'))
         nextKinds[to.r][to.c] = kind;
     }
-    for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++)
+    for (let r = 0; r < size; r++) for (let c = 0; c < size; c++)
       kinds[r][c] = nextKinds[r][c];
     const moved = board.some((row,r) => row.some((value,c) => value !== sourceBoard[r][c] || kinds[r][c] !== sourceKinds[r][c]));
     if (!moved) return null;
@@ -195,14 +199,15 @@ const Board = {
     return { score, gold, merges, newTilePos, moveMap, bombMoves, cracked, thawed };
   },
 
-  canMove(board, kinds = this.emptyKinds()) {
+  canMove(board, kinds = this.emptyKinds(board.length)) {
+    const size = board.length;
     for (const dir of ['left','right','up','down']) {
       const coordinate = (line, index) => ({
-        r: dir === 'up' ? index : dir === 'down' ? GRID_SIZE - 1 - index : line,
-        c: dir === 'left' ? index : dir === 'right' ? GRID_SIZE - 1 - index : line,
+        r: dir === 'up' ? index : dir === 'down' ? size - 1 - index : line,
+        c: dir === 'left' ? index : dir === 'right' ? size - 1 - index : line,
       });
-      for (let line = 0; line < GRID_SIZE; line++) {
-        const cells = Array.from({length:GRID_SIZE}, (_,i) => coordinate(line,i));
+      for (let line = 0; line < size; line++) {
+        const cells = Array.from({length:size}, (_,i) => coordinate(line,i));
         const values = cells.map(({r,c}) => board[r][c]);
         const tags = cells.map(({r,c}) => kinds[r][c]);
         const next = this.slideRow(values, 0, tags);
@@ -241,8 +246,8 @@ const Board = {
 
   // Bomb timer system
   _initBombTimers(board, timers) {
-    for (let r = 0; r < GRID_SIZE; r++)
-      for (let c = 0; c < GRID_SIZE; c++)
+    for (let r = 0; r < board.length; r++)
+      for (let c = 0; c < board.length; c++)
         if (board[r][c] === TILE.BOMB) {
           timers[`${r},${c}`] = 10 + Rng.int(11); // 10-20 moves
         }
@@ -259,7 +264,7 @@ const Board = {
   },
 
   // Tick bombs after movement and defuses; return the number that exploded.
-  tickBombs(board, timers, kinds = this.emptyKinds()) {
+  tickBombs(board, timers, kinds = this.emptyKinds(board.length)) {
     const exploded = [];
     for (const key of Object.keys(timers)) {
       const [r, c] = key.split(',').map(Number);
@@ -277,8 +282,8 @@ const Board = {
       const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
       for (const [dr, dc] of dirs) {
         const nr = br + dr, nc = bc + dc;
-        if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) continue;
-        if (board[nr][nc] > 0) board[nr][nc] = Math.max(2, board[nr][nc] / 2);
+        if (nr < 0 || nr >= board.length || nc < 0 || nc >= board.length) continue;
+        if (board[nr][nc] > 0) board[nr][nc] = Math.max(this.base(), board[nr][nc] / 2);
         else if (board[nr][nc] === TILE.JOKER || board[nr][nc] === TILE.MULT) {
           board[nr][nc] = 0; kinds[nr][nc] = null;
         }

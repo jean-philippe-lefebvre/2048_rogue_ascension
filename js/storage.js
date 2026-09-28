@@ -31,7 +31,9 @@ const Storage = {
       });
       run.relics = (run.relics || []).map(value => RELICS.find(r => r.id === (value?.id || value))).filter(Boolean);
       if (run.battle) {
-        run.battle.kinds ??= Board.emptyKinds();
+        run.battle.size ??= run.battle.board?.length || GRID_SIZE;
+        run.battle.base ??= 2;
+        run.battle.kinds ??= Board.emptyKinds(run.battle.size);
         run.battle.portals ??= [];
         run.battle.iceHits ??= {};
         if (run.battle.combat) {
@@ -49,6 +51,7 @@ const Storage = {
         floorIdx:room.floorIdx, rowIdx:room.rowIdx, nodeIdx:room.nodeIdx,
         enemyId:room.enemyDef.id, combat:room.combat, relicState:room.relicState,
         board:GameState.board, kinds:GameState.kinds, portals:GameState.portals,
+        size:GameState.size || GameState.board.length, base:GameState.base || 2,
         iceHits:room.iceHits, obstacleAge:GameState.obstacleAge, bombTimers:GameState.bombTimers,
         score:GameState.score, mergeCount:GameState.mergeCount,
         movesLeft:GameState.movesLeft, movesMax:GameState.movesMax,

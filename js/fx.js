@@ -102,18 +102,21 @@ const Fx = {
     for (const m of merges) {
       const at = this.cellCenter(m.r, m.c);
       if (!at) continue;
-      this.burst(at.x, at.y, this.colors[Math.min(m.val, 2048)], 8 + Math.log2(m.val) * 3);
+      // Colour and size follow the tile rank, so the base-3 series (Trinity) matches its gems.
+      const rank = Math.max(1, Math.min(11, Math.round(Board.rank(m.val))));
+      this.burst(at.x, at.y, this.colors[2 ** rank], 8 + rank * 3);
       this.float(at.x, at.y, m.val);
     }
-    this.shake(Math.min(10, 1 + Math.log2(max) * 0.9 + merges.length));
-    if (max >= 64) this.flash();
+    this.shake(Math.min(10, 1 + Board.rank(max) * 0.9 + merges.length));
+    if (Board.rank(max) >= 6) this.flash();
     if (merges.length >= 2) this.combo(merges.length);
   },
   roomSuccess() {
     if (this.reduced()) return;
     [0,120,240].forEach(delay => setTimeout(() => {
       if (!document.getElementById('gameScreen').classList.contains('active')) return;
-      const at = this.cellCenter(Math.floor(Math.random() * 4), Math.floor(Math.random() * 4));
+      const n = GameState.board?.length || GRID_SIZE;
+      const at = this.cellCenter(Math.floor(Math.random() * n), Math.floor(Math.random() * n));
       if (at) this.burst(at.x, at.y, '#d4a843', 24);
     }, delay));
   },

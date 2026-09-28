@@ -87,8 +87,8 @@ const RelicHooks = {
 
 const RELICS = [
   // ══════ COMMON ══════
-  { id:'entropy',   icon:'entropy', name:'Entropie',      rarity:'common', desc:'Les nouvelles tuiles sont toujours des 4.',       effect:'+50% valeur tuile',
-    hooks: { onTileSpawn: ctx => { ctx.value = Math.max(ctx.value, 4); } } },
+  { id:'entropy',   icon:'entropy', name:'Entropie',      rarity:'common', desc:'Les nouvelles tuiles sont toujours de rang 2.',       effect:'Apparitions de rang 2',
+    hooks: { onTileSpawn: ctx => { ctx.value = Math.max(ctx.value, Board.base() * 2); } } },
   { id:'greed',     icon:'greed', name:'Avidité',        rarity:'common', desc:'Chaque fusion rapporte +1 or.',                   effect:'+1 or par fusion',
     hooks: { onGoldCalc: ctx => { ctx.gold += ctx.merges.length; } } },
   { id:'haste',     icon:'haste', name:'Hâte',           rarity:'common', desc:'+4 coups dans toutes les salles.',                effect:'+4 coups max',
@@ -100,7 +100,7 @@ const RELICS = [
   { id:'collector', icon:'collector', name:'Collecteur',     rarity:'common', desc:'+3 or à chaque salle terminée.',                  effect:'+3 or/salle',
     hooks: { onRoomEnd: ctx => { if(ctx.won) ctx.goldBonus += 3; } } },
   { id:'compass',   icon:'compass', name:'Précision',      rarity:'common', desc:'Les tuiles apparaissent toujours sur les bords.', effect:'Spawn sur les bords',
-    hooks: { onTileSpawn: ctx => { const edges=ctx.empty.filter(([r,c])=>r===0||r===GRID_SIZE-1||c===0||c===GRID_SIZE-1); if(edges.length) ctx.position=edges[Rng.int(edges.length)]; } } },
+    hooks: { onTileSpawn: ctx => { const edge=ctx.board.length-1; const edges=ctx.empty.filter(([r,c])=>r===0||r===edge||c===0||c===edge); if(edges.length) ctx.position=edges[Rng.int(edges.length)]; } } },
 
   // ══════ RARE ══════
   { id:'echo',      icon:'echo', name:'Écho',           rarity:'rare', desc:'Après chaque fusion, une tuile apparaît aléatoirement.', effect:'Tuile bonus par fusion',
@@ -109,8 +109,8 @@ const RELICS = [
     hooks: { onTileSpawn: ctx => { if(Rng.next()<0.1) ctx.kind='gold'; } } },
   { id:'tide',      icon:'tide', name:'Marée',          rarity:'rare', desc:'1×/salle : le premier coup sans fusion est gratuit.', effect:'1 coup gratuit/salle',
     hooks: { onAfterMove: (ctx, run, gs) => { const rs=gs.room?.relicState; if(rs && !rs._tideUsed && ctx.result.merges.length===0) { rs._tideUsed=true; ctx.freeMove=true; } } } },
-  { id:'blade',     icon:'blade', name:'Lame double',    rarity:'rare', desc:'Les fusions 2+2 donnent 8 au lieu de 4.',          effect:'2+2 → 8',
-    hooks: { onAfterMove: ctx => { for(const m of ctx.result.merges) { if(m.normal && m.val===4 && ctx.board[m.r][m.c]>0) { ctx.board[m.r][m.c]=8; m.val=8; } } } } },
+  { id:'blade',     icon:'blade', name:'Lame double',    rarity:'rare', desc:'La fusion de deux tuiles de rang 1 donne une tuile de rang 3.', effect:'Fusion rang 1 → rang 3',
+    hooks: { onAfterMove: ctx => { for(const m of ctx.result.merges) { if(m.normal && Board.rank(m.val)===2 && ctx.board[m.r][m.c]>0) { ctx.board[m.r][m.c]*=2; m.val*=2; } } } } },
   { id:'focus',     icon:'focus', name:'Focus',          rarity:'rare', desc:'Le premier coup avec 2 fusions ou plus inflige ×2 dégâts.',              effect:'Premier combo ×2 dégâts',
     hooks: { onDamageCalc: (ctx, run, gs) => { const rs=gs.room?.relicState; if(rs && !rs._focusUsed && ctx.merges.length>=2) { rs._focusUsed=true; ctx.multiplier*=2; } } } },
   { id:'recycle',   icon:'recycle', name:'Recyclage',      rarity:'rare', desc:'Quand tu rates une salle, récupère la moitié de l\'or.', effect:'50% or sur défaite',
@@ -120,34 +120,38 @@ const RELICS = [
   { id:'crystal',   icon:'crystal', name:'Cristal',        rarity:'epic', desc:'Début de salle : la tuile la plus haute double de valeur.', effect:'×2 tuile max au départ',
     hooks: { onRoomStart: ctx => { Board.doubleMax(ctx.board); } } },
   { id:'mirror',    icon:'mirror', name:'Miroir',         rarity:'epic', desc:'Chaque salle commence avec une copie de la dernière tuile créée.', effect:'Tuile bonus au départ',
-    hooks: { onRoomStart: (ctx, run) => { if(run.lastTileVal>0) Board.placeValue(ctx.board, run.lastTileVal); } } },
-  { id:'hourglass', icon:'hourglass', name:'Sablier',        rarity:'epic', desc:'+1 coup chaque fois que tu fusionnes une tuile ≥ 64.', effect:'+1 coup si fusion ≥ 64',
-    hooks: { onAfterMove: ctx => { if(ctx.result.merges.some(m=>m.val>=64)) ctx.addMove+=1; } } },
+    hooks: { onRoomStart: (ctx, run, gs) => { if(run.lastTileVal>0) { const rank=run.lastTileRank || Math.round(Math.log2(run.lastTileVal)); Board.placeValue(ctx.board, (gs.base || 2) * 2 ** (rank - 1)); } } } },
+  { id:'hourglass', icon:'hourglass', name:'Sablier',        rarity:'epic', desc:'+1 coup pour chaque fusion de rang 6 ou plus.', effect:'+1 coup si fusion rang 6+',
+    hooks: { onAfterMove: ctx => { if(ctx.result.merges.some(m=>Board.rank(m.val)>=6)) ctx.addMove+=1; } } },
   { id:'vortex',    icon:'vortex', name:'Vortex',         rarity:'epic', desc:'1×/salle : quand tu atteins 0 coups, gagne +5 coups.', effect:'+5 coups de survie',
     hooks: { onMovesExhausted: (ctx, run, gs) => { const rs=gs.room?.relicState; if(rs && !rs._vortexUsed) { rs._vortexUsed=true; ctx.movesLeft=5; ctx.consumed=true; ctx.overlayIcon='vortex'; ctx.overlayTitle='VORTEX !'; ctx.overlaySub='+5 coups !'; } } } },
   { id:'crown',     icon:'crown', name:'Couronne',       rarity:'epic', desc:'Les salles boss donnent le double d\'or.',           effect:'×2 or boss',
     hooks: { onRoomEnd: ctx => { if(ctx.won && ctx.type==='boss') ctx.goldMultiplier*=2; } } },
   { id:'dupli',     icon:'dupli', name:'Duplication',    rarity:'epic', desc:'Début de salle : la tuile la plus basse est dupliquée.', effect:'Copie tuile min',
-    hooks: { onRoomStart: ctx => { let min=Infinity; for(let r=0;r<GRID_SIZE;r++) for(let c=0;c<GRID_SIZE;c++) { const v=ctx.board[r][c]; if(v>0&&v<min) min=v; } if(min<Infinity) Board.placeValue(ctx.board, min); } } },
+    hooks: { onRoomStart: ctx => { let min=Infinity; for(let r=0;r<ctx.board.length;r++) for(let c=0;c<ctx.board.length;c++) { const v=ctx.board[r][c]; if(v>0&&v<min) min=v; } if(min<Infinity) Board.placeValue(ctx.board, min); } } },
 
   // ══════ LEGENDARY ══════
   { id:'phoenix',   icon:'phoenix', name:'Phénix',         rarity:'legendary', desc:'1×/run : si tu rates une salle, rejoue-la avec +10 coups.', effect:'1 seconde vie',
     hooks: { onMovesExhausted: (ctx, run) => { if(run._phoenixReady) { run._phoenixReady=false; ctx.movesLeft=10; ctx.consumed=true; ctx.overlayIcon='flame'; ctx.overlayTitle='PHÉNIX !'; ctx.overlaySub='Le Phénix te sauve ! +10 coups'; } },
              onRunStart: (ctx, run) => { run._phoenixReady = true; } } },
-  { id:'transmute', icon:'transmute', name:'Transmutation',  rarity:'legendary', desc:'Les obstacles se transforment en tuile 4 après 3 coups.', effect:'Obstacles → tuile 4',
+  { id:'transmute', icon:'transmute', name:'Transmutation',  rarity:'legendary', desc:'Les obstacles se transforment en tuile de rang 2 après 3 coups.', effect:'Obstacles → tuile rang 2',
     hooks: { onTransmute: (ctx) => { ctx.active = true; } } },
   { id:'darkpact',  icon:'darkpact', name:'Pacte sombre',   rarity:'legendary', desc:'-10 coups max, mais chaque fusion donne +2 or.', effect:'-10 coups, +2 or/fusion',
     hooks: { onMovesCalc: ctx => { ctx.bonus -= 10; }, onGoldCalc: ctx => { ctx.gold += ctx.merges.length * 2; } } },
-  { id:'eclipse',   icon:'eclipse', name:'Éclipse',        rarity:'legendary', desc:'Les tuiles 2, 8, 32, 128, 512 sont doublées au spawn.', effect:'Tuiles impaires ×2',
-    hooks: { onTileSpawn: ctx => { if([2,8,32,128,512].includes(ctx.value)) ctx.value*=2; } } },
+  { id:'eclipse',   icon:'eclipse', name:'Éclipse',        rarity:'legendary', desc:'Les tuiles de rang 1, 3, 5, 7 et 9 doublent au spawn.', effect:'Tuiles impaires ×2',
+    hooks: { onTileSpawn: ctx => { if([1,3,5,7,9].includes(Board.rank(ctx.value))) ctx.value*=2; } } },
   { id:'berserker', icon:'berserker', name:'Berserker',      rarity:'legendary', desc:'+15 coups max, mais les fusions ne rapportent aucun or.', effect:'+15 coups, 0 or',
     hooks: { onMovesCalc: ctx => { ctx.bonus += 15; }, onGoldCalc: ctx => { ctx.gold = 0; } } },
+  { id:'expanse', icon:'expanse', rarity:'legendary',
+    hooks: { onMovesCalc: ctx => { ctx.bonus += 4; } } },
+  { id:'trinity', icon:'trinity', rarity:'legendary',
+    hooks: { onRoomStart: (ctx,run,gs) => { const fight=gs.room.combat; fight.maxHp=Math.ceil(fight.maxHp*1.4); fight.hp=fight.maxHp; } } },
 
-  { id:'philosopher', icon:'philosopher', rarity:'legendary', hooks:{ onAfterMove:(ctx,run,gs) => { for(const m of ctx.result.merges) if(m.val>=64 && gs.kinds?.[m.r]) gs.kinds[m.r][m.c]='gold'; } } },
+  { id:'philosopher', icon:'philosopher', rarity:'legendary', hooks:{ onAfterMove:(ctx,run,gs) => { for(const m of ctx.result.merges) if(Board.rank(m.val)>=6 && gs.kinds?.[m.r]) gs.kinds[m.r][m.c]='gold'; } } },
   { id:'powder', icon:'powder', rarity:'epic', hooks:{ onBombExplosion:ctx => { ctx.damage += Math.floor(ctx.fight.maxHp*0.1); } } },
   { id:'chainreact', icon:'chainreact', rarity:'legendary', hooks:{ onDamageCalc:ctx => { ctx.comboStep=0.5; } } },
-  { id:'cornerstone', icon:'cornerstone', rarity:'epic', hooks:{ onDamageCalc:ctx => { for(const m of ctx.merges) if((m.r===0||m.r===GRID_SIZE-1)&&(m.c===0||m.c===GRID_SIZE-1)) m.damageMultiplier*=2; } } },
-  { id:'swarm', icon:'swarm', rarity:'rare', hooks:{ onDamageCalc:ctx => { for(const m of ctx.merges) if(m.val===4||m.val===8) m.damageMultiplier*=3; } } },
+  { id:'cornerstone', icon:'cornerstone', rarity:'epic', hooks:{ onDamageCalc:ctx => { const edge=GameState.board.length-1; for(const m of ctx.merges) if((m.r===0||m.r===edge)&&(m.c===0||m.c===edge)) m.damageMultiplier*=2; } } },
+  { id:'swarm', icon:'swarm', rarity:'rare', hooks:{ onDamageCalc:ctx => { for(const m of ctx.merges) if([2,3].includes(Board.rank(m.val))) m.damageMultiplier*=3; } } },
   { id:'catring', icon:'catring', rarity:'rare', hooks:{ onRoomStart:ctx => { Board.placeValue(ctx.board,TILE.MULT); } } },
   { id:'wildcard', icon:'wildcard', rarity:'epic', hooks:{ onMoveCommitted:(ctx,run) => { if((run._wildcardMoves=(run._wildcardMoves||0)+1)%12===0) Board.placeValue(ctx.board,TILE.JOKER); } } },
   { id:'frostbite', icon:'frostbite', rarity:'rare', hooks:{ onIceThaw:ctx => { for(const {r,c} of ctx.result.cracked) { ctx.kinds[r][c]=null; delete ctx.iceHits[`${r},${c}`]; ctx.result.thawed.push({r,c}); } ctx.result.cracked=[]; } } },
@@ -163,7 +167,7 @@ const RELICS = [
   { id:'cursed',    icon:'cursed', name:'Malédiction',    rarity:'curse', isCurse:true, desc:'1 obstacle indestructible apparaît dans chaque salle.', effect:'+1 obstacle permanent',
     hooks: { onRoomStart: ctx => { Board.placeValue(ctx.board, TILE.OBSTACLE); } } },
   { id:'slow',      icon:'slow', name:'Lenteur',        rarity:'curse', isCurse:true, desc:'Les tuiles générées reculent d\'un cran.', effect:'Tuiles -1 niveau',
-    hooks: { onTileSpawn: ctx => { if(ctx.value > 2) ctx.value = ctx.value / 2; } } },
+    hooks: { onTileSpawn: ctx => { if(Board.rank(ctx.value) > 1) ctx.value = ctx.value / 2; } } },
   { id:'tax',       icon:'tax', name:'Taxe',           rarity:'curse', isCurse:true, desc:'-20% de l\'or gagné dans chaque salle.', effect:'-20% or',
     hooks: { onGoldCalc: ctx => { ctx.gold = Math.floor(ctx.gold * 0.8); } } },
 ];
@@ -172,7 +176,7 @@ const RELIC_TAGS = {
   entropy:['small'], greed:['gold'], haste:['tempo'], shield:['control'], sprout:['small'], collector:['gold'], compass:['corner'],
   echo:['small'], magnet:['gold'], tide:['tempo'], blade:['small'], focus:['chain'], recycle:['gold'],
   crystal:['corner'], mirror:['small'], hourglass:['tempo'], vortex:['tempo'], crown:['gold'], dupli:['small'],
-  phoenix:['tempo'], transmute:['control'], darkpact:['gold','tempo'], eclipse:['small'], berserker:['tempo'],
+  phoenix:['tempo'], transmute:['control'], darkpact:['gold','tempo'], eclipse:['small'], berserker:['tempo'], expanse:['control'], trinity:['small'],
   philosopher:['gold'], powder:['blast'], chainreact:['chain'], cornerstone:['corner'], swarm:['small'],
   catring:['blast'], wildcard:['control'], frostbite:['control'], grimoire:['spell'],
 };
@@ -184,13 +188,13 @@ const MAX_ASCENSION   = ASCENSION_COSTS.length;
 const META_DEFS = [
   // ── Base (Ascension 0+) ──
   { id:'extraMoves',  icon:'extraMoves', name:'Élan',           maxLvl:4, costs:[20,40,70,110], ascReq:0, desc:'Coups de base de toutes les salles.',     getEffect: l => `+${l*2} coups de base` },
-  { id:'startTile',   icon:'startTile', name:'Tuile de départ', maxLvl:3, costs:[30,60,100],   ascReq:0, desc:'Commence chaque run avec une tuile bonus.', getEffect: l => `Tuile ${[4,8,16][l-1]} au départ` },
+  { id:'startTile',   icon:'startTile', name:'Tuile de départ', maxLvl:3, costs:[30,60,100],   ascReq:0, desc:'Commence chaque run avec une tuile bonus.', getEffect: l => `Tuile ${Board.base() * 2 ** l} au départ` },
   { id:'goldBonus',   icon:'goldBonus', name:'Alchimie',        maxLvl:3, costs:[25,50,90],    ascReq:0, desc:"Or gagné en fin de salle.",               getEffect: l => `+${l*2} or/salle` },
   { id:'relicSlots',  icon:'relicSlots', name:'Besace',          maxLvl:2, costs:[50,100],      ascReq:0, desc:'Plus de choix de reliques proposés.',     getEffect: l => `${l+3} reliques proposées` },
   { id:'startRelic',  icon:'startRelic', name:'Bénédiction',     maxLvl:1, costs:[80],          ascReq:0, desc:'1 relique commune gratuite au départ.',   getEffect: _  => '1 relique gratuite' },
 
   // ── Ascension 1 ──
-  { id:'forgedEntropy', icon:'forgedEntropy', name:'Entropie Forgée', maxLvl:3, costs:[80,160,300], ascReq:1, desc:'Les tuiles générées commencent plus haut.', getEffect: l => `Tuiles de base : ${[4,8,16][l-1]}` },
+  { id:'forgedEntropy', icon:'forgedEntropy', name:'Entropie Forgée', maxLvl:3, costs:[80,160,300], ascReq:1, desc:'Les tuiles générées commencent plus haut.', getEffect: l => `Tuiles de base : ${Board.base() * 2 ** (l + 1)}` },
   { id:'synergy',       icon:'synergy', name:'Synergie',        maxLvl:2, costs:[120,250],   ascReq:1, desc:'Les reliques proposées sont de meilleure rareté.', getEffect: l => `+${l*10} rareté` },
 
   // ── Ascension 2 ──
@@ -198,7 +202,7 @@ const META_DEFS = [
   { id:'destiny',    icon:'destiny', name:'Destinée',       maxLvl:1, costs:[250],        ascReq:2, desc:'Choisis 1 relique rare au début de chaque run.', getEffect: _ => '1 relique rare au départ' },
 
   // ── Ascension 3 ──
-  { id:'singularity', icon:'singularity', name:'Singularité', maxLvl:1, costs:[500],        ascReq:3, desc:'1×/run : quand une tuile atteint 128+, tout le board double.', getEffect: _ => 'Doublement total à 128+' },
+  { id:'singularity', icon:'singularity', name:'Singularité', maxLvl:1, costs:[500],        ascReq:3, desc:'1×/run : une fusion de rang 7+ double toutes les tuiles.', getEffect: _ => 'Doublement total au rang 7+' },
   { id:'mastery',     icon:'mastery', name:'Maîtrise',    maxLvl:3, costs:[150,300,500], ascReq:3, desc:'Coups bonus dans les salles boss.',                           getEffect: l => `+${l*10}% coups boss` },
 ];
 
