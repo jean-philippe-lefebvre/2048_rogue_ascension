@@ -11,6 +11,35 @@ const Storage = {
       if (meta.tierUnlocked === undefined)
         meta.tierUnlocked = Math.min(MAX_TIER, Math.max(0, 3 * (meta.ascension ?? meta.ascensionLevel ?? 0)));
       meta.tierUnlocked = Math.min(MAX_TIER, Math.max(0, meta.tierUnlocked));
+      meta.codex ??= { relics:[], enemies:{}, runs:[] };
+      meta.codex.relics ??= [];
+      meta.codex.enemies ??= {};
+      meta.codex.runs = (meta.codex.runs || []).slice(0,20);
+      meta.records = { tile:0, hit:0, gold:0, ...meta.records };
+      meta.progress = { bombs:0, spells:0, ...meta.progress };
+      meta.achievements ??= [];
+      // Only infer achievements from persisted evidence. Older aggregate counters do not
+      // establish which boss, character or tier produced them.
+      for (const entry of meta.codex.runs) {
+        const facts = [
+          {event:'run', win:entry.result === 'victory', hearts:entry.hearts, tier:entry.tier},
+          ...(entry.bosses || []).map(floor => ({event:'boss',floor})),
+        ];
+        for (const def of ACHIEVEMENTS) if (facts.some(fact => achievementMet(def,fact)) && !meta.achievements.includes(def.id)) meta.achievements.push(def.id);
+      }
+      for (const def of ACHIEVEMENTS) {
+        const facts = [
+          {event:'record',rank:Math.floor(Math.log2(meta.records.tile || 1))},
+          {event:'gold',gold:meta.records.gold},
+          {event:'bomb',count:meta.progress.bombs},
+          {event:'spell',count:meta.progress.spells},
+          ...Object.entries(meta.codex.enemies).filter(([,count]) => count > 0).flatMap(([id]) => {
+            const enemy = ENEMIES.find(definition => definition.id === id);
+            return enemy ? [{event:'fight'}, ...(enemy.kind === 'boss' ? [{event:'boss',floor:enemy.floor}] : [])] : [];
+          }),
+        ];
+        if (facts.some(fact => achievementMet(def,fact)) && !meta.achievements.includes(def.id)) meta.achievements.push(def.id);
+      }
       delete meta.ascension;
       delete meta.ascensionLevel;
       return meta;
@@ -78,5 +107,6 @@ const Storage = {
     } catch { return false; }
   },
   clearRun() { try { localStorage.removeItem(this.RUN_KEY); } catch {} },
-  defaultMeta: () => ({ totalRuns:0, bestFloor:0, totalGold:0, permanentGold:0, upgrades:{}, tierUnlocked:0, daily:null, settings:{ sound:true } }),
+  defaultMeta: () => ({ totalRuns:0, bestFloor:0, totalGold:0, permanentGold:0, upgrades:{}, tierUnlocked:0, daily:null,
+    codex:{relics:[],enemies:{},runs:[]}, records:{tile:0,hit:0,gold:0}, progress:{bombs:0,spells:0}, achievements:[], settings:{sound:true,music:true} }),
 };

@@ -91,6 +91,13 @@ function bindButtons() {
     I18n.renderSoundToggle();
     Audio2.unlock();
   });
+  document.getElementById('musicToggle').addEventListener('click', () => {
+    GameState.meta.settings.music = GameState.meta.settings.music === false;
+    Storage.save(GameState.meta);
+    Audio2.unlock();
+    Music.syncSetting();
+    I18n.renderMusicToggle();
+  });
   // Title
   document.getElementById('btnContinueRun').addEventListener('click', () => {
     if (!GameState.run) return;
@@ -101,6 +108,8 @@ function bindButtons() {
   document.getElementById('btnTierDown').addEventListener('click', () => Controller.selectTier((Controller.selectedTier ?? 0) - 1));
   document.getElementById('btnTierUp').addEventListener('click', () => Controller.selectTier((Controller.selectedTier ?? 0) + 1));
   document.getElementById('btnShowMeta').addEventListener('click',  () => { Renderer.renderMeta(); showScreen('metaScreen'); });
+  document.getElementById('btnCodex').addEventListener('click', () => { Renderer.renderCodex(); showScreen('codexScreen'); });
+  document.getElementById('btnCodexBack').addEventListener('click', () => showScreen('titleScreen'));
 
   // Map : abandon with confirmation
   document.getElementById('btnAbandon').addEventListener('click', () => {
@@ -184,6 +193,11 @@ function bindButtons() {
   const saved = Storage.load();
   if (saved) GameState.meta = { ...Storage.defaultMeta(), ...saved, settings: { ...Storage.defaultMeta().settings, ...saved.settings } };
   GameState.run = Storage.loadRun();
+  if (GameState.run) {
+    const discovered = GameState.meta.codex.relics;
+    for (const relic of GameState.run.relics) if (!discovered.includes(relic.id)) discovered.push(relic.id);
+    Storage.save(GameState.meta);
+  }
   if (GameState.run) {
     Rng._seed = GameState.run.seed >>> 0;
     Rng._state = (GameState.run.rngState ?? GameState.run.seed) >>> 0;

@@ -514,6 +514,25 @@ const I18n = {
       'relic.grimoire.name': 'Grimoire',
       'relic.grimoire.desc': 'Les sorts peuvent contenir 4 charges. +1 charge au début de chaque combat.',
       'relic.grimoire.effect': '4 charges et +1 par combat',
+      'ui.btn.codex': 'Codex', 'ui.btn.codexBack': '← Retour',
+      'settings.musicOn': 'Musique : oui', 'settings.musicOff': 'Musique : non',
+      'codex.tab.relics': 'Reliques', 'codex.tab.bestiary': 'Bestiaire', 'codex.tab.achievements': 'Succès', 'codex.tab.history': 'Historique',
+      'codex.unlock': 'Débloquer', 'codex.reward': 'Récompense', 'codex.floor': 'Étage {n}', 'codex.defeated': 'Vaincu {n}×',
+      'codex.daily': 'quotidien', 'codex.seed': 'Graine', 'codex.noRuns': 'Aucune run terminée.',
+      'codex.result.victory': 'Victoire', 'codex.result.defeat': 'Défaite', 'codex.result.abandoned': 'Abandon',
+      'achievement.firstblood.name': 'Premier sang', 'achievement.firstblood.condition': 'Remporter un combat.',
+      'achievement.jailbreak.name': 'Évadé', 'achievement.jailbreak.condition': 'Vaincre un boss de l’étage I.',
+      'achievement.forged.name': 'Trempé', 'achievement.forged.condition': 'Vaincre un boss de l’étage II.',
+      'achievement.gaze.name': 'Regard soutenu', 'achievement.gaze.condition': 'Gagner une run.',
+      'achievement.chain5.name': 'Réaction', 'achievement.chain5.condition': 'Faire 5 fusions en un coup.',
+      'achievement.tile1024.name': 'Millier', 'achievement.tile1024.condition': 'Créer une tuile 1024 (1536 avec Trinité).',
+      'achievement.tile2048.name': 'Ascension', 'achievement.tile2048.condition': 'Créer une tuile 2048 (3072 avec Trinité).',
+      'achievement.rich.name': 'Trésor', 'achievement.rich.condition': 'Détenir 200 or dans une run.',
+      'achievement.flawless.name': 'Intouchable', 'achievement.flawless.condition': 'Gagner avec 3 cœurs.',
+      'achievement.pyro.name': 'Démineur', 'achievement.pyro.condition': 'Désamorcer 10 bombes au total.',
+      'achievement.scholar.name': 'Érudit', 'achievement.scholar.condition': 'Lancer 50 sorts au total.',
+      'achievement.ascetic.name': 'Ascète', 'achievement.ascetic.condition': 'Gagner au niveau A5 ou plus.',
+      'achievement.legend.name': 'Légende', 'achievement.legend.condition': 'Gagner au niveau A10.',
     },
 
     en: {
@@ -1025,6 +1044,25 @@ const I18n = {
       'relic.grimoire.name': 'Grimoire',
       'relic.grimoire.desc': 'Spells hold 4 charges. Gain +1 charge at battle start.',
       'relic.grimoire.effect': '4 charges and +1 per battle',
+      'ui.btn.codex': 'Codex', 'ui.btn.codexBack': '← Back',
+      'settings.musicOn': 'Music: on', 'settings.musicOff': 'Music: off',
+      'codex.tab.relics': 'Relics', 'codex.tab.bestiary': 'Bestiary', 'codex.tab.achievements': 'Achievements', 'codex.tab.history': 'History',
+      'codex.unlock': 'Unlock', 'codex.reward': 'Reward', 'codex.floor': 'Floor {n}', 'codex.defeated': 'Defeated {n}×',
+      'codex.daily': 'daily', 'codex.seed': 'Seed', 'codex.noRuns': 'No completed runs.',
+      'codex.result.victory': 'Victory', 'codex.result.defeat': 'Defeat', 'codex.result.abandoned': 'Abandoned',
+      'achievement.firstblood.name': 'First Blood', 'achievement.firstblood.condition': 'Win a fight.',
+      'achievement.jailbreak.name': 'Jailbreak', 'achievement.jailbreak.condition': 'Defeat a floor I boss.',
+      'achievement.forged.name': 'Tempered', 'achievement.forged.condition': 'Defeat a floor II boss.',
+      'achievement.gaze.name': 'Unblinking', 'achievement.gaze.condition': 'Win a run.',
+      'achievement.chain5.name': 'Reaction', 'achievement.chain5.condition': 'Make 5 merges in one move.',
+      'achievement.tile1024.name': 'Thousand', 'achievement.tile1024.condition': 'Make a 1024 tile (1536 with Trinity).',
+      'achievement.tile2048.name': 'Ascension', 'achievement.tile2048.condition': 'Make a 2048 tile (3072 with Trinity).',
+      'achievement.rich.name': 'Hoard', 'achievement.rich.condition': 'Hold 200 gold in one run.',
+      'achievement.flawless.name': 'Untouched', 'achievement.flawless.condition': 'Win with 3 hearts.',
+      'achievement.pyro.name': 'Sapper', 'achievement.pyro.condition': 'Defuse 10 bombs in total.',
+      'achievement.scholar.name': 'Scholar', 'achievement.scholar.condition': 'Cast 50 spells in total.',
+      'achievement.ascetic.name': 'Ascetic', 'achievement.ascetic.condition': 'Win at A5 or higher.',
+      'achievement.legend.name': 'Legend', 'achievement.legend.condition': 'Win at A10.',
     },
   },
 
@@ -1040,6 +1078,7 @@ const I18n = {
     this.applyDOM();
     // Re-render the title screen (language toggle is on title)
     if (typeof Renderer !== 'undefined') Renderer.renderTitle();
+    if (typeof Renderer !== 'undefined' && document.getElementById('codexScreen')?.classList.contains('active')) Renderer.renderCodex();
     if (typeof Renderer !== 'undefined' && GameState.run) {
       if (document.getElementById('gameScreen').classList.contains('active')) Renderer.renderSpells();
       if (document.getElementById('shopScreen').classList.contains('active')) Renderer.renderShop();
@@ -1073,6 +1112,7 @@ const I18n = {
     }
     this.renderLangToggle();
     this.renderSoundToggle();
+    this.renderMusicToggle();
   },
 
   renderLangToggle() {
@@ -1095,6 +1135,14 @@ const I18n = {
     const on = GameState.meta.settings?.sound !== false;
     button.textContent = this.t(on ? 'settings.soundOn' : 'settings.soundOff');
     button.setAttribute('aria-pressed', String(on));
+  },
+
+  renderMusicToggle() {
+    const button = document.getElementById('musicToggle');
+    if (!button) return;
+    const on = GameState.meta.settings?.music !== false;
+    button.innerHTML = `${Icons.svg('music')} ${this.t(on ? 'settings.musicOn' : 'settings.musicOff')}`;
+    button.setAttribute('aria-pressed',String(on));
   },
 
   langs: [

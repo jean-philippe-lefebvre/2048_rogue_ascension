@@ -11,6 +11,7 @@ function showScreen(id) {
   _screens[id].classList.add('active');
   _screens[id].scrollTop = 0;
   Scene.forScreen(id);
+  if (typeof Music !== 'undefined') Music.forScreen(id);
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     _screens[id].animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}], {duration:220,easing:'cubic-bezier(.2,.8,.2,1)'});
   }
@@ -27,9 +28,13 @@ const Renderer = {
     container.innerHTML='';
     for(const character of CHARACTERS) {
       const card=document.createElement('button');
-      card.className='character-card';
-      card.innerHTML=`<span class="character-icon">${Icons.svg(character.icon)}</span><span class="character-name">${I18n.t('character.'+character.id+'.name')}</span><span class="character-detail">${I18n.t('character.relic')}${I18n.t('ui.colon')}${I18n.t('relic.'+character.relic+'.name')}</span><span class="character-detail">${I18n.t('character.spell')}${I18n.t('ui.colon')}${I18n.t('spell.'+character.spell)}</span><span class="character-detail">${I18n.t('character.'+character.id+'.passive')}</span>`;
-      card.addEventListener('click',()=>Controller.chooseCharacter(character.id));
+      const locked = !Controller.characterUnlocked(character.id);
+      card.className='character-card' + (locked ? ' is-locked' : '');
+      card.disabled = locked;
+      card.innerHTML=locked
+        ? `<span class="character-icon">${Icons.svg('lock')}</span><span class="character-name">${I18n.t('character.'+character.id+'.name')}</span><span class="character-detail">${I18n.t('codex.unlock')}${I18n.t('ui.colon')}${I18n.t('achievement.'+UNLOCKS[character.id]+'.name')}</span>`
+        : `<span class="character-icon">${Icons.svg(character.icon)}</span><span class="character-name">${I18n.t('character.'+character.id+'.name')}</span><span class="character-detail">${I18n.t('character.relic')}${I18n.t('ui.colon')}${I18n.t('relic.'+character.relic+'.name')}</span><span class="character-detail">${I18n.t('character.spell')}${I18n.t('ui.colon')}${I18n.t('spell.'+character.spell)}</span><span class="character-detail">${I18n.t('character.'+character.id+'.passive')}</span>`;
+      if (!locked) card.addEventListener('click',()=>Controller.chooseCharacter(character.id));
       container.appendChild(card);
     }
     document.getElementById('btnCharacterBack').onclick=()=>showScreen('titleScreen');
@@ -584,6 +589,7 @@ const Renderer = {
     document.getElementById('s-best').textContent = m.bestFloor;
     document.getElementById('s-gold').textContent = m.totalGold;
     I18n.renderSoundToggle();
+    I18n.renderMusicToggle();
 
     // Highest unlocked tier
     const ascBadge = document.getElementById('ascensionBadge');
@@ -801,5 +807,79 @@ const Renderer = {
       modal.classList.remove('show');
       onClose();
     };
+  },
+
+  renderCodex(tab = this._codexTab || 'relics') {
+    this._codexTab = tab;
+    const meta = GameState.meta;
+    const tabs = document.getElementById('codexTabs');
+    tabs.innerHTML = '';
+    for (const id of ['relics','bestiary','achievements','history']) {
+      const button = document.createElement('button');
+      button.className = 'codex-tab' + (id === tab ? ' is-active' : '');
+      button.textContent = I18n.t('codex.tab.'+id);
+      button.setAttribute('aria-selected',String(id === tab));
+      button.onclick = () => this.renderCodex(id);
+      tabs.appendChild(button);
+    }
+    const list = document.getElementById('codexContent');
+    list.innerHTML = '';
+    const counter = document.getElementById('codexCounter');
+    counter.textContent = '';
+    if (tab === 'relics') {
+      counter.textContent = `${meta.codex.relics.length} / ${RELICS.length}`;
+      list.className = 'codex-content codex-grid';
+      for (const relic of RELICS) {
+        const seen = meta.codex.relics.includes(relic.id);
+        const card = document.createElement('div');
+        card.className = 'codex-card' + (seen ? '' : ' is-unknown');
+        card.innerHTML = seen
+          ? `<div class="codex-icon">${Icons.svg(relic.icon)}</div><div class="codex-name">${I18n.t('relic.'+relic.id+'.name')}</div><div class="relic-rarity rarity-${relic.rarity}">${I18n.t('rarity.'+relic.rarity)}</div><div class="codex-families">${this.familyChips(relic)}</div>`
+          : `<div class="codex-icon">${Icons.svg('lock')}</div><div class="codex-name">???</div>${UNLOCKS[relic.id] ? `<div class="codex-hint">${I18n.t('achievement.'+UNLOCKS[relic.id]+'.name')}</div>` : ''}`;
+        list.appendChild(card);
+      }
+    } else if (tab === 'bestiary') {
+      list.className = 'codex-content';
+      for (const enemy of ENEMIES) {
+        const count = meta.codex.enemies[enemy.id] || 0;
+        const card = document.createElement('div'); card.className = 'codex-row' + (count ? '' : ' is-unknown');
+        card.innerHTML = `<span class="codex-icon">${Icons.svg(count ? 'e-'+enemy.id : 'lock')}</span><span class="codex-row-main"><strong>${count ? I18n.t(enemy.kind === 'boss' ? 'enemy.'+enemy.id+'.name' : 'enemy.'+enemy.id) : '???'}</strong><small>${I18n.t('codex.floor',{n:enemy.floor+1})}</small></span><span>${count ? I18n.t('codex.defeated',{n:count}) : ''}</span>`;
+        list.appendChild(card);
+      }
+    } else if (tab === 'achievements') {
+      list.className = 'codex-content';
+      for (const achievement of ACHIEVEMENTS) {
+        const earned = meta.achievements.includes(achievement.id);
+        const card = document.createElement('div'); card.className = 'codex-row' + (earned ? ' is-earned' : ' is-unknown');
+        card.innerHTML = `<span class="codex-icon">${Icons.svg('trophy')}</span><span class="codex-row-main"><strong>${I18n.t('achievement.'+achievement.id+'.name')}</strong><small>${I18n.t('achievement.'+achievement.id+'.condition')}</small>${achievement.reward ? `<small>${I18n.t('codex.reward')}${I18n.t('ui.colon')}${I18n.t(achievement.reward === 'artificer' || achievement.reward === 'monk' ? 'character.'+achievement.reward+'.name' : 'relic.'+achievement.reward+'.name')}</small>` : ''}</span>`;
+        list.appendChild(card);
+      }
+    } else {
+      list.className = 'codex-content';
+      if (!meta.codex.runs.length) list.textContent = I18n.t('codex.noRuns');
+      for (const run of meta.codex.runs) {
+        const card = document.createElement('div'); card.className = 'codex-row';
+        const character = CHARACTERS.find(c => c.id === run.character);
+        const date = new Date(run.date);
+        card.innerHTML = `<span class="codex-icon">${Icons.svg(character?.icon || 'c-alchemist')}</span><span class="codex-row-main"><strong>${Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(I18n._lang)} · A${run.tier || 0}${run.daily ? ' · '+I18n.t('codex.daily') : ''}</strong><small>${I18n.t('codex.result.'+run.result)} · ${I18n.t('codex.floor',{n:run.floor || 1})} · ${run.boss ? I18n.t('enemy.'+run.boss+'.name') : '???'}</small><small>${I18n.t('codex.seed')}${I18n.t('ui.colon')}${run.seed}</small></span>`;
+        list.appendChild(card);
+      }
+    }
+  },
+
+  showAchievement(id) {
+    this._achievementQueue ??= [];
+    this._achievementQueue.push(id);
+    if (this._achievementShowing) return;
+    const next = () => {
+      const current = this._achievementQueue.shift();
+      if (!current) { this._achievementShowing = false; return; }
+      this._achievementShowing = true;
+      const banner = document.getElementById('achievementToast');
+      banner.innerHTML = `${Icons.svg('trophy')} <span>${I18n.t('achievement.'+current+'.name')}</span>`;
+      banner.classList.add('show');
+      setTimeout(() => { banner.classList.remove('show'); setTimeout(next,220); },2620);
+    };
+    next();
   },
 };

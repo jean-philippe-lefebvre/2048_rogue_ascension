@@ -28,6 +28,36 @@ const CHARACTERS = [
   { id:'monk', icon:'c-monk', relic:'focus', spell:'pivot' },
 ];
 
+const UNLOCKS = { artificer:'jailbreak', monk:'gaze', chainreact:'chain5', cornerstone:'tile1024', philosopher:'rich', wildcard:'scholar' };
+
+const ACHIEVEMENTS = [
+  {id:'firstblood', event:'fight'},
+  {id:'jailbreak', event:'boss', floor:0, reward:'artificer'},
+  {id:'forged', event:'boss', floor:1},
+  {id:'gaze', event:'run', reward:'monk'},
+  {id:'chain5', event:'move', minMerges:5, reward:'chainreact'},
+  {id:'tile1024', event:'record', minRank:10, reward:'cornerstone'},
+  {id:'tile2048', event:'record', minRank:11},
+  {id:'rich', event:'gold', minGold:200, reward:'philosopher'},
+  {id:'flawless', event:'run', minHearts:3},
+  {id:'pyro', event:'bomb', minCount:10},
+  {id:'scholar', event:'spell', minCount:50, reward:'wildcard'},
+  {id:'ascetic', event:'run', minTier:5},
+  {id:'legend', event:'run', minTier:10},
+];
+
+function achievementMet(def, context) {
+  if (def.event !== context.event) return false;
+  if (def.event === 'run' && !context.win) return false;
+  return (def.floor === undefined || context.floor === def.floor)
+    && (def.minMerges === undefined || context.merges >= def.minMerges)
+    && (def.minRank === undefined || context.rank >= def.minRank)
+    && (def.minGold === undefined || context.gold >= def.minGold)
+    && (def.minHearts === undefined || context.hearts >= def.minHearts)
+    && (def.minCount === undefined || context.count >= def.minCount)
+    && (def.minTier === undefined || context.tier >= def.minTier);
+}
+
 const EVENTS = [
   { id:'altar', icon:'ev-altar', options:['take','pray','leave'] },
   { id:'peddler', icon:'merchant', options:['buy','sell','leave'] },

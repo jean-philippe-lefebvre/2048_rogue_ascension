@@ -82,12 +82,15 @@ const Controller = {
     fight.patternIndex = 0;
     fight.intentIn = fight.cadence;
     Combat.announce(fight);
+    if (typeof Music !== 'undefined') Music.forScreen('gameScreen');
     return true;
   },
   advancePhase(fight, def) {
-    return fight.phaseThreshold && fight.phase === 1 && fight.hp > 0 && fight.id !== 'necromancer' &&
+    const changed = fight.phaseThreshold && fight.phase === 1 && fight.hp > 0 && fight.id !== 'necromancer' &&
       fight.hp <= fight.maxHp * fight.phaseThreshold && def.phase2
       ? this.enterTierPhase(fight, def) : Combat.phase(fight, def);
+    if (changed && typeof Music !== 'undefined') Music.forScreen('gameScreen');
+    return changed;
   },
 
   breakHazards(fight, board, merges, bombTimers) {
@@ -97,6 +100,12 @@ const Controller = {
         const r=merge.r+dr,c=merge.c+dc;
         if (board[r]?.[c] === TILE.BOMB) { board[r][c]=0; delete bombTimers[`${r},${c}`]; broken.push({r,c,kind:'bomb'}); }
       }
+    const bombs = broken.filter(item => item.kind === 'bomb').length;
+    if (bombs) {
+      GameState.meta.progress.bombs += bombs;
+      this.checkAchievements({event:'bomb',count:GameState.meta.progress.bombs});
+      Storage.save(GameState.meta);
+    }
     return broken;
   },
 
@@ -129,11 +138,43 @@ const Controller = {
     const run = GameState.run;
     run.gold += amount;
     if (amount > 0) (run.stats ??= {biggestTile:0,bestDamage:0,goldEarned:0,floorsCleared:0}).goldEarned += amount;
+    GameState.meta.records.gold = Math.max(GameState.meta.records.gold,run.gold);
+    this.checkAchievements({event:'gold',gold:run.gold});
+    Storage.save(GameState.meta);
   },
   recordMoveStats(board, dealt) {
     const stats = GameState.run.stats ??= {biggestTile:0,bestDamage:0,goldEarned:0,floorsCleared:0};
     stats.bestDamage = Math.max(stats.bestDamage, dealt);
     stats.biggestTile = Math.max(stats.biggestTile, ...board.flat().filter(value => value > 0), 0);
+    const records = GameState.meta.records;
+    records.tile = Math.max(records.tile,stats.biggestTile);
+    records.hit = Math.max(records.hit,dealt);
+    this.checkAchievements({event:'record',rank:Math.floor(Math.log2(records.tile || 1))});
+    Storage.save(GameState.meta);
+  },
+
+  characterUnlocked(id) { return !UNLOCKS[id] || GameState.meta.achievements.includes(UNLOCKS[id]); },
+  relicUnlocked(id) {
+    return !UNLOCKS[id] || GameState.meta.achievements.includes(UNLOCKS[id])
+      || !!GameState.run?.relics.some(relic => relic.id === id);
+  },
+  checkAchievements(context) {
+    const meta = GameState.meta;
+    const earned = ACHIEVEMENTS.filter(def => !meta.achievements.includes(def.id) && achievementMet(def,context));
+    for (const def of earned) {
+      meta.achievements.push(def.id);
+      Renderer.showAchievement?.(def.id);
+    }
+    if (earned.length) Storage.save(meta);
+    return earned.map(def => def.id);
+  },
+  recordRun(result) {
+    const r = GameState.run, codex = GameState.meta.codex;
+    codex.runs.unshift({date:new Date().toISOString(),character:r.character,tier:r.tier,daily:!!r.daily,
+      result,floor:Math.min(3,r.floorIdx + 1),boss:r.floors?.[Math.min(2,r.floorIdx)]?.at(-1)?.[0]?.bossId || null,
+      bosses:(r.bossesDefeated || []).map(id => ENEMIES.find(e => e.id === id)?.floor).filter(Number.isInteger),
+      hearts:r.hearts,seed:r.seed});
+    codex.runs.length = Math.min(20,codex.runs.length);
   },
 
   // ── Run ──
@@ -147,7 +188,7 @@ const Controller = {
   },
 
   chooseCharacter(characterId) {
-    if (!CHARACTERS.some(c => c.id === characterId)) return false;
+    if (!CHARACTERS.some(c => c.id === characterId) || !this.characterUnlocked(characterId)) return false;
     this._beginRun(characterId);
     return true;
   },
@@ -183,6 +224,7 @@ const Controller = {
       spells: [{ id:CHARACTERS.find(c => c.id === characterId).spell, charges:2 }],
       _wildcardMoves: 0,
       seenEvents: [],
+      bossesDefeated: [],
       bossHpMult: 1,
       lastTileVal: 0,
       floorIdx: 0,
@@ -207,7 +249,7 @@ const Controller = {
 
     // Destiny upgrade: offer a rare relic at start
     if (!daily && m.upgrades.destiny) {
-      const rares = RELICS.filter(r => r.rarity === 'rare' || r.rarity === 'epic');
+      const rares = RELICS.filter(r => (r.rarity === 'rare' || r.rarity === 'epic') && this.relicUnlocked(r.id));
       this._offerRelics(2, () => { Renderer.renderMap(); showScreen('mapScreen'); }, rares, 'destiny');
     } else {
       Renderer.renderMap();
@@ -225,7 +267,7 @@ const Controller = {
     }
     if (run.pendingRelic) {
       const pending = run.pendingRelic;
-      const choices = pending.ids.map(id => RELICS.find(r => r.id === id)).filter(Boolean);
+      const choices = pending.ids.map(id => RELICS.find(r => r.id === id)).filter(r => r && this.relicUnlocked(r.id));
       GameState._relicDone = pending.reason === 'battle'
         ? () => this._finishBattleReward()
         : () => { Renderer.renderMap(); showScreen('mapScreen'); };
@@ -239,7 +281,7 @@ const Controller = {
     if (run.pendingShop) { this._showShop(); return; }
     if (run.pendingEvent) { this._showEvent(); return; }
     if (run.pendingRest) {
-      const choices = run.pendingRest.map(id => RELICS.find(r => r.id === id)).filter(Boolean);
+      const choices = run.pendingRest.map(id => RELICS.find(r => r.id === id)).filter(r => r && this.relicUnlocked(r.id));
       GameState._restDone = () => { delete run.pendingRest; Storage.saveRun(run); Renderer.renderMap(); showScreen('mapScreen'); };
       Renderer.renderRestChoice(choices);
       showScreen('relicScreen');
@@ -360,7 +402,7 @@ const Controller = {
 
   // Pick `count` random items from `pool` with rarity weighting by floor
   _pickRandom(pool, count, floorIdx) {
-    const remaining = [...pool];
+    const remaining = pool.filter(r => this.relicUnlocked(r.id));
     const picks = [];
     const fi = Math.min(floorIdx ?? GameState.run?.floorIdx ?? 0, 2);
     const synergyLvl = GameState.getUpgradeLevel('synergy');
@@ -390,14 +432,18 @@ const Controller = {
 
   _getUnownedRelics(customPool) {
     const owned = new Set(GameState.run.relics.map(r => r.id));
-    return (customPool || RELICS).filter(r => !owned.has(r.id));
+    return (customPool || RELICS).filter(r => !owned.has(r.id) && this.relicUnlocked(r.id));
   },
 
   _grantRelic(relic) {
+    if (!relic) return false;
     GameState.run.relics.push(relic);
+    const discovered = GameState.meta.codex.relics;
+    if (!discovered.includes(relic.id)) { discovered.push(relic.id); Storage.save(GameState.meta); }
     RelicHooks.invalidate();
     if (relic.hooks?.onRunStart) relic.hooks.onRunStart({}, GameState.run, GameState);
     Storage.saveRun(GameState.run);
+    return true;
   },
 
   abandonRun() {
@@ -408,6 +454,7 @@ const Controller = {
     m.permanentGold += banked;
     m.totalGold += banked;
     if (run.daily) m.daily = { date:run.daily, result:'abandoned', score:run.totalScore, floor:run.floorIdx + 1 };
+    this.recordRun('abandoned');
     Storage.save(m);
     Storage.clearRun();
     Renderer.renderEndScreen(false, true);
@@ -570,6 +617,7 @@ const Controller = {
   },
 
   _showShop() {
+    GameState.run.pendingShop = GameState.run.pendingShop.filter(offer => offer.type !== 'relic' || this.relicUnlocked(offer.id));
     Renderer.renderShop();
     showScreen('shopScreen');
     Scene.set('shop');
@@ -582,7 +630,7 @@ const Controller = {
     if (offer.type === 'charge') return run.spells.some(s => s.charges < this.spellCapacity());
     if (offer.type === 'heal') return run.hearts < 3;
     if (offer.type === 'cleanse') return run.relics.some(r => r.isCurse);
-    return !run.relics.some(r => r.id === offer.id);
+    return this.relicUnlocked(offer.id) && !run.relics.some(r => r.id === offer.id);
   },
 
   buyShop(index) {
@@ -835,11 +883,22 @@ const Controller = {
 
   _castSpell(slot,targets) {
     const gs = GameState, spell = gs.run.spells[slot];
+    const bombsBefore = spell?.id === 'smash' ? gs.board.flat().filter(value => value === TILE.BOMB).length : 0;
     const undoStats = spell?.id === 'undo' ? gs.room.undo?.runStats : null;
     if (gs.roomFinished || (typeof document !== 'undefined' && document.querySelector?.('.modal-backdrop.show, .room-overlay.show'))) return false;
     if (!spell || spell.charges <= 0 || !Spells.apply(gs,spell.id,targets)) return false;
+    if (spell.id === 'smash') {
+      const defused = bombsBefore - gs.board.flat().filter(value => value === TILE.BOMB).length;
+      if (defused > 0) {
+        GameState.meta.progress.bombs += defused;
+        this.checkAchievements({event:'bomb',count:GameState.meta.progress.bombs});
+      }
+    }
     if (undoStats) gs.run.stats = undoStats;
     gs.run.spells[slot].charges = Math.max(0, gs.run.spells[slot].charges - 1);
+    GameState.meta.progress.spells++;
+    this.checkAchievements({event:'spell',count:GameState.meta.progress.spells});
+    Storage.save(GameState.meta);
     gs.spellTarget = null;
     if (spell.id === 'undo' && gs.room.combat.id === 'clockmaker') this._resetClock();
     for (const [r,c] of targets) {
@@ -886,6 +945,12 @@ const Controller = {
       gs.run.lastTileVal = result.merges[result.merges.length - 1].val;
       // Mirror copies by rank, so the tile still fits if Trinity changes the base.
       gs.run.lastTileRank = Math.round(Board.rank(gs.run.lastTileVal));
+      const records = gs.meta.records;
+      for (const merge of result.merges) {
+        records.tile = Math.max(records.tile,merge.val);
+      }
+      this.checkAchievements({event:'record',rank:Math.floor(Math.log2(records.tile || 1))});
+      this.checkAchievements({event:'move',merges:result.merges.length});
     }
 
     const moveCtx = { result, board: gs.board, movesLeft: gs.movesLeft, addMove: 0, freeMove: false };
@@ -935,6 +1000,7 @@ const Controller = {
     const phaseChanged = this.advancePhase(fight, gs.room.enemyDef);
     if (fight.id === 'necromancer' && fight.reviveAvailable && fight.hp <= 0) {
       Combat.revive(fight); Renderer.phaseBanner('combat.revive');
+      if (typeof Music !== 'undefined') Music.forScreen('gameScreen');
     } else if (phaseChanged) Renderer.phaseBanner();
     if (!moveCtx.freeMove) gs.movesLeft--;
     if (!moveCtx.freeMove && fight.id === 'clockmaker') this._resetClock();
@@ -1038,6 +1104,15 @@ const Controller = {
     gs.roomFinished = true;
     this._stopClock();
     const type = gs.room.data.type;
+    const enemyId = gs.room.enemyDef?.id;
+    if (enemyId) {
+      const enemies = gs.meta.codex.enemies;
+      enemies[enemyId] = (enemies[enemyId] || 0) + 1;
+      if (type === 'boss') (gs.run.bossesDefeated ??= []).push(enemyId);
+      this.checkAchievements({event:'fight'});
+      if (type === 'boss') this.checkAchievements({event:'boss',floor:gs.room.floorIdx});
+      Storage.save(gs.meta);
+    }
     const reward = type === 'boss' ? [12,16,20][gs.room.floorIdx] : type === 'elite' ? 12 : 8;
     const leftover = Combat.leftoverGold(gs.movesLeft);
     const endCtx = { won:true, type, floorIdx:gs.room.floorIdx, goldBonus:0,
@@ -1141,6 +1216,7 @@ const Controller = {
   },
 
   pickRelic(relic) {
+    if (!this.relicUnlocked(relic.id)) return false;
     this._grantRelic(relic);
     Audio2.relic();
     this._finishRelicScreen();
@@ -1179,6 +1255,8 @@ const Controller = {
     m.totalGold += banked;
     if (win && !r.daily) m.tierUnlocked = Math.max(m.tierUnlocked || 0, Math.min(MAX_TIER, (r.tier || 0) + 1));
     if (r.daily) m.daily = { date:r.daily, result:win ? 'victory' : 'defeat', score:r.totalScore, floor:r.floorIdx + 1 };
+    this.checkAchievements({event:'run',win,hearts:r.hearts,tier:r.tier});
+    this.recordRun(win ? 'victory' : 'defeat');
     m.bestFloor      = Math.max(m.bestFloor, r.floorIdx + 1);
     Storage.save(m);
     Storage.clearRun();

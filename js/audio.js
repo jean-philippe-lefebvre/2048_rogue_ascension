@@ -3,22 +3,27 @@
 const Audio2 = {
   _context: null,
   _master: null,
+  _effects: null,
   _penta: [0,2,4,7,9,12,14,16,19,21,24],
   get enabled() { return GameState.meta.settings?.sound !== false; },
   syncSetting() {
-    if (this._master) this._master.gain.value = this.enabled ? 0.8 : 0;
+    if (this._effects) this._effects.gain.value = this.enabled ? 1 : 0;
+    if (typeof Music !== 'undefined') Music.syncSetting();
   },
   unlock() {
-    if (!this.enabled) return;
+    if (!this.enabled && GameState.meta.settings?.music === false) return;
     try {
       if (!this._context) {
         this._context = new (window.AudioContext || window.webkitAudioContext)();
         this._master = this._context.createGain();
         this._master.gain.value = 0.8;
         this._master.connect(this._context.destination);
+        this._effects = this._context.createGain();
+        this._effects.connect(this._master);
       }
       if (this._context.state === 'suspended') this._context.resume();
       this.syncSetting();
+      if (typeof Music !== 'undefined') Music.unlock();
     } catch { /* Audio is optional on unsupported browsers. */ }
   },
   tone(frequency, duration, type, peak, delay = 0, endFrequency = null) {
@@ -33,7 +38,7 @@ const Audio2 = {
     gain.gain.setValueAtTime(0.0001, at);
     gain.gain.exponentialRampToValueAtTime(peak, at + 0.012);
     gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
-    osc.connect(gain).connect(this._master);
+    osc.connect(gain).connect(this._effects);
     osc.start(at);
     osc.stop(at + duration + 0.02);
   },
