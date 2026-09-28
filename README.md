@@ -12,7 +12,7 @@ A roguelike variant of 2048 with meta-progression, relics, and an ascension syst
 
 Open `index.html` in a browser. Swipe or use arrow keys / WASD / ZQSD to move tiles.
 
-Each **run** spans 3 floors. Each floor has a branching node map with battles, elite rooms, mystery events, rest stops, and a boss. Merge tiles to damage enemies before your moves run out. Enemy intents show what happens next and when; three hearts let you survive failed rooms.
+Each **run** spans 3 floors. Each floor has a branching node map with battles, elite rooms, mystery events, rest stops, a merchant, and a boss. Merge tiles to damage enemies before your moves run out. Enemy intents show what happens next and when; three hearts let you survive failed rooms.
 
 ## Features
 
@@ -21,8 +21,11 @@ Each **run** spans 3 floors. Each floor has a branching node map with battles, e
 - **Hook-based relic system** – adding a relic is a single entry in `constants.js`, no other files to touch
 - **Meta-progression** – spend gold on permanent upgrades in the Forge of Fate
 - **Ascension system** – 3 prestige tiers that reset upgrades and unlock new passives
-- **Mystery rooms** – 9+ weighted random events including gold, relics, curses, traps, and ambush combat
-- **Special tiles**: gold tiles pay on merges; ice blocks until two adjacent merges thaw it; jokers merge with numbered tiles; ×2 doubles a numbered tile. Obstacles block movement, bombs halve adjacent numbers and destroy jokers or ×2 tiles, and floor III battles place paired portals. Prophet and Herald can freeze numbered tiles. Gold, joker and ×2 are fully implemented; their creation sources arrive in later versions.
+- **Mystery rooms** – eight events with visible choices, risks, and rewards
+- **Special tiles**: gold tiles pay on merges; ice blocks until two adjacent merges thaw it; jokers merge with numbered tiles; ×2 doubles a numbered tile. Obstacles block movement, bombs halve adjacent numbers and destroy jokers or ×2 tiles, and floor III battles place paired portals. Prophet and Herald can freeze numbered tiles. Gold, joker and ×2 are fully implemented; spells can create joker and ×2 tiles.
+- **Spells**: two slots and three charges each. Start with Smash at two charges; a consumed move with at least three merges restores one charge to the first non-full spell. Use 1 or 2 to cast a slot. While targeting, arrows or WASD/ZQSD move the cursor, Enter or Space selects, and Escape cancels. A rescue spell can save a board with no legal slide before defeat is finalized.
+- **Merchant**: one per floor on row 2 or 3; spend run gold on relics, spells, healing, recharge or curse removal. Remaining run gold is banked at the end.
+- **Rest rooms**: choose a relic, heal or meditate to recharge spells.
 - **Combat**: enemy HP, combo damage, block, temporary seals, telegraphed intents and boss phases
 - **Bilingual** – French and English, switchable from the title screen
 - **Mobile-first** – touch swipe controls, 440px max width, responsive
@@ -36,7 +39,7 @@ Each **run** spans 3 floors. Each floor has a branching node map with battles, e
 Vanilla JS, single CSS file, no dependencies:
 
 ```
-haptics → i18n → icons → rng → constants → storage → state → board → combat → fx → scene → audio → renderer → controller → input
+haptics → i18n → icons → rng → constants → storage → state → board → combat → spells → fx → scene → audio → renderer → controller → input
 ```
 
 ## Architecture
@@ -50,6 +53,7 @@ haptics → i18n → icons → rng → constants → storage → state → board
 | `state.js` | Runtime game state singleton |
 | `board.js` | 4×4 grid logic: slide, merge, obstacles, bombs |
 | `combat.js` | Pure combat rules: HP, intents, phases, seals and hearts |
+| `spells.js` | Pure spell effects, one-move undo, charges and rotation |
 | `fx.js` | Canvas particles and DOM feedback |
 | `audio.js` | WebAudio effects |
 | `renderer.js` | All DOM manipulation, tile pool, map SVG |

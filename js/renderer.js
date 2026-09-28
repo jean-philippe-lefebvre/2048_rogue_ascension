@@ -215,6 +215,116 @@ const Renderer = {
     document.getElementById('invertTag').textContent = fight?.invertTurns ? I18n.t('hud.inverted', { n:fight.invertTurns }) : '';
     document.querySelector('.grid-wrap').classList.toggle('is-inverted', !!fight?.invertTurns);
     document.querySelectorAll('[data-dir]').forEach(btn => btn.classList.toggle('is-locked', !!fight && Combat.isLocked(fight, btn.dataset.dir)));
+    this.renderSpells();
+  },
+
+  renderSpells() {
+    const bar = document.getElementById('spellBar');
+    if (!bar || !GameState.run) return;
+    const target = GameState.run.spells[GameState.spellTarget?.slot] ? GameState.spellTarget : null;
+    bar.innerHTML = Array.from({length:2}, (_,i) => {
+      const owned = GameState.run.spells[i];
+      if (!owned) return `<button class="spell-slot is-empty" disabled>${I18n.t('spell.empty')}</button>`;
+      const def = SPELLS.find(s => s.id === owned.id);
+      const disabled = !Controller.spellAvailable(owned);
+      return `<button class="spell-slot ${target?.slot === i ? 'is-targeting' : ''}" data-spell-slot="${i}" ${disabled ? 'disabled' : ''}>${Icons.svg(def.icon)}<span>${I18n.t('spell.'+owned.id)}</span><span class="spell-dots">${Array.from({length:3},(_,n) => `<i class="${n < owned.charges ? 'filled' : ''}"></i>`).join('')}</span></button>`;
+    }).join('');
+    const hint = document.getElementById('spellHint');
+    hint.innerHTML = '';
+    if (target) {
+      const message = document.createElement('span');
+      message.textContent = I18n.t(target.targets.length ? 'spell.pickTwo' : SPELLS.find(s => s.id === GameState.run.spells[target.slot].id).targets === 2 ? 'spell.pickTwo' : 'spell.pickOne');
+      hint.appendChild(message);
+      if (target.cursor) {
+        const position = document.createElement('span');
+        position.className = 'spell-cursor-announce';
+        position.textContent = I18n.t('spell.cell',{r:target.cursor[0]+1,c:target.cursor[1]+1});
+        hint.appendChild(position);
+      }
+    }
+    if (GameState.stuck) {
+      const message = document.createElement('span');
+      message.textContent = I18n.t(GameState.movesLeft > 0 ? 'spell.stuckSlide' : 'spell.stuckMoves');
+      hint.appendChild(message);
+      const accept = document.createElement('button');
+      accept.className = 'btn-ghost spell-accept';
+      accept.dataset.acceptDefeat = '';
+      accept.textContent = I18n.t('spell.acceptDefeat');
+      hint.appendChild(accept);
+    }
+    document.querySelectorAll('#gameGrid .gcell').forEach((cell,i) => {
+      const r = Math.floor(i/GRID_SIZE), c = i%GRID_SIZE;
+      cell.classList.toggle('spell-valid',!!target && Spells.valid(GameState,GameState.run.spells[target.slot].id,r,c,target.targets));
+      cell.classList.toggle('spell-cursor',!!target && target.cursor?.[0] === r && target.cursor?.[1] === c);
+      if (target) cell.setAttribute('aria-label',I18n.t('spell.cell',{r:r+1,c:c+1}));
+      else if (cell.classList.contains('is-portal')) cell.setAttribute('aria-label',I18n.t('tile.portal'));
+      else cell.removeAttribute('aria-label');
+    });
+  },
+
+  renderPortals() {
+    document.querySelectorAll('#gameGrid .gcell').forEach((cell,i) => {
+      const active = GameState.portals?.some(([r,c]) => r * GRID_SIZE + c === i);
+      cell.classList.toggle('is-portal',!!active);
+      if (active) cell.setAttribute('aria-label',I18n.t('tile.portal'));
+      else cell.removeAttribute('aria-label');
+    });
+  },
+
+  renderShop(animateGold = false) {
+    const run = GameState.run, gold = document.getElementById('shopGold');
+    const previous = Number(gold.dataset.value || run.gold);
+    gold.dataset.value = run.gold;
+    if (this._shopGoldRaf) cancelAnimationFrame(this._shopGoldRaf);
+    gold.innerHTML = `${Icons.svg('gold')} <span>${run.gold}</span>`;
+    if (animateGold && previous !== run.gold && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const number = gold.querySelector('span'), start = performance.now(), final = run.gold;
+      const tick = now => {
+        const progress = Math.min(1,(now-start)/300);
+        number.textContent = Math.round(previous + (final-previous)*progress);
+        if (progress < 1) this._shopGoldRaf = requestAnimationFrame(tick);
+      };
+      number.textContent = previous;
+      this._shopGoldRaf = requestAnimationFrame(tick);
+    }
+    const container = document.getElementById('shopOffers');
+    container.innerHTML = '';
+    run.pendingShop.forEach((offer,index) => {
+      const data = offer.type === 'relic' ? RELICS.find(r => r.id === offer.id) : offer.type === 'spell' ? SPELLS.find(s => s.id === offer.id) : null;
+      const icon = data?.icon || {charge:'s-catalyst',heal:'heart',cleanse:'ev-altar'}[offer.type];
+      const name = offer.type === 'relic' ? I18n.t('relic.'+offer.id+'.name') : offer.type === 'spell' ? I18n.t('spell.'+offer.id) : I18n.t('shop.'+offer.type);
+      const desc = offer.type === 'relic' ? I18n.t('relic.'+offer.id+'.desc') : offer.type === 'spell' ? I18n.t('spell.desc.'+offer.id) : I18n.t('shop.desc.'+offer.type);
+      const unavailable = offer.type === 'spell' && run.spells.length >= 2 ? I18n.t('shop.slotsFull') : '';
+      const card = document.createElement('button');
+      card.className = `relic-card shop-offer ${run.gold < offer.price ? 'is-unaffordable' : ''}`;
+      card.disabled = !Controller.shopAvailable(offer);
+      card.innerHTML = `<div class="relic-card-header"><div class="relic-icon">${Icons.svg(icon)}</div><div><div class="relic-name">${name}</div></div></div><div class="relic-desc">${desc}</div><div class="shop-price ${run.gold < offer.price ? 'is-red' : ''}">${offer.bought ? I18n.t('shop.sold') : unavailable || `${Icons.svg('gold')} ${offer.price}`}</div>`;
+      card.addEventListener('click',() => Controller.buyShop(index));
+      container.appendChild(card);
+    });
+  },
+
+  renderEvent() {
+    const pending = GameState.run.pendingEvent, def = EVENTS.find(e => e.id === pending.id);
+    document.getElementById('eventIcon').innerHTML = Icons.svg(def.icon);
+    document.getElementById('eventTitle').textContent = I18n.t('event.'+def.id+'.title');
+    document.getElementById('eventFlavour').textContent = I18n.t('event.'+def.id+'.flavour');
+    const options = document.getElementById('eventOptions');
+    options.innerHTML = '';
+    document.getElementById('eventOutcome').textContent = pending.stage === 'outcome' ? I18n.t('event.outcome.'+pending.outcome) : '';
+    document.getElementById('btnEventContinue').style.display = pending.stage === 'outcome' ? '' : 'none';
+    if (pending.stage === 'outcome') return;
+    const ids = pending.stage === 'spell' ? pending.spells : def.options;
+    ids.forEach(option => {
+      const reason = pending.stage === 'choice' ? Controller.eventOptionStatus(def.id,option) : null;
+      const button = document.createElement('button');
+      button.className = 'event-option'; button.disabled = !!reason;
+      const label = pending.stage === 'spell' ? I18n.t('spell.'+option) : I18n.t(`event.${def.id}.${option}.label`);
+      const consequence = pending.stage === 'spell' ? I18n.t('event.library.study.effect') : I18n.t(`event.${def.id}.${option}.effect`);
+      button.innerHTML = `<span>${label}</span><small class="${/−|malédiction|curse/.test(consequence) ? 'is-cost' : ''}">${reason ? I18n.t('event.reason.'+reason) : consequence}</small>`;
+      button.addEventListener('click',() => pending.stage === 'spell' ? Controller.chooseLibrarySpell(option) : Controller.chooseEvent(option));
+      options.appendChild(button);
+    });
   },
 
   renderEnemy(first = false) {
@@ -503,6 +613,8 @@ const Renderer = {
 
   // ── Relic choice ──
   renderRelicChoice(choices) {
+    document.querySelector('#relicScreen .text-xs').textContent = I18n.t('relic.chooseTitle');
+    document.querySelector('#relicScreen .relic-screen-title').textContent = I18n.t('relic.reward');
     const container = document.getElementById('relicChoices');
     container.innerHTML = '';
     choices.forEach((relic, index) => {
@@ -540,25 +652,10 @@ const Renderer = {
     document.getElementById('relicGoldInfo').textContent = I18n.t('rest.goldBonus');
     // Render relic cards
     this.renderRelicChoice(choices);
+    document.querySelector('#relicScreen .text-xs').textContent = I18n.t('rest.choose');
+    document.querySelector('#relicScreen .relic-screen-title').textContent = I18n.t('room.rest');
 
-    // Add shop button after relic cards
     const container = document.getElementById('relicChoices');
-    const shopCard = document.createElement('div');
-    shopCard.className = 'relic-card rest-shop-card';
-    shopCard.innerHTML = `
-      <div class="relic-card-header">
-        <div class="relic-icon">${Icons.svg('castle')}</div>
-        <div>
-          <div class="relic-name">${I18n.t('rest.shopName')}</div>
-          <div class="relic-rarity rarity-common">${I18n.t('rest.shopRarity')}</div>
-        </div>
-      </div>
-      <div class="relic-desc">${I18n.t('rest.shopDesc')}</div>
-      <div class="relic-effect">${Icons.svg('gold')} ${I18n.t('rest.shopGold', { n: GameState.meta.permanentGold + GameState.run.gold })}</div>`;
-    shopCard.addEventListener('click', () => Controller.pickRestShop());
-    container.appendChild(shopCard);
-    this.animateRelicCard(shopCard, choices.length);
-
     if ((GameState.run.hearts ?? 3) < 3) {
       const healCard = document.createElement('div');
       healCard.className = 'relic-card rest-heal-card';
@@ -568,8 +665,16 @@ const Renderer = {
       this.animateRelicCard(healCard, choices.length + 1);
     }
 
-    // Hide skip button for rest (player must choose)
-    document.getElementById('btnSkipRelic').style.display = 'none';
+    if (GameState.run.spells.some(spell => spell.charges < 3)) {
+      const card = document.createElement('button');
+      card.className = 'relic-card';
+      card.innerHTML = `<div class="relic-card-header"><div class="relic-icon">${Icons.svg('s-catalyst')}</div><div class="relic-name">${I18n.t('rest.meditate')}</div></div>`;
+      card.addEventListener('click', () => Controller.pickRestMeditate());
+      container.appendChild(card);
+    }
+
+    // Offer a way out when every rest reward is unavailable.
+    document.getElementById('btnSkipRelic').style.display = container.children.length ? 'none' : '';
   },
 
   // ── End screen ──

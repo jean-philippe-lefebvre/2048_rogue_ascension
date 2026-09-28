@@ -8,7 +8,7 @@ const context = vm.createContext({
   console, Date,
   localStorage: { getItem:key => saved.get(key) ?? null, setItem:(key,value) => saved.set(key,value) },
 });
-for (const file of ['i18n','rng','constants','storage','state','board','combat','controller'])
+for (const file of ['i18n','rng','constants','storage','state','board','combat','spells','controller'])
   vm.runInContext(fs.readFileSync(new URL(`../js/${file}.js`, import.meta.url), 'utf8'), context, {filename:file});
 const { Board, Combat, Controller, GameState, Storage, Rng, TILE, ENEMIES } =
   vm.runInContext('({Board,Combat,Controller,GameState,Storage,Rng,TILE,ENEMIES})', context);

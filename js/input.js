@@ -4,7 +4,7 @@ const Input = {
   touchStart: null,
 
   init() {
-    // Swipe — detect on entire game screen, not just grid
+    // Swipe : detect on entire game screen, not just grid
     document.addEventListener('touchstart', e => {
       const screen = document.getElementById('gameScreen');
       if (screen && screen.classList.contains('active')) {
@@ -26,7 +26,7 @@ const Input = {
       if (haptic) Haptics.trigger(haptic);
     }, { passive: true });
 
-    // Keyboard — keyCode (physical) + key (logical) for max compatibility
+    // Keyboard : keyCode (physical) + key (logical) for max compatibility
     const codeMap = {
       37:'left', 38:'up', 39:'right', 40:'down',
       65:'left', 68:'right', 87:'up', 83:'down',
@@ -38,7 +38,21 @@ const Input = {
       q:'left', z:'up',
     };
     window.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && GameState.spellTarget) { e.preventDefault(); Controller.cancelSpell(); return; }
+      if ((e.key === '1' || e.key === '2') && document.getElementById('gameScreen').classList.contains('active')) {
+        e.preventDefault(); Controller.selectSpell(Number(e.key)-1); return;
+      }
       const dir = codeMap[e.keyCode] || keyMap[e.key];
+      if (document.activeElement?.closest?.('[data-accept-defeat]')
+        && (e.key === 'Enter' || e.key === ' ' || e.code === 'Space')) return;
+      if (GameState.spellTarget && (dir || e.key === 'Enter' || e.key === ' ' || e.code === 'Space')) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        Audio2.unlock();
+        if (dir) Controller.moveTargetCursor(dir);
+        else Controller.confirmSpellCursor();
+        return false;
+      }
       if (document.activeElement && document.activeElement.tagName === 'BUTTON') {
         document.activeElement.blur();
       }
@@ -52,7 +66,7 @@ const Input = {
       }
     }, { capture: true });
 
-    // Resize — re-render tiles (debounced)
+    // Resize : re-render tiles (debounced)
     let _resizeTimer;
     window.addEventListener('resize', () => {
       clearTimeout(_resizeTimer);
@@ -85,7 +99,7 @@ function bindButtons() {
   document.getElementById('btnStartRun').addEventListener('click',  () => Controller.startRun());
   document.getElementById('btnShowMeta').addEventListener('click',  () => { Renderer.renderMeta(); showScreen('metaScreen'); });
 
-  // Map — abandon with confirmation
+  // Map : abandon with confirmation
   document.getElementById('btnAbandon').addEventListener('click', () => {
     document.getElementById('abandonModal').classList.add('show');
   });
@@ -97,13 +111,27 @@ function bindButtons() {
     Controller.abandonRun();
   });
 
-  // Game — abandon from game screen
+  // Game : abandon from game screen
   document.getElementById('btnGameAbandon').addEventListener('click', () => {
+    if (GameState.spellTarget) Controller.cancelSpell();
     document.getElementById('abandonModal').classList.add('show');
   });
 
   // Game overlay
   document.getElementById('overlayBtn').addEventListener('click', () => Controller.overlayAction());
+  document.getElementById('spellBar').addEventListener('click', e => {
+    const button = e.target.closest('[data-spell-slot]');
+    if (button) Controller.selectSpell(Number(button.dataset.spellSlot));
+  });
+  document.getElementById('spellHint').addEventListener('click', e => {
+    if (e.target.closest('[data-accept-defeat]')) Controller._checkFailure(true);
+  });
+  document.getElementById('gameGrid').addEventListener('click', e => {
+    const cell = e.target.closest('.gcell');
+    if (cell && GameState.spellTarget) Controller.targetSpell(Math.floor([...cell.parentNode.children].indexOf(cell)/GRID_SIZE),[...cell.parentNode.children].indexOf(cell)%GRID_SIZE);
+  });
+  document.getElementById('btnLeaveShop').addEventListener('click', () => Controller.leaveShop());
+  document.getElementById('btnEventContinue').addEventListener('click', () => Controller.continueEvent());
   document.querySelectorAll('[data-dir]').forEach(button => button.addEventListener('click', () => {
     const haptic = Controller.move(button.dataset.dir);
     if (haptic) Haptics.trigger(haptic);
@@ -133,7 +161,7 @@ function bindButtons() {
     Renderer.renderTitle();
   });
 
-  // Meta — return to map if opened from rest room, otherwise title
+  // Meta : return to map if opened from rest room, otherwise title
   document.getElementById('btnMetaBack').addEventListener('click', () => {
     if (GameState._shopReturnToMap) {
       GameState._shopReturnToMap = false;

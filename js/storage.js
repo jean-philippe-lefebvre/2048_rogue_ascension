@@ -16,6 +16,11 @@ const Storage = {
       if (!raw) return null;
       const run = JSON.parse(raw);
       run.hearts ??= 3;
+      run.spells = (run.spells ?? [{ id:'smash', charges:2 }])
+        .filter(spell => SPELLS.some(def => def.id === spell.id)).slice(0,2)
+        .map(spell => ({ id:spell.id, charges:Math.min(3,Math.max(0,spell.charges ?? 0)) }));
+      run.seenEvents ??= [];
+      run.bossHpMult ??= 1;
       run.relics = (run.relics || []).map(value => RELICS.find(r => r.id === (value?.id || value))).filter(Boolean);
       if (run.battle) {
         run.battle.kinds ??= Board.emptyKinds();
@@ -35,6 +40,8 @@ const Storage = {
         iceHits:room.iceHits, obstacleAge:GameState.obstacleAge, bombTimers:GameState.bombTimers,
         score:GameState.score, mergeCount:GameState.mergeCount,
         movesLeft:GameState.movesLeft, movesMax:GameState.movesMax,
+        stuck:!!GameState.stuck,
+        undo:room.undo || null,
       } : null;
       run.battle = battle;
       localStorage.setItem(this.RUN_KEY, JSON.stringify({ ...run, battle, rngState:Rng._state, relics: run.relics.map(r => r.id) }));

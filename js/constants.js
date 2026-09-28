@@ -8,9 +8,30 @@ const ROOM_DEFS = {
   normal:  { icon:'sword',    label:'Combat',   color:'var(--text-dim)' },
   elite:   { icon:'skull',    label:'Élite',    color:'var(--red)' },
   rest:    { icon:'campfire', label:'Repos',    color:'var(--green)' },
+  shop:    { icon:'merchant', label:'Marchand', color:'var(--gold)' },
   mystery: { icon:'question', label:'Mystère', color:'var(--purple)' },
   boss:    { icon:'eye',      label:'BOSS',     color:'var(--red)' },
 };
+
+const SPELLS = [
+  { id:'smash', icon:'s-smash', targets:1 },
+  { id:'swap', icon:'s-swap', targets:2 },
+  { id:'undo', icon:'s-undo', targets:0 },
+  { id:'pivot', icon:'s-pivot', targets:0 },
+  { id:'joker', icon:'s-joker', targets:0 },
+  { id:'catalyst', icon:'s-catalyst', targets:0 },
+];
+
+const EVENTS = [
+  { id:'altar', icon:'ev-altar', options:['take','pray','leave'] },
+  { id:'peddler', icon:'merchant', options:['buy','sell','leave'] },
+  { id:'fountain', icon:'ev-fountain', options:['drink','toss','leave'] },
+  { id:'chest', icon:'ev-chest', options:['force','disarm','leave'] },
+  { id:'ambush', icon:'ambush', options:['fight','flee'] },
+  { id:'library', icon:'ev-library', options:['study','pages'] },
+  { id:'pact', icon:'ev-pact', options:['sign','refuse'] },
+  { id:'dice', icon:'slots', options:['betGold','betHeart','leave'] },
+];
 
 const ENEMIES = [
   { id:'rat', floor:0, kind:'normal', hp:180, cadence:4, pattern:['gnaw','strike'] },

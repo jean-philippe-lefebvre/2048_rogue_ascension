@@ -16,6 +16,8 @@ const Controller = {
     GameState.roomFinished = false;
     GameState._restDone = null;
     GameState._relicDone = null;
+    GameState.spellTarget = null;
+    GameState.stuck = false;
     RelicHooks.invalidate();
     GameState.run = {
       seed: Rng.getSeed(),
@@ -23,6 +25,9 @@ const Controller = {
       hearts: 3,
       totalScore: 0,
       relics: [],
+      spells: [{ id:'smash', charges:2 }],
+      seenEvents: [],
+      bossHpMult: 1,
       lastTileVal: 0,
       floorIdx: 0,
       singularityReady: !!(m.upgrades.singularity),
@@ -52,6 +57,10 @@ const Controller = {
     const run = GameState.run;
     if (!run) return;
     if ((run.hearts ?? 3) <= 0) { this._endRun(false); return; }
+    if (run.pendingRoom) {
+      const {floorIdx,rowIdx,nodeIdx} = run.pendingRoom;
+      GameState.room = {floorIdx,rowIdx,nodeIdx,data:run.floors[floorIdx]?.[rowIdx]?.[nodeIdx]};
+    }
     if (run.pendingRelic) {
       const pending = run.pendingRelic;
       const choices = pending.ids.map(id => RELICS.find(r => r.id === id)).filter(Boolean);
@@ -65,6 +74,8 @@ const Controller = {
       return;
     }
     if (run.pendingReward) { this._showBattleReward(); return; }
+    if (run.pendingShop) { this._showShop(); return; }
+    if (run.pendingEvent) { this._showEvent(); return; }
     if (run.pendingRest) {
       const choices = run.pendingRest.map(id => RELICS.find(r => r.id === id)).filter(Boolean);
       GameState._restDone = () => { delete run.pendingRest; Storage.saveRun(run); Renderer.renderMap(); showScreen('mapScreen'); };
@@ -78,7 +89,7 @@ const Controller = {
       const enemyDef = ENEMIES.find(e => e.id === saved.enemyId);
       if (data && enemyDef) {
         GameState.room = { floorIdx:saved.floorIdx, rowIdx:saved.rowIdx, nodeIdx:saved.nodeIdx,
-          data, enemyDef, combat:saved.combat, relicState:saved.relicState || {}, iceHits:saved.iceHits || {} };
+          data, enemyDef, combat:saved.combat, relicState:saved.relicState || {}, iceHits:saved.iceHits || {}, undo:saved.undo || null };
         GameState.board = saved.board;
         GameState.kinds = saved.kinds || Board.emptyKinds();
         GameState.portals = saved.portals || [];
@@ -89,6 +100,7 @@ const Controller = {
         GameState.movesLeft = saved.movesLeft;
         GameState.movesMax = saved.movesMax;
         GameState.roomFinished = false;
+        GameState.stuck = !!saved.stuck;
         const type = enemyDef.kind, def = ROOM_DEFS[type];
         const roomLabel = type === 'boss' ? I18n.t('boss.name.' + saved.floorIdx) : I18n.t('room.' + type);
         document.getElementById('roomName').innerHTML = `<span style="color:${def.color}">${Icons.svg(def.icon)}</span> ${roomLabel}`;
@@ -157,6 +169,14 @@ const Controller = {
           if (rows[r - 1].some(p => p.type === node.type && p.connections.includes(col))) node.type = 'normal';
         });
       }
+
+      // One merchant on a middle row, replacing a normal room.
+      const candidateRows = [2,3].filter(r => rows[r].some(node => node.type === 'normal'));
+      const shopRow = candidateRows.length ? Rng.pick(candidateRows) : 2 + Rng.int(2);
+      const normalCols = rows[shopRow].map((node, col) => node.type === 'normal' ? col : -1).filter(col => col >= 0);
+      const shopCol = normalCols.length ? Rng.pick(normalCols) : Rng.int(COLS);
+      if (!normalCols.length) rows[shopRow][shopCol].type = 'normal';
+      rows[shopRow][shopCol].type = 'shop';
 
       // Last row connects to boss (index 0 in boss row)
       rows[ROWS - 1].forEach(node => { node.connections = [0]; });
@@ -230,6 +250,7 @@ const Controller = {
     GameState.room = { floorIdx, rowIdx, nodeIdx, data: roomData };
 
     if (roomData.type === 'rest')    { this._doRestRoom();    return; }
+    if (roomData.type === 'shop')    { this._doShopRoom(); return; }
     if (roomData.type === 'mystery') { this._doMysteryRoom(); return; }
 
     this._startBattleRoom(roomData.type, floorIdx);
@@ -238,16 +259,23 @@ const Controller = {
   _startBattleRoom(type, floorIdx) {
     const run = GameState.run;
     const m   = GameState.meta;
+    GameState.spellTarget = null;
+    GameState.stuck = false;
 
     const enemy = GameState.room.enemyDef || Combat.pick(floorIdx, type);
     GameState.room.enemyDef = enemy;
     GameState.room.combat = Combat.create(enemy);
+    if (type === 'boss' && run.bossHpMult > 1) {
+      GameState.room.combat.maxHp = Math.ceil(GameState.room.combat.maxHp * run.bossHpMult);
+      GameState.room.combat.hp = GameState.room.combat.maxHp;
+    }
     const base = (type === 'boss' ? [50,56,62] : type === 'elite' ? [40,44,48] : [36,40,44])[floorIdx];
     // Meta bonuses
     const moveCtx = { base, bonus: (m.upgrades.extraMoves || 0) * 2, type, floorIdx };
     if (type === 'boss') moveCtx.bonus += Math.floor(base * (m.upgrades.mastery || 0) * 0.1);
     // Relic hooks modify bonus
     RelicHooks.fire('onMovesCalc', moveCtx);
+    if (run.nextFight) { moveCtx.bonus += run.nextFight.movesDelta || 0; delete run.nextFight; }
     GameState.movesMax  = moveCtx.base + moveCtx.bonus;
     GameState.movesLeft = GameState.movesMax;
     GameState.score      = 0;
@@ -255,6 +283,7 @@ const Controller = {
     GameState.roomFinished = false;
     GameState.room.relicState = {};
     GameState.room.iceHits = {};
+    GameState.room.undo = null;
 
     // Build board
     GameState.board = Board.empty();
@@ -300,19 +329,12 @@ const Controller = {
     GameState.run.gold += 5;
     this._completeCurrentRoom();
     Storage.saveRun(GameState.run);
-    // Sealed curse: rest rooms only offer shop
-    const isSealed = GameState.run.relics.some(r => r.id === 'sealed');
-    if (isSealed) {
-      GameState._shopReturnToMap = true;
-      Renderer.renderMeta();
-      showScreen('metaScreen');
-    } else {
-      this._showRestChoice();
-    }
+    this._showRestChoice();
   },
 
   _showRestChoice() {
-    const choices = this._pickRandom(this._getUnownedRelics(), 2);
+    const sealed = GameState.run.relics.some(r => r.id === 'sealed');
+    const choices = sealed ? [] : this._pickRandom(this._getUnownedRelics(), 2);
     GameState.run.pendingRest = choices.map(r => r.id);
     Storage.saveRun(GameState.run);
     Renderer.renderRestChoice(choices);
@@ -338,77 +360,195 @@ const Controller = {
     if (cb) cb();
   },
 
+  pickRestMeditate() {
+    if (!Spells.chargeAll(GameState.run)) return;
+    const cb = GameState._restDone;
+    GameState._restDone = null;
+    if (cb) cb();
+  },
+
+  _doShopRoom() {
+    const run = GameState.run;
+    run.pendingRoom = {floorIdx:GameState.room.floorIdx,rowIdx:GameState.room.rowIdx,nodeIdx:GameState.room.nodeIdx};
+    const relics = this._pickRandom(this._getUnownedRelics().filter(r => !r.isCurse), 3);
+    const spells = SPELLS.filter(s => !run.spells.some(owned => owned.id === s.id));
+    run.pendingShop = [
+      ...relics.map(r => ({ type:'relic', id:r.id, price:{ common:35, rare:55, epic:80, legendary:120 }[r.rarity], bought:false })),
+      ...(spells.length ? [{ type:'spell', id:Rng.pick(spells).id, price:45, bought:false }] : []),
+      { type:'charge', price:20, bought:false },
+      { type:'heal', price:40, bought:false },
+      { type:'cleanse', price:60, bought:false },
+    ];
+    Storage.saveRun(run);
+    this._showShop();
+  },
+
+  _showShop() {
+    Renderer.renderShop();
+    showScreen('shopScreen');
+    Scene.set('shop');
+  },
+
+  shopAvailable(offer) {
+    const run = GameState.run;
+    if (offer.bought || run.gold < offer.price) return false;
+    if (offer.type === 'spell') return run.spells.length < 2 && !run.spells.some(s => s.id === offer.id);
+    if (offer.type === 'charge') return run.spells.some(s => s.charges < 3);
+    if (offer.type === 'heal') return run.hearts < 3;
+    if (offer.type === 'cleanse') return run.relics.some(r => r.isCurse);
+    return !run.relics.some(r => r.id === offer.id);
+  },
+
+  buyShop(index) {
+    const run = GameState.run, offer = run.pendingShop?.[index];
+    if (!offer || !this.shopAvailable(offer)) return false;
+    run.gold -= offer.price;
+    if (offer.type === 'relic') this._grantRelic(RELICS.find(r => r.id === offer.id));
+    if (offer.type === 'spell') run.spells.push({ id:offer.id, charges:2 });
+    if (offer.type === 'charge') Spells.chargeAll(run);
+    if (offer.type === 'heal') run.hearts++;
+    if (offer.type === 'cleanse') {
+      const index = run.relics.findLastIndex(r => r.isCurse);
+      run.relics.splice(index,1); RelicHooks.invalidate();
+    }
+    offer.bought = true;
+    Storage.saveRun(run);
+    Renderer.renderShop(true);
+    Audio2.relic();
+    return true;
+  },
+
+  leaveShop() {
+    if (!GameState.run?.pendingShop) return;
+    delete GameState.run.pendingShop;
+    this._completeCurrentRoom();
+    delete GameState.run.pendingRoom;
+    Storage.saveRun(GameState.run);
+    Renderer.renderMap(); showScreen('mapScreen');
+  },
+
   _doMysteryRoom() {
     const run = GameState.run;
-    const fi  = GameState.room.floorIdx;
+    run.pendingRoom = {floorIdx:GameState.room.floorIdx,rowIdx:GameState.room.rowIdx,nodeIdx:GameState.room.nodeIdx};
+    let pool = EVENTS.filter(event => !run.seenEvents.includes(event.id));
+    if (!pool.length) { run.seenEvents = []; pool = EVENTS; }
+    const event = Rng.pick(pool);
+    run.seenEvents.push(event.id);
+    run.pendingEvent = { id:event.id, stage:'choice' };
+    Storage.saveRun(run);
+    this._showEvent();
+  },
 
-    // Weighted events: [weight, handler]
-    const events = [
-      // ── Or ──
-      [20, () => { run.gold += 5;  return { icon:'gold', title:I18n.t('mystery.goldSmall.title'),  sub:I18n.t('mystery.goldSmall.sub') }; }],
-      [20, () => { run.gold += 10; return { icon:'gold', title:I18n.t('mystery.goldMedium.title'),  sub:I18n.t('mystery.goldMedium.sub') }; }],
-      [10, () => { run.gold += 20; return { icon:'gold', title:I18n.t('mystery.goldLarge.title'),   sub:I18n.t('mystery.goldLarge.sub') }; }],
-      // ── Reliques ──
-      [15, () => {
-        const picks = this._pickRandom(this._getUnownedRelics().filter(r => r.rarity === 'common'), 1);
-        if (picks.length) { this._grantRelic(picks[0]); return { icon:'gift', title:I18n.t('mystery.relicCommon.title'), sub:I18n.t('mystery.relicCommon.sub') }; }
-        run.gold += 8; return { icon:'gold', title:I18n.t('mystery.relicCommonFail.title'), sub:I18n.t('mystery.relicCommonFail.sub') };
-      }],
-      [5, () => {
-        const picks = this._pickRandom(this._getUnownedRelics().filter(r => r.rarity === 'rare' || r.rarity === 'epic'), 1);
-        if (picks.length) { this._grantRelic(picks[0]); return { icon:'sparkle', title:I18n.t('mystery.relicRare.title'), sub:I18n.t('mystery.relicRare.sub') }; }
-        run.gold += 15; return { icon:'gold', title:I18n.t('mystery.relicRareFail.title'), sub:I18n.t('mystery.relicRareFail.sub') };
-      }],
-      // ── Bonus coups ──
-      [10, () => {
-        const haste = RELICS.find(r => r.id === 'haste');
-        if (haste && !run.relics.find(r => r.id === 'haste')) { this._grantRelic(haste); return { icon:'haste', title:I18n.t('mystery.haste.title'), sub:I18n.t('mystery.haste.sub') }; }
-        run.gold += 10; return { icon:'gold', title:I18n.t('mystery.hasteFail.title'), sub:I18n.t('mystery.hasteFail.sub') };
-      }],
-      // ── Perte d'or ──
-      [8, () => { const lost = Math.min(run.gold, 10); run.gold -= lost; return { icon:'trap', title:I18n.t('mystery.trap.title'), sub:I18n.t('mystery.trap.sub', { n: lost }) }; }],
-      // ── Double ou rien ──
-      [7, () => {
-        if (Rng.next() < 0.5) { run.gold += 25; return { icon:'slots', title:I18n.t('mystery.double.title'), sub:I18n.t('mystery.double.lucky') }; }
-        const lost = Math.min(run.gold, 15); run.gold -= lost; return { icon:'slots', title:I18n.t('mystery.double.title'), sub:I18n.t('mystery.double.unlucky', { n: lost }) };
-      }],
-      // ── Curse (malus) ──
-      [8, () => {
-        const curses = RELICS.filter(r => r.isCurse && !run.relics.find(x => x.id === r.id));
-        if (curses.length) { const c = curses[Rng.int(curses.length)]; this._grantRelic(c); return { icon:c.icon, title:I18n.t('mystery.curse.title'), sub:`${I18n.t('relic.' + c.id + '.name')} : ${I18n.t('relic.' + c.id + '.desc')}` }; }
-        run.gold += 5; return { icon:'gold', title:I18n.t('mystery.curseFail.title'), sub:I18n.t('mystery.curseFail.sub') };
-      }],
-      // ── Combat piège (rare) ──
-      [5, () => 'AMBUSH'],
-    ];
+  _showEvent() {
+    Renderer.renderEvent();
+    showScreen('eventScreen');
+  },
 
-    // Weighted random pick
-    const totalWeight = events.reduce((sum, e) => sum + e[0], 0);
-    let roll = Rng.next() * totalWeight;
-    let picked;
-    for (const [weight, handler] of events) {
-      roll -= weight;
-      if (roll <= 0) { picked = handler; break; }
+  eventOptionStatus(id, option) {
+    const run = GameState.run;
+    if ((id === 'peddler' && option === 'buy') && (run.gold < 30 || run.spells.length >= 2))
+      return run.spells.length >= 2 ? 'slots' : 'gold';
+    if (id === 'peddler' && option === 'sell' && run.hearts < 2) return 'hearts';
+    if (id === 'fountain' && option === 'toss' && run.gold < 10) return 'gold';
+    if (id === 'ambush' && option === 'flee' && run.gold < 15) return 'gold';
+    if (id === 'dice' && option === 'betGold' && run.gold < 20) return 'gold';
+    if (id === 'dice' && option === 'betHeart' && run.hearts < 1) return 'hearts';
+    if (id === 'altar' && option === 'pray' && !run.spells.some(s => s.charges < 3)) return 'charges';
+    return null;
+  },
+
+  // Never hand out a relic the run already owns (hooks would fire twice): fall back to any unowned
+  // relic, then to gold of matching value.
+  _eventRelic(rarity) {
+    const unowned = this._getUnownedRelics().filter(r => !r.isCurse);
+    const pool = unowned.filter(r => r.rarity === rarity);
+    const pick = pool.length ? Rng.pick(pool) : unowned.length ? Rng.pick(unowned) : null;
+    if (!pick) { GameState.run.gold += { common:15, rare:25, epic:40, legendary:60 }[rarity] || 15; return false; }
+    this._grantRelic(pick);
+    return true;
+  },
+
+  chooseEvent(option) {
+    const run = GameState.run, pending = run?.pendingEvent;
+    if (!pending || pending.stage !== 'choice' || !EVENTS.find(e => e.id === pending.id)?.options.includes(option)
+      || this.eventOptionStatus(pending.id,option)) return false;
+    const id = pending.id;
+    let outcome = `${id}.${option}`;
+    if (id === 'altar') {
+      if (option === 'take') {
+        this._eventRelic('rare');
+        const curses = RELICS.filter(r => r.isCurse && !run.relics.some(x => x.id === r.id));
+        if (curses.length) this._grantRelic(Rng.pick(curses));
+      }
+      if (option === 'pray') Spells.chargeAll(run);
+    } else if (id === 'peddler') {
+      if (option === 'buy') {
+        const pool = SPELLS.filter(s => !run.spells.some(x => x.id === s.id));
+        if (pool.length) { run.gold -= 30; run.spells.push({ id:Rng.pick(pool).id, charges:2 }); outcome = 'peddler.bought'; }
+      }
+      if (option === 'sell') { run.hearts--; run.gold += 40; }
+    } else if (id === 'fountain') {
+      if (option === 'drink') { if (run.hearts < 3) { run.hearts++; outcome = 'fountain.healed'; } else { run.gold += 15; outcome = 'fountain.gold'; } }
+      if (option === 'toss') { run.gold -= 10; outcome = Rng.next() < .5 && this._eventRelic('common') ? 'fountain.found' : 'fountain.empty'; }
+    } else if (id === 'chest') {
+      if (option === 'force' || option === 'disarm') run.gold += 30;
+      if (option === 'force') { if (Rng.next() < .5) { run.hearts--; outcome = 'chest.hurt'; } else outcome = 'chest.safe'; }
+      if (option === 'disarm') run.nextFight = { movesDelta:-6 };
+    } else if (id === 'ambush') {
+      if (option === 'fight') {
+        delete run.pendingEvent;
+        delete run.pendingRoom;
+        run.pendingAmbushRare = true;
+        GameState.room.enemyDef = Combat.pick(GameState.room.floorIdx,'normal');
+        this._startBattleRoom('normal',GameState.room.floorIdx);
+        return true;
+      }
+      if (option === 'flee') run.gold -= 15;
+    } else if (id === 'library') {
+      if (option === 'pages') run.gold += 12;
+      if (option === 'study') {
+        const pool = SPELLS.filter(s => !run.spells.some(x => x.id === s.id));
+        if (run.spells.length < 2 && pool.length) {
+          pending.stage = 'spell';
+          pending.spells = this._pickEventSpells(pool,2);
+          Storage.saveRun(run); this._showEvent(); return true;
+        }
+        Spells.chargeAll(run);
+      }
+    } else if (id === 'pact') {
+      if (option === 'sign') { this._eventRelic('epic'); run.bossHpMult = Math.max(run.bossHpMult || 1,1.15); }
+    } else if (id === 'dice') {
+      if (option === 'betGold') { run.gold -= 20; if (Rng.next() < .5) { run.gold += 45; outcome = 'dice.goldWin'; } else outcome = 'dice.goldLose'; }
+      if (option === 'betHeart' && Rng.next() < .5) { this._eventRelic('rare'); outcome = 'dice.heartWin'; }
+      else if (option === 'betHeart') { run.hearts--; outcome = 'dice.heartLose'; }
     }
-    if (!picked) picked = events[0][1];
+    pending.stage = 'outcome'; pending.outcome = outcome;
+    if (run.hearts <= 0) { delete run.pendingEvent; this._endRun(false); return true; }
+    Storage.saveRun(run); this._showEvent();
+    return true;
+  },
 
-    const result = picked();
+  _pickEventSpells(pool,count) {
+    const remaining = [...pool], picks = [];
+    while (remaining.length && picks.length < count) picks.push(remaining.splice(Rng.int(remaining.length),1)[0].id);
+    return picks;
+  },
 
-    // Combat piège : lance un vrai combat au lieu d'un modal
-    if (result === 'AMBUSH') {
-      // Show ambush warning, then start battle
-      Renderer.showMysteryModal('ambush', I18n.t('mystery.ambush.title'), I18n.t('mystery.ambush.sub'), () => {
-        GameState.room.enemyDef = Combat.pick(fi, 'normal');
-        this._startBattleRoom('normal', fi);
-      });
-      return;
-    }
+  chooseLibrarySpell(id) {
+    const pending = GameState.run?.pendingEvent;
+    if (pending?.stage !== 'spell' || !pending.spells.includes(id) || GameState.run.spells.length >= 2) return false;
+    GameState.run.spells.push({ id, charges:2 });
+    pending.stage = 'outcome'; pending.outcome = 'library.learned';
+    Storage.saveRun(GameState.run); this._showEvent(); return true;
+  },
 
+  continueEvent() {
+    if (GameState.run?.pendingEvent?.stage !== 'outcome') return;
+    delete GameState.run.pendingEvent;
     this._completeCurrentRoom();
-    Renderer.showMysteryModal(result.icon, result.title, result.sub, () => {
-      Renderer.renderMap();
-      showScreen('mapScreen');
-    });
+    delete GameState.run.pendingRoom;
+    Storage.saveRun(GameState.run);
+    Renderer.renderMap(); showScreen('mapScreen');
   },
 
   _completeCurrentRoom() {
@@ -446,15 +586,97 @@ const Controller = {
   },
 
   // ── Move ──
+  _rescueIds() { return GameState.movesLeft > 0 ? ['smash','swap','undo'] : ['undo']; },
+
+  spellAvailable(owned) {
+    return !!owned && owned.charges > 0 && Spells.canCast(GameState,owned.id)
+      && (!GameState.stuck || this._rescueIds().includes(owned.id));
+  },
+
+  _firstSpellCell(id, targets) {
+    for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++)
+      if (Spells.valid(GameState,id,r,c,targets)) return [r,c];
+    return null;
+  },
+
+  selectSpell(slot) {
+    const gs = GameState;
+    if (!gs.run || !gs.room?.combat || gs.roomFinished || !document.getElementById('gameScreen').classList.contains('active')
+      || document.querySelector('.modal-backdrop.show, .room-overlay.show') || gs.spellBusy
+      || document.getElementById('gameTiles').getAnimations?.({subtree:true}).some(animation =>
+        animation.playState === 'running' && Number.isFinite(animation.effect?.getComputedTiming().endTime))) return false;
+    const owned = gs.run.spells[slot];
+    if (!this.spellAvailable(owned)) return false;
+    if (gs.spellTarget?.slot === slot) { this.cancelSpell(); return true; }
+    const def = SPELLS.find(s => s.id === owned.id);
+    if (!def) return false;
+    gs.spellTarget = def.targets ? {slot, targets:[], cursor:this._firstSpellCell(owned.id,[])} : null;
+    if (!def.targets) return this._castSpell(slot,[]);
+    Renderer.renderSpells();
+    return true;
+  },
+
+  cancelSpell() { GameState.spellTarget = null; Renderer.renderSpells(); },
+
+  moveTargetCursor(dir) {
+    const target = GameState.spellTarget;
+    if (!target?.cursor) return false;
+    const [dr,dc] = {left:[0,-1],right:[0,1],up:[-1,0],down:[1,0]}[dir] || [0,0];
+    target.cursor = [Math.max(0,Math.min(GRID_SIZE-1,target.cursor[0]+dr)),
+      Math.max(0,Math.min(GRID_SIZE-1,target.cursor[1]+dc))];
+    Renderer.renderSpells();
+    return true;
+  },
+
+  confirmSpellCursor() {
+    const cursor = GameState.spellTarget?.cursor;
+    return cursor ? this.targetSpell(...cursor) : false;
+  },
+
+  targetSpell(r,c) {
+    const target = GameState.spellTarget;
+    if (!target) return false;
+    if (typeof document !== 'undefined' && document.querySelector?.('.modal-backdrop.show, .room-overlay.show')) return false;
+    const id = GameState.run.spells[target.slot].id;
+    if (!Spells.valid(GameState,id,r,c,target.targets)) return false;
+    target.targets.push([r,c]);
+    if (target.targets.length === SPELLS.find(s => s.id === id).targets)
+      return this._castSpell(target.slot,target.targets);
+    target.cursor = this._firstSpellCell(id,target.targets);
+    Renderer.renderSpells();
+    return true;
+  },
+
+  _castSpell(slot,targets) {
+    const gs = GameState, spell = gs.run.spells[slot];
+    if (gs.roomFinished || (typeof document !== 'undefined' && document.querySelector?.('.modal-backdrop.show, .room-overlay.show'))) return false;
+    if (!spell || spell.charges <= 0 || !Spells.apply(gs,spell.id,targets)) return false;
+    gs.run.spells[slot].charges = Math.max(0, gs.run.spells[slot].charges - 1);
+    gs.spellTarget = null;
+    for (const [r,c] of targets) {
+      const at = Fx.cellCenter(r,c);
+      if (at) Fx.burst(at.x,at.y,'#d4a843',12);
+    }
+    Audio2.relic();
+    if (spell.id === 'pivot' || spell.id === 'undo') Renderer.renderPortals();
+    Renderer.renderTiles(); Renderer.renderEnemy(); Renderer.updateHUD(); Renderer.renderSpells();
+    this._checkFailure();
+    Storage.saveRun(gs.run);
+    return true;
+  },
+
   /** @returns {'success'|'buzz'|null} haptic to fire */
   move(inputDir) {
     const gs = GameState;
-    if (!gs.run || gs.roomFinished || gs.movesLeft <= 0) return null;
+    if (!gs.run || !gs.room?.combat || gs.roomFinished || gs.movesLeft <= 0 || gs.spellTarget || gs.spellBusy
+      || (typeof document !== 'undefined' && document.getElementById('gameScreen')?.classList && !document.getElementById('gameScreen').classList.contains('active'))
+      || (typeof document !== 'undefined' && document.querySelector('.modal-backdrop.show, .room-overlay.show'))) return null;
     const fight = gs.room.combat;
     if (Combat.isLocked(fight, inputDir)) {
       Fx.nudge(inputDir); Audio2.bump(); return 'buzz';
     }
     const dir = Combat.direction(fight, inputDir);
+    const before = Spells.snapshot(gs);
     const result = Board.applyMove(gs.board, dir, {
       kinds: gs.kinds,
       iceHits: gs.room.iceHits,
@@ -474,6 +696,13 @@ const Controller = {
     const moveCtx = { result, board: gs.board, movesLeft: gs.movesLeft, addMove: 0, freeMove: false };
     RelicHooks.fire('onAfterMove', moveCtx);
     gs.movesLeft += moveCtx.addMove;
+    if (!moveCtx.freeMove) {
+      gs.room.undo = before;
+      if (result.merges.length >= 3 && Spells.charge(gs.run)) {
+        const at = Fx.cellCenter(result.merges[0].r,result.merges[0].c);
+        if (at) { Fx.float(at.x,at.y,'1 ✦'); const label = document.querySelector('.grid-wrap .fx-float:last-of-type'); if (label) label.style.color = '#d4a843'; }
+      }
+    }
 
     const goldFromTiles = result.merges.reduce((sum, merge) => {
       if (merge.gold) merge.gold = Math.max(1, Math.floor(merge.val / 8));
@@ -539,13 +768,18 @@ const Controller = {
     return result.merges.length ? 'success' : null;
   },
 
-  _checkFailure() {
+  _checkFailure(force = false) {
     const gs = GameState;
-    if (gs.roomFinished || (gs.movesLeft > 0 && Combat.hasLegalMove(gs.room.combat, gs.board, gs.kinds))) return false;
+    if (gs.roomFinished) return false;
+    if (!force && gs.movesLeft > 0 && Combat.hasLegalMove(gs.room.combat, gs.board, gs.kinds)) {
+      if (gs.stuck) { gs.stuck = false; Renderer.renderSpells(); Storage.saveRun(gs.run); }
+      return false;
+    }
     const exhCtx = { movesLeft:0, consumed:false, overlayIcon:'', overlayTitle:'', overlaySub:'' };
     RelicHooks.fire('onMovesExhausted', exhCtx);
     if (exhCtx.consumed) {
       gs.movesLeft = exhCtx.movesLeft;
+      gs.stuck = false;
       // Persist the rescue, or a reload would restore the battle at 0 moves.
       Storage.saveRun(gs.run);
       Renderer.showRoomOverlay('phoenix', exhCtx.overlaySub);
@@ -555,7 +789,17 @@ const Controller = {
       Renderer.updateHUD();
       return false;
     }
+    if (!force && gs.run.spells.some(spell => spell.charges > 0 && this._rescueIds().includes(spell.id)
+      && Spells.canCast(gs,spell.id))) {
+      gs.stuck = true;
+      Renderer.renderSpells();
+      Storage.saveRun(gs.run);
+      return false;
+    }
+    gs.stuck = false;
+    gs.spellTarget = null;
     gs.roomFinished = true;
+    delete gs.run.pendingAmbushRare;
     const defeated = Combat.loseHeart(gs.run);
     const type = gs.room.data.type;
     const reward = type === 'boss' ? [12,16,20][gs.room.floorIdx] : type === 'elite' ? 12 : 8;
@@ -573,6 +817,7 @@ const Controller = {
 
   _winRoom(result, dir) {
     const gs = GameState;
+    gs.stuck = false;
     gs.roomFinished = true;
     const type = gs.room.data.type;
     const reward = type === 'boss' ? [12,16,20][gs.room.floorIdx] : type === 'elite' ? 12 : 8;
@@ -582,6 +827,10 @@ const Controller = {
     RelicHooks.fire('onRoomEnd', endCtx);
     const total = Math.floor((endCtx.roomReward + endCtx.goldBonus) * endCtx.goldMultiplier);
     gs.run.gold += total + (gs.meta.upgrades.goldBonus || 0) * 2;
+    if (gs.run.pendingAmbushRare) {
+      this._eventRelic('rare');
+      delete gs.run.pendingAmbushRare;
+    }
     gs.run.pendingReward = { floorIdx:gs.room.floorIdx, rowIdx:gs.room.rowIdx,
       nodeIdx:gs.room.nodeIdx, type };
     this._completeCurrentRoom();

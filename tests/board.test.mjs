@@ -67,6 +67,9 @@ test('maps are deterministic and satisfy room constraints over 200 seeds', () =>
     for (const floor of floors) {
       assert.deepEqual(floor[0].map(n => n.type), ['normal','normal','normal']);
       assert.deepEqual(floor[4].map(n => n.type), ['rest','rest','rest']);
+      const shops = floor.flatMap((row,r) => row.map(node => ({type:node.type,row:r}))).filter(node => node.type === 'shop');
+      assert.equal(shops.length,1);
+      assert.ok([2,3].includes(shops[0].row));
       assert.ok(floor[1].every(n => n.type !== 'elite'));
       for (let row = 1; row < 5; row++) {
         floor[row - 1].forEach(parent => {

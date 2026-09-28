@@ -30,7 +30,7 @@
     <button class="btn-ghost" id="btnResetSave" style="margin-top:4px;color:var(--text-muted)" data-i18n="ui.btn.resetSave">↺ Tout effacer</button>
   </div>
   <div class="lang-toggle"><div id="langToggle"></div><button class="lang-btn" id="soundToggle" type="button"></button></div>
-  <div class="version-tag">v2.1.0</div>
+  <div class="version-tag">v2.2.0</div>
 </div>
 
 <!-- MAP -->
@@ -60,15 +60,16 @@
     </div>
     <div class="hud-pills">
       <div class="hud-pill"><div class="hud-pill-val" id="hudScore">0</div><div class="hud-pill-label" data-i18n="hud.score">Score</div></div>
-      <div class="hud-pill"><div class="hud-pill-val" id="hudGold">0</div><div class="hud-pill-label" data-icon="gold" data-i18n="hud.gold">Or</div></div><div class="hud-hearts" id="hudHearts" aria-label="Hearts"></div>
+      <div class="hud-pill"><div class="hud-pill-val" id="hudGold">0</div><div class="hud-pill-label" data-icon="gold" data-i18n="hud.gold">Or</div></div><div class="hud-hearts" id="hudHearts" aria-label="Hearts"></div><button class="btn-ghost hud-abandon" id="btnGameAbandon" data-icon="abandon" data-i18n="ui.btn.abandon">Abandonner</button>
     </div>
   </div>
   <div class="moves-wrap w-full">
     <div class="moves-label"><span data-i18n="hud.movesLeft">Coups restants</span><span id="comboLabel" aria-live="polite"></span><span id="invertTag"></span><span id="movesText">0/0</span></div>
     <div class="moves-track"><div class="moves-fill" id="movesFill" style="width:100%"></div></div>
   </div>
+  <div class="spell-bar w-full" id="spellBar"></div>
+  <div class="spell-hint w-full" id="spellHint" aria-live="polite"></div>
   <div class="active-relics" id="activeRelics"></div>
-  <button class="btn-ghost" id="btnGameAbandon" style="align-self:flex-end;padding:4px 8px" data-icon="abandon" data-i18n="ui.btn.abandon">Abandonner</button>
   <div class="grid-wrap w-full">
     <div id="gameGrid"></div><div id="phaseBanner"></div>
     <div id="gameTiles"></div>
@@ -82,6 +83,23 @@
   </div>
   <div class="dpad" data-i18n-aria="hud.directions"><button data-dir="left" data-i18n-aria="hud.left">←</button><button data-dir="up" data-i18n-aria="hud.up">↑</button><button data-dir="down" data-i18n-aria="hud.down">↓</button><button data-dir="right" data-i18n-aria="hud.right">→</button></div>
 
+</div>
+
+<!-- MERCHANT -->
+<div id="shopScreen" class="screen">
+  <div class="relic-header"><div class="text-xs text-dim" data-i18n="shop.eyebrow">Boutique</div><div class="relic-screen-title" data-i18n="shop.title">Marchand</div><div class="relic-gold-info" id="shopGold"></div></div>
+  <div class="relic-choices" id="shopOffers"></div>
+  <button class="btn" id="btnLeaveShop" data-i18n="shop.leave">Quitter la boutique</button>
+</div>
+
+<!-- EVENT -->
+<div id="eventScreen" class="screen">
+  <div class="event-icon" id="eventIcon"></div>
+  <div class="event-title" id="eventTitle"></div>
+  <div class="event-flavour" id="eventFlavour"></div>
+  <div class="event-options" id="eventOptions"></div>
+  <div class="event-outcome" id="eventOutcome"></div>
+  <button class="btn btn-primary" id="btnEventContinue" data-i18n="ui.btn.continue">Continuer</button>
 </div>
 
 <!-- RELIC CHOICE -->
@@ -190,6 +208,7 @@
 <script src="js/state.js"></script>
 <script src="js/board.js"></script>
 <script src="js/combat.js"></script>
+<script src="js/spells.js"></script>
 <script src="js/fx.js"></script>
 <script src="js/scene.js"></script>
 <script src="js/audio.js"></script>
