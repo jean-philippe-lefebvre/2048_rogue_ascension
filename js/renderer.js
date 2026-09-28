@@ -49,6 +49,8 @@ const Renderer = {
         cell.classList.add('is-portal');
         cell.setAttribute('aria-label', I18n.t('tile.portal'));
       }
+      if (GameState.room?.combat?.voidCell?.[0] === Math.floor(i/GRID_SIZE)
+        && GameState.room.combat.voidCell[1] === i%GRID_SIZE) cell.classList.add('is-void');
       grid.appendChild(cell);
     }
     Fx.resize();
@@ -281,6 +283,8 @@ const Renderer = {
     document.querySelectorAll('#gameGrid .gcell').forEach((cell,i) => {
       const active = GameState.portals?.some(([r,c]) => r * GRID_SIZE + c === i);
       cell.classList.toggle('is-portal',!!active);
+      cell.classList.toggle('is-void',GameState.room?.combat?.voidCell?.[0] === Math.floor(i/GRID_SIZE)
+        && GameState.room.combat.voidCell[1] === i%GRID_SIZE);
       if (active) cell.setAttribute('aria-label',I18n.t('tile.portal'));
       else cell.removeAttribute('aria-label');
     });
@@ -350,9 +354,10 @@ const Renderer = {
     panel.classList.toggle('is-dead', fight.hp <= 0);
     document.getElementById('enemyEmblem').innerHTML = Icons.svg('e-' + def.id);
     document.getElementById('enemyEmblem').style.color = ROOM_DEFS[def.kind].color;
-    document.getElementById('enemyName').textContent = I18n.t(def.kind === 'boss' ? 'boss.name.' + def.floor : 'enemy.' + def.id);
+    document.getElementById('enemyName').textContent = I18n.t(def.kind === 'boss' ? 'enemy.' + def.id + '.name' : 'enemy.' + def.id);
     document.getElementById('enemyHp').innerHTML = `${fight.hp} / ${fight.maxHp}` +
-      (fight.block ? ` <span class="enemy-block">${Icons.svg('i-shield')} ${fight.block}</span>` : '');
+      (fight.block ? ` <span class="enemy-block">${Icons.svg('i-shield')} ${fight.block}</span>` : '') +
+      (fight.reviveAvailable ? ` <span class="phylactery" title="${I18n.t('combat.reviveAvailable')}">${Icons.svg('i-heal')}</span>` : '');
     const width = `${fight.hp / fight.maxHp * 100}%`;
     for (const id of ['enemyHpFill','enemyHpGhost']) {
       const el = document.getElementById(id);
@@ -364,6 +369,8 @@ const Renderer = {
     const arrow = fight.intentDirection ? { left:'←', right:'→', up:'↑', down:'↓' }[fight.intentDirection] : '';
     const chip = document.getElementById('enemyIntent');
     chip.innerHTML = `${Icons.svg('i-' + base)} <span>${I18n.t('intent.' + base, { n:room.floorIdx === 2 ? 3 : 2, arrow })} · ${I18n.t('intent.in', { n:fight.intentIn })}</span>`;
+    const passive = def.id === 'colossus' ? 'gravity' : def.id === 'clockmaker' ? 'clock' : null;
+    document.getElementById('enemyPassive').textContent = passive ? I18n.t('combat.' + passive) : '';
     chip.classList.toggle('is-imminent', fight.intentIn === 1);
   },
 
@@ -387,10 +394,28 @@ const Renderer = {
     const fl = document.createElement('span'); fl.className = 'fx-float strike-float'; fl.textContent = `−${n}`;
     label.appendChild(fl); setTimeout(() => fl.remove(), 950);
   },
-  phaseBanner() {
+  phaseBanner(key = 'combat.phase2') {
     const el = document.getElementById('phaseBanner');
-    el.textContent = I18n.t('combat.phase2');
+    el.textContent = I18n.t(key);
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  },
+
+  renderClock(fraction, remaining) {
+    const ring = document.getElementById('movesClock');
+    if (!ring) return;
+    ring.classList.toggle('active',GameState.room?.combat?.id === 'clockmaker');
+    ring.style.setProperty('--clock-progress', `${Math.max(0,fraction)*100}%`);
+    ring.style.setProperty('--clock-color', remaining < 1.5 ? 'var(--red)' : '#d4a843');
+  },
+  voidConsume({r,c,value}) {
+    const geo = this.getTileGeometry();
+    if (!geo) return;
+    const tile = document.createElement('div');
+    tile.className = `tile t${Math.min(value,2048)} is-void-consumed`;
+    tile.style.cssText = `left:${geo.left(c)}px;top:${geo.top(r)}px;width:${geo.cellSize}px;height:${geo.cellSize}px;z-index:24;pointer-events:none`;
+    tile.innerHTML = `<div class="tile-face">${value}</div>`;
+    document.querySelector('.grid-wrap').appendChild(tile);
+    setTimeout(() => tile.remove(),220);
   },
 
   updateActiveRelics() {
@@ -476,7 +501,10 @@ const Renderer = {
       if (!roomData.available && !roomData.completed)          cls.push('locked');
       if (roomData.type === 'boss')                            cls.push('boss');
       node.className = cls.join(' ');
-      node.innerHTML = `<span style="color:${def.color}">${roomData.completed ? '✓' : Icons.svg(def.icon)}</span><span class="room-label" style="color:${def.color}">${I18n.t('room.' + roomData.type)}</span>`;
+      const bossId = roomData.type === 'boss' ? roomData.bossId || ['jailer','smith','eye'][fi] : null;
+      node.innerHTML = bossId
+        ? `<span class="boss-emblem">${roomData.completed ? '✓' : Icons.svg('e-' + bossId)}</span><span class="room-label boss-name">${I18n.t('enemy.' + bossId + '.name')}</span>`
+        : `<span style="color:${def.color}">${roomData.completed ? '✓' : Icons.svg(def.icon)}</span><span class="room-label" style="color:${def.color}">${I18n.t('room.' + roomData.type)}</span>`;
       if (roomData.available) node.addEventListener('click', () => Controller.enterRoom(fi, rowIdx, nodeIdx));
       return node;
     };

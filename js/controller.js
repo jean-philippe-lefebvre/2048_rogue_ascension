@@ -1,6 +1,52 @@
 'use strict';
 
 const Controller = {
+  clockNow: () => performance.now(),
+  _clockTimer: null,
+  _clockLast: null,
+  _clockRemaining: 5,
+  _clockVisibilityBound: false,
+  _clockLimit() { return GameState.room?.combat?.phase === 2 ? 3.5 : 5; },
+  _clockPaused() {
+    return !!(GameState.room?.combat?.id !== 'clockmaker' || GameState.roomFinished || GameState.spellTarget
+      || (typeof document !== 'undefined' && (document.hidden || !document.getElementById('gameScreen')?.classList.contains('active')
+        || document.querySelector('.modal-backdrop.show, .room-overlay.show'))));
+  },
+  _resetClock() { this._clockRemaining = this._clockLimit(); this._clockLast = null; Renderer.renderClock?.(1,this._clockRemaining); },
+  _stopClock() { if (this._clockTimer) globalThis.clearInterval?.(this._clockTimer); this._clockTimer = null; this._clockLast = null; },
+  _startClock(remaining = null) {
+    this._stopClock();
+    if (GameState.room?.combat?.id === 'clockmaker' && Number.isFinite(remaining)) {
+      this._clockRemaining = Math.max(0,Math.min(this._clockLimit(),remaining));
+      Renderer.renderClock?.(this._clockRemaining / this._clockLimit(),this._clockRemaining);
+    } else this._resetClock();
+    if (!this._clockVisibilityBound && typeof document !== 'undefined' && document.addEventListener) {
+      document.addEventListener('visibilitychange', () => {
+        this._clockLast = null;
+        if (document.hidden && GameState.room?.combat?.id === 'clockmaker' && !GameState.roomFinished)
+          Storage.saveRun(GameState.run);
+      });
+      globalThis.addEventListener?.('pagehide', () => {
+        if (GameState.room?.combat?.id === 'clockmaker' && !GameState.roomFinished) Storage.saveRun(GameState.run);
+      });
+      this._clockVisibilityBound = true;
+    }
+    if (GameState.room?.combat?.id === 'clockmaker') this._clockTimer = globalThis.setInterval?.(() => this.clockTick(), 50);
+  },
+  clockTick(now = this.clockNow()) {
+    if (this._clockPaused()) { this._clockLast = null; return false; }
+    if (this._clockLast === null) { this._clockLast = now; return false; }
+    this._clockRemaining -= Math.max(0,now - this._clockLast) / 1000;
+    this._clockLast = now;
+    Renderer.renderClock?.(Math.max(0,this._clockRemaining / this._clockLimit()),this._clockRemaining);
+    if (this._clockRemaining > 0) return false;
+    GameState.movesLeft = Math.max(0,GameState.movesLeft - 1);
+    Renderer.updateHUD(); Renderer.strike(1);
+    this._resetClock();
+    Storage.saveRun(GameState.run);
+    this._checkFailure();
+    return true;
+  },
 
   spellCapacity() { return GameState.run?.relics.some(r => r.id === 'grimoire') ? 4 : 3; },
   chargeSpell() {
@@ -151,10 +197,11 @@ const Controller = {
         GameState.roomFinished = false;
         GameState.stuck = !!saved.stuck;
         const type = enemyDef.kind, def = ROOM_DEFS[type];
-        const roomLabel = type === 'boss' ? I18n.t('boss.name.' + saved.floorIdx) : I18n.t('room.' + type);
+        const roomLabel = type === 'boss' ? I18n.t('enemy.' + enemyDef.id + '.name') : I18n.t('room.' + type);
         document.getElementById('roomName').innerHTML = `<span style="color:${def.color}">${Icons.svg(def.icon)}</span> ${roomLabel}`;
         Renderer.hideRoomOverlay(); Renderer.renderEnemy(true); Renderer.updateHUD();
         Renderer.updateActiveRelics(); Renderer.buildGrid(); showScreen('gameScreen');
+        this._startClock(saved.clockRemaining);
         requestAnimationFrame(() => { Fx.resize(); Renderer.renderTiles(); });
         return;
       }
@@ -167,7 +214,7 @@ const Controller = {
     const ROWS = 5;
     const POOL = ['normal','normal','normal','elite','mystery','rest'];
 
-    return Array.from({ length: 3 }, () => {
+    return Array.from({ length: 3 }, (_, floorIdx) => {
       // 5 rows of 3 nodes
       const rows = [];
       for (let r = 0; r < ROWS; r++) rows.push(
@@ -231,7 +278,9 @@ const Controller = {
       rows[ROWS - 1].forEach(node => { node.connections = [0]; });
 
       // Boss row (single node)
-      rows.push([{ type: 'boss', available: false, completed: false, connections: [] }]);
+      const bosses = ENEMIES.filter(e => e.floor === floorIdx && e.kind === 'boss');
+      rows.bossId = bosses[Rng.int(bosses.length)].id;
+      rows.push([{ type: 'boss', bossId:rows.bossId, available: false, completed: false, connections: [] }]);
 
       // First row available
       rows[0].forEach(n => { n.available = true; });
@@ -283,6 +332,7 @@ const Controller = {
   },
 
   abandonRun() {
+    this._stopClock();
     const m = GameState.meta;
     m.permanentGold += GameState.run.gold;
     m.totalGold     += GameState.run.gold;
@@ -312,7 +362,8 @@ const Controller = {
     GameState.spellTarget = null;
     GameState.stuck = false;
 
-    const enemy = GameState.room.enemyDef || Combat.pick(floorIdx, type);
+    const bossId = GameState.run.floors?.[floorIdx]?.bossId || GameState.room.data?.bossId || ['jailer','smith','eye'][floorIdx];
+    const enemy = GameState.room.enemyDef || (type === 'boss' ? ENEMIES.find(e => e.id === bossId) : Combat.pick(floorIdx, type));
     GameState.room.enemyDef = enemy;
     GameState.room.combat = Combat.create(enemy);
     if (type === 'boss' && run.bossHpMult > 1) {
@@ -357,10 +408,11 @@ const Controller = {
     // Relic hooks modify board at room start (crystal, mirror, germination, curses, etc.)
     RelicHooks.fire('onRoomStart', { board: GameState.board, type, floorIdx, run });
     if (floorIdx === 2) GameState.portals = Board.createPortals(GameState.board);
+    if (enemy.id === 'stareater') Combat.placeVoid(GameState.room.combat,GameState.board,GameState.portals);
 
     // Render room UI
     const def = ROOM_DEFS[type];
-    const roomLabel = type === 'boss' ? I18n.t('boss.name.' + Math.min(floorIdx, 2)) : I18n.t('room.' + type);
+    const roomLabel = type === 'boss' ? I18n.t('enemy.' + enemy.id + '.name') : I18n.t('room.' + type);
     document.getElementById('roomName').innerHTML = `<span style="color:${def.color}">${Icons.svg(def.icon)}</span> ${roomLabel}`;
     Renderer.renderEnemy(true);
     Renderer.hideRoomOverlay();
@@ -369,6 +421,7 @@ const Controller = {
     Renderer.buildGrid();
 
     showScreen('gameScreen');
+    this._startClock();
     Storage.saveRun(GameState.run);
 
     // Defer first render to ensure grid is visible and has correct dimensions
@@ -704,6 +757,7 @@ const Controller = {
     if (!spell || spell.charges <= 0 || !Spells.apply(gs,spell.id,targets)) return false;
     gs.run.spells[slot].charges = Math.max(0, gs.run.spells[slot].charges - 1);
     gs.spellTarget = null;
+    if (spell.id === 'undo' && gs.room.combat.id === 'clockmaker') this._resetClock();
     for (const [r,c] of targets) {
       const at = Fx.cellCenter(r,c);
       if (at) Fx.burst(at.x,at.y,'#d4a843',12);
@@ -780,16 +834,26 @@ const Controller = {
       if (at) Fx.burst(at.x, at.y, kind === 'bomb' ? '#c44a3a' : '#9fb3c8', 14);
     }
     result.teleported = Board.applyPortals(gs.board, gs.kinds, gs.bombTimers, gs.portals);
+    const consumed = Combat.consumeVoid(fight,gs.board,gs.kinds);
+    if (consumed) {
+      Renderer.voidConsume(consumed);
+      const at = Fx.cellCenter(consumed.r,consumed.c);
+      if (at) Fx.burst(at.x,at.y,'#9a6ae0',12);
+    }
     const hit = this.damage(fight, result.merges);
     if (hit.dealt > 0) Renderer.enemyHit(hit.dealt);
     const phaseChanged = Combat.phase(fight, gs.room.enemyDef);
-    if (phaseChanged) Renderer.phaseBanner();
+    if (fight.id === 'necromancer' && fight.phase === 1 && fight.hp <= 0) {
+      Combat.revive(fight); Renderer.phaseBanner('combat.revive');
+    } else if (phaseChanged) Renderer.phaseBanner();
     if (!moveCtx.freeMove) gs.movesLeft--;
+    if (!moveCtx.freeMove && fight.id === 'clockmaker') this._resetClock();
     if (fight.hp <= 0) {
       this._winRoom(result, dir);
       return 'buzz';
     }
 
+    if (!moveCtx.freeMove && fight.id === 'colossus') Board.gravity(gs.board,gs.kinds,gs.bombTimers);
     const exploded = Board.tickBombs(gs.board, gs.bombTimers, gs.kinds);
     for (let i = 0; i < exploded; i++) {
       Combat.bombExploded(fight);
@@ -812,13 +876,16 @@ const Controller = {
       }
     }
     if (!moveCtx.freeMove) Combat.tick(fight, gs.board, phaseChanged);
-    const effect = moveCtx.freeMove ? null : Combat.resolve(fight, gs.board, gs.bombTimers, gs.room.floorIdx, gs.kinds, gs.portals);
+    const effect = moveCtx.freeMove ? null : Combat.resolve(fight, gs.board, gs.bombTimers, gs.room.floorIdx, gs.kinds, gs.portals,gs.room.iceHits,gs.obstacleAge);
     if (effect) RelicHooks.fire('onEnemyIntent', { effect, board:gs.board, bombTimers:gs.bombTimers });
     if (effect?.strike) {
       gs.movesLeft = Math.max(0, gs.movesLeft - effect.strike);
       Renderer.strike(effect.strike);
     }
-    if (effect) Renderer.intentFired();
+    if (effect) {
+      Renderer.intentFired();
+      if (effect.intent === 'flip' || effect.intent === 'flipv' || effect.intent === 'void') Renderer.renderPortals();
+    }
     this._renderAfterMove(result, dir);
     Renderer.renderEnemy();
     Storage.saveRun(gs.run);
@@ -857,6 +924,7 @@ const Controller = {
     gs.stuck = false;
     gs.spellTarget = null;
     gs.roomFinished = true;
+    this._stopClock();
     delete gs.run.pendingAmbushRare;
     const defeated = Combat.loseHeart(gs.run);
     const type = gs.room.data.type;
@@ -877,6 +945,7 @@ const Controller = {
     const gs = GameState;
     gs.stuck = false;
     gs.roomFinished = true;
+    this._stopClock();
     const type = gs.room.data.type;
     const reward = type === 'boss' ? [12,16,20][gs.room.floorIdx] : type === 'elite' ? 12 : 8;
     const leftover = Combat.leftoverGold(gs.movesLeft);

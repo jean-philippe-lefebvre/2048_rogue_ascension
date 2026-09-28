@@ -19,6 +19,7 @@ function trial(def, seed) {
   }
   Board.addRandom(board); Board.addRandom(board);
   const portals = def.floor === 2 ? Board.createPortals(board) : [];
+  if (def.id === 'stareater') Combat.placeVoid(fight,board,portals);
   while (moves > 0 && Combat.hasLegalMove(fight, board, kinds)) {
     let best = null;
     for (const input of Combat.directions) {
@@ -27,7 +28,7 @@ function trial(def, seed) {
       const copy = board.map(row => [...row]);
       const copyKinds = kinds.map(row => [...row]);
       const rng = Rng._state;
-      const result = Board.applyMove(copy, dir, { kinds:copyKinds, iceHits:{...iceHits} });
+      const result = Board.applyMove(copy, dir, { kinds:copyKinds, iceHits:{...iceHits}, voidCell:fight.voidCell });
       Rng._state = rng;
       if (!result) continue;
       const damage = Math.floor(result.merges.reduce((n,m) => n + m.val,0) *
@@ -36,18 +37,20 @@ function trial(def, seed) {
       if (!best || value > best.value) best = { input, value };
     }
     if (!best) break;
-    const result = Board.applyMove(board, Combat.direction(fight, best.input), { kinds, iceHits });
+    const result = Board.applyMove(board, Combat.direction(fight, best.input), { kinds, iceHits, voidCell:fight.voidCell });
     Board.remapBombTimers(timers, result.bombMoves);
     Combat.breakHazards(fight, board, result.merges, timers);
     Board.applyPortals(board, kinds, timers, portals);
+    Combat.consumeVoid(fight,board,kinds);
     Combat.damage(fight, result.merges);
     const phaseChanged = Combat.phase(fight, def);
     moves--;
     if (fight.hp <= 0) return moves;
+    if (def.id === 'colossus') Board.gravity(board,kinds,timers);
     const exploded = Board.tickBombs(board, timers, kinds);
     for (let i = 0; i < exploded; i++) Combat.bombExploded(fight);
     Combat.tick(fight, board, phaseChanged);
-    const effect = Combat.resolve(fight, board, timers, def.floor, kinds, portals);
+    const effect = Combat.resolve(fight, board, timers, def.floor, kinds, portals, iceHits);
     if (effect?.strike) moves -= effect.strike;
   }
   return null;

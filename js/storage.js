@@ -22,11 +22,22 @@ const Storage = {
         .map(spell => ({ id:spell.id, charges:Math.min((run.relics || []).some(r => (r?.id || r) === 'grimoire') ? 4 : 3,Math.max(0,spell.charges ?? 0)) }));
       run.seenEvents ??= [];
       run.bossHpMult ??= 1;
+      (run.floors || []).forEach((floor, i) => {
+        const boss = floor?.[floor.length - 1]?.[0];
+        if (boss?.type === 'boss') {
+          boss.bossId ??= ['jailer','smith','eye'][i];
+          floor.bossId = boss.bossId;
+        }
+      });
       run.relics = (run.relics || []).map(value => RELICS.find(r => r.id === (value?.id || value))).filter(Boolean);
       if (run.battle) {
         run.battle.kinds ??= Board.emptyKinds();
         run.battle.portals ??= [];
         run.battle.iceHits ??= {};
+        if (run.battle.combat) {
+          run.battle.combat.reviveAvailable ??= run.battle.combat.id === 'necromancer' && run.battle.combat.phase === 1;
+          run.battle.combat.voidCell ??= null;
+        }
       }
       return run;
     } catch { return null; }
@@ -41,6 +52,8 @@ const Storage = {
         iceHits:room.iceHits, obstacleAge:GameState.obstacleAge, bombTimers:GameState.bombTimers,
         score:GameState.score, mergeCount:GameState.mergeCount,
         movesLeft:GameState.movesLeft, movesMax:GameState.movesMax,
+        clockRemaining:room.combat.id === 'clockmaker' && typeof Controller !== 'undefined'
+          ? Controller._clockRemaining : null,
         stuck:!!GameState.stuck,
         undo:room.undo || null,
       } : null;

@@ -81,6 +81,10 @@ const Spells = {
       gs.obstacleAge = this.rotateKeys(gs.obstacleAge);
       gs.room.iceHits = this.rotateKeys(gs.room.iceHits);
       gs.portals = gs.portals.map(([r,c]) => [c,GRID_SIZE-1-r]);
+      if (gs.room.combat.voidCell) {
+        const [r,c] = gs.room.combat.voidCell;
+        gs.room.combat.voidCell = [c,GRID_SIZE-1-r];
+      }
     } else if (id === 'joker' || id === 'catalyst') {
       const empty = Board.getEmpty(gs.board);
       const [r,c] = empty[Rng.int(empty.length)];

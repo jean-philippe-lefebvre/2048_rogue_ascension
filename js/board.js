@@ -3,16 +3,18 @@
 const Board = {
   empty() { return Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0)); },
 
-  getEmpty(board) {
+  getEmpty(board, excluded = null) {
+    excluded ??= typeof GameState !== 'undefined' && GameState.board === board ? GameState.room?.combat?.voidCell : null;
     const cells = [];
     for (let r = 0; r < GRID_SIZE; r++)
       for (let c = 0; c < GRID_SIZE; c++)
-        if (board[r][c] === 0) cells.push([r, c]);
+        if (board[r][c] === 0 && !(excluded && excluded[0] === r && excluded[1] === c)) cells.push([r, c]);
     return cells;
   },
 
-  addRandom(board, useEntropy = false, forgedEntropyLvl = 0) {
-    const empty = this.getEmpty(board);
+  addRandom(board, useEntropy = false, forgedEntropyLvl = 0, excluded = null) {
+    excluded ??= typeof GameState !== 'undefined' && GameState.board === board ? GameState.room?.combat?.voidCell : null;
+    const empty = this.getEmpty(board, excluded);
     if (!empty.length) return null;
     const position = empty[Rng.int(empty.length)];
     let value;
@@ -31,8 +33,9 @@ const Board = {
     return ctx.position;
   },
 
-  placeValue(board, val) {
-    const empty = this.getEmpty(board);
+  placeValue(board, val, excluded = null) {
+    excluded ??= typeof GameState !== 'undefined' && GameState.board === board ? GameState.room?.combat?.voidCell : null;
+    const empty = this.getEmpty(board, excluded);
     if (!empty.length) return;
     const [r, c] = empty[Rng.int(empty.length)];
     board[r][c] = val;
@@ -47,6 +50,43 @@ const Board = {
   },
 
   emptyKinds() { return Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null)); },
+
+  gravity(board, kinds, timers = {}) {
+    const moves = [], nextTimers = {};
+    for (let c = 0; c < GRID_SIZE; c++) {
+      let bottom = GRID_SIZE - 1;
+      for (let r = GRID_SIZE - 1; r >= 0; r--) {
+        const value = board[r][c], kind = kinds[r][c];
+        if (value === TILE.OBSTACLE || kind === 'ice') { bottom = r - 1; continue; }
+        if (!value) continue;
+        if (bottom !== r) {
+          board[bottom][c] = value; kinds[bottom][c] = kind;
+          board[r][c] = 0; kinds[r][c] = null;
+          moves.push({ from:{r,c}, to:{r:bottom,c} });
+        }
+        if (value === TILE.BOMB) nextTimers[`${bottom},${c}`] = timers[`${r},${c}`] ?? 15;
+        bottom--;
+      }
+    }
+    Object.keys(timers).forEach(key => delete timers[key]);
+    Object.assign(timers, nextTimers);
+    return moves;
+  },
+
+  flip(board, kinds, seals, timers, iceHits, portals, axis = 'horizontal', obstacleAge = {}, voidCell = null) {
+    const point = ([r,c]) => axis === 'horizontal' ? [r,GRID_SIZE-1-c] : [GRID_SIZE-1-r,c];
+    for (const grid of [board,kinds]) {
+      const source = grid.map(row => [...row]);
+      for (let r=0;r<GRID_SIZE;r++) for (let c=0;c<GRID_SIZE;c++) { const [sr,sc] = point([r,c]); grid[r][c] = source[sr][sc]; }
+    }
+    for (const object of [seals,timers,iceHits,obstacleAge]) {
+      const entries = Object.entries(object || {});
+      entries.forEach(([key]) => delete object[key]);
+      entries.forEach(([key,value]) => { const [r,c] = point(key.split(',').map(Number)); object[`${r},${c}`] = value; });
+    }
+    for (const cell of portals) { const mapped = point(cell); cell[0]=mapped[0]; cell[1]=mapped[1]; }
+    return voidCell ? point(voidCell) : null;
+  },
 
   // A line is ordered from the side the player moved toward. Ice and obstacles
   // split it into independent segments. Entries retain their source coordinate.
@@ -151,7 +191,7 @@ const Board = {
       if (iceHits[key] >= 2) { kinds[r][c] = null; delete iceHits[key]; thawed.push({r,c}); }
       else cracked.push({r,c});
     }
-    const newTilePos = this.addRandom(board, useEntropy, forgedEntropyLvl);
+    const newTilePos = this.addRandom(board, useEntropy, forgedEntropyLvl, mods.voidCell);
     return { score, gold, merges, newTilePos, moveMap, bombMoves, cracked, thawed };
   },
 

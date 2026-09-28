@@ -11,7 +11,8 @@ const Combat = {
   create(def) {
     const fight = { id:def.id, maxHp:def.hp, hp:def.hp, block:0, cadence:def.cadence,
       pattern:def.pattern, patternIndex:0, intentIn:def.cadence, phase:1,
-      locked:null, lockTurns:0, invertTurns:0, seals:{}, intentDirection:null };
+      locked:null, lockTurns:0, invertTurns:0, seals:{}, intentDirection:null,
+      reviveAvailable:def.id === 'necromancer', voidCell:null };
     this.announce(fight);
     return fight;
   },
@@ -47,7 +48,34 @@ const Combat = {
     const absorbed = Math.min(raw, fight.block);
     fight.block -= absorbed;
     fight.hp = Math.max(0, fight.hp - (raw - absorbed));
+    this.revive(fight);
     return { raw, dealt:raw - absorbed, absorbed, combo };
+  },
+  revive(fight) {
+    if (fight.id !== 'necromancer' || !fight.reviveAvailable || fight.hp > 0) return false;
+    fight.reviveAvailable = false;
+    fight.hp = Math.ceil(fight.maxHp * 0.4);
+    fight.phase = 2;
+    fight.cadence = 3;
+    fight.pattern = ['seal','strike','heal'];
+    fight.patternIndex = 0;
+    fight.intentIn = fight.cadence;
+    this.announce(fight);
+    return true;
+  },
+  placeVoid(fight, board, portals = []) {
+    const cells = Board.getEmpty(board).filter(([r,c]) => !portals.some(([pr,pc]) => pr===r && pc===c)
+      && !(fight.voidCell?.[0] === r && fight.voidCell?.[1] === c));
+    if (cells.length) fight.voidCell = cells[Rng.int(cells.length)];
+    return fight.voidCell;
+  },
+  consumeVoid(fight, board, kinds) {
+    if (!fight.voidCell) return null;
+    const [r,c] = fight.voidCell, value = board[r][c];
+    if (value <= 0) return null;
+    board[r][c] = 0; kinds[r][c] = null;
+    fight.hp = Math.min(fight.maxHp, fight.hp + Math.floor(value/2));
+    return {r,c,value};
   },
   breakHazards(fight, board, merges, bombTimers) {
     const broken = [];
@@ -77,14 +105,14 @@ const Combat = {
     if (!phaseChanged) fight.intentIn--;
   },
   phase(fight, def) {
-    if (fight.phase === 1 && def.phase2 && fight.hp > 0 && fight.hp <= fight.maxHp / 2) {
+    if (fight.id !== 'necromancer' && fight.phase === 1 && def.phase2 && fight.hp > 0 && fight.hp <= fight.maxHp / 2) {
       fight.phase = 2; fight.cadence = def.phase2.cadence; fight.pattern = def.phase2.pattern;
       fight.patternIndex = 0; fight.intentIn = fight.cadence; this.announce(fight);
       return true;
     }
     return false;
   },
-  resolve(fight, board, bombTimers, floor, kinds = Board.emptyKinds(), portals = []) {
+  resolve(fight, board, bombTimers, floor, kinds = Board.emptyKinds(), portals = [], iceHits = {}, obstacleAge = {}) {
     if (fight.intentIn > 0 || fight.hp <= 0) return null;
     const intent = this.intent(fight);
     const effect = { intent, cells:[], strike:0 };
@@ -93,7 +121,7 @@ const Combat = {
     if (intent === 'seal' || intent === 'seal2' || intent === 'bomb') {
       const count = intent === 'seal2' ? 2 : 1;
       for (let i = 0; i < count; i++) {
-        const empty = Board.getEmpty(board).filter(([r,c]) => !portals.some(([pr,pc]) => pr === r && pc === c));
+        const empty = Board.getEmpty(board, fight.voidCell).filter(([r,c]) => !portals.some(([pr,pc]) => pr === r && pc === c));
         if (!empty.length) break;
         const [r,c] = empty[Rng.int(empty.length)], key = `${r},${c}`;
         board[r][c] = intent === 'bomb' ? TILE.BOMB : TILE.OBSTACLE;
@@ -123,6 +151,15 @@ const Combat = {
       fight.hp = Math.min(fight.maxHp, fight.hp + Math.floor(fight.maxHp * 0.12));
     } else if (intent === 'shield') {
       fight.block = Math.floor(fight.maxHp * 0.08);
+    } else if (intent === 'devour') {
+      // The Glutton eats up to two smallest tiles (reading order, not frozen): it takes away merge material.
+      for (let r=0;r<GRID_SIZE;r++) for (let c=0;c<GRID_SIZE;c++)
+        if (effect.cells.length < 2 && board[r][c] === 2 && kinds[r][c] !== 'ice') { board[r][c]=0; kinds[r][c]=null; effect.cells.push([r,c]); }
+    } else if (intent === 'flip' || intent === 'flipv') {
+      fight.voidCell = Board.flip(board,kinds,fight.seals,bombTimers,iceHits,portals,
+        intent === 'flip' ? 'horizontal' : 'vertical',obstacleAge,fight.voidCell);
+    } else if (intent === 'void') {
+      this.placeVoid(fight,board,portals);
     }
     fight.patternIndex++;
     fight.intentIn = fight.cadence;

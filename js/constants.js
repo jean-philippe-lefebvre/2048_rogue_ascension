@@ -55,6 +55,12 @@ const ENEMIES = [
   { id:'jailer', floor:0, kind:'boss', hp:294, cadence:3, pattern:['seal','seal','strike'], phase2:{ cadence:3, pattern:['seal2','strike','seal2'] } },
   { id:'smith', floor:1, kind:'boss', hp:338, cadence:5, pattern:['bomb','strike','shield'], phase2:{ cadence:4, pattern:['bomb','lock','bomb','strike'] } },
   { id:'eye', floor:2, kind:'boss', hp:496, cadence:3, pattern:['invert','gnaw','seal'], phase2:{ cadence:2, pattern:['invert','gnaw','strike'] } },
+  { id:'glutton', floor:0, kind:'boss', hp:214, cadence:3, pattern:['devour','strike','gnaw'], phase2:{ cadence:3, pattern:['devour','devour','strike'] } },
+  { id:'necromancer', floor:0, kind:'boss', hp:195, cadence:4, pattern:['seal','heal','shield'], phase2:{ cadence:3, pattern:['seal','strike','heal'] } },
+  { id:'colossus', floor:1, kind:'boss', hp:320, cadence:4, pattern:['shield','strike','lock'], phase2:{ cadence:3, pattern:['shield','lock','strike'] } },
+  { id:'clockmaker', floor:1, kind:'boss', hp:340, cadence:4, pattern:['strike','invert','shield'], phase2:{ cadence:3, pattern:['strike','invert','shield'] } },
+  { id:'mirror', floor:2, kind:'boss', hp:480, cadence:3, pattern:['flip','gnaw','seal'], phase2:{ cadence:3, pattern:['flip','flipv','strike'] } },
+  { id:'stareater', floor:2, kind:'boss', hp:350, cadence:3, pattern:['void','gnaw','strike'], phase2:{ cadence:2, pattern:['void','gnaw','strike'] } },
 ];
 
 // ── Relic Hook System ──

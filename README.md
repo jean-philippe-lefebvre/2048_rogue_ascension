@@ -12,7 +12,7 @@ A roguelike variant of 2048 with meta-progression, relics, and an ascension syst
 
 Open `index.html` in a browser. Swipe or use arrow keys / WASD / ZQSD to move tiles.
 
-Each **run** spans 3 floors. Each floor has a branching node map with battles, elite rooms, mystery events, rest stops, a merchant, and a boss. Merge tiles to damage enemies before your moves run out. Enemy intents show what happens next and when; three hearts let you survive failed rooms.
+Each **run** spans 3 floors. Each floor has a branching node map with battles, elite rooms, mystery events, rest stops, a merchant, and one boss drawn from a pool of three. The map reveals the boss before you reach it. Merge tiles to damage enemies before your moves run out. Enemy intents show what happens next and when; three hearts let you survive failed rooms.
 
 ## Features
 
@@ -26,7 +26,7 @@ Each **run** spans 3 floors. Each floor has a branching node map with battles, e
 - **Spells**: two slots and three charges each, or four with Grimoire. Choose Alchemist, Artificer, or Monk to start with their relic and spell at two charges; a consumed move with at least three merges restores one charge to the first non-full spell. Use 1 or 2 to cast a slot. While targeting, arrows or WASD/ZQSD move the cursor, Enter or Space selects, and Escape cancels. A rescue spell can save a board with no legal slide before defeat is finalized.
 - **Merchant**: one per floor on row 2 or 3; spend run gold on relics, spells, healing, recharge or curse removal. Remaining run gold is banked at the end.
 - **Rest rooms**: choose a relic, heal or meditate to recharge spells.
-- **Combat**: enemy HP, combo damage, block, temporary seals, telegraphed intents and boss phases
+- **Combat**: enemy HP, combo damage, block, temporary seals, telegraphed intents and boss phases. New boss mechanics include devouring tiles, a one-time revive, gravity, a move clock, board flips, and a moving void
 - **Bilingual** – French and English, switchable from the title screen
 - **Mobile-first** – touch swipe controls, 440px max width, responsive
 - **Sensation** – gem tiles, merge particles, floating values, shake, and screen motion

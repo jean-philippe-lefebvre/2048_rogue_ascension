@@ -30,7 +30,7 @@
     <button class="btn-ghost" id="btnResetSave" style="margin-top:4px;color:var(--text-muted)" data-i18n="ui.btn.resetSave">↺ Tout effacer</button>
   </div>
   <div class="lang-toggle"><div id="langToggle"></div><button class="lang-btn" id="soundToggle" type="button"></button></div>
-  <div class="version-tag">v2.3.0</div>
+  <div class="version-tag">v2.4.0</div>
 </div>
 
 <!-- CHARACTER CHOICE -->
@@ -63,6 +63,7 @@
         <div class="enemy-row"><span id="enemyEmblem"></span><span id="enemyName"></span><span id="enemyHp" aria-live="polite"></span></div>
         <div class="enemy-hp-track"><div id="enemyHpGhost"></div><div id="enemyHpFill"></div></div>
         <div id="enemyIntent" class="enemy-intent" aria-live="polite"></div>
+        <div id="enemyPassive" class="enemy-passive"></div>
       </div>
     </div>
     <div class="hud-pills">
@@ -71,7 +72,7 @@
     </div>
   </div>
   <div class="moves-wrap w-full">
-    <div class="moves-label"><span data-i18n="hud.movesLeft">Coups restants</span><span id="comboLabel" aria-live="polite"></span><span id="invertTag"></span><span id="movesText">0/0</span></div>
+    <div class="moves-label"><span data-i18n="hud.movesLeft">Coups restants</span><span id="comboLabel" aria-live="polite"></span><span id="invertTag"></span><span id="movesClock"><span id="movesText">0/0</span></span></div>
     <div class="moves-track"><div class="moves-fill" id="movesFill" style="width:100%"></div></div>
   </div>
   <div class="spell-bar w-full" id="spellBar"></div>
