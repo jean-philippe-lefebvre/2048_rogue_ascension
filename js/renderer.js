@@ -107,7 +107,9 @@ const Renderer = {
         if (val === TILE.OBSTACLE) {
           cls += 't-obstacle';
           const age = GameState.obstacleAge?.[`${r},${c}`];
-          label = age !== undefined ? `${3 - age}` : Icons.svg('obstacle');
+          const ttl = GameState.room?.combat?.seals?.[key];
+          label = ttl !== undefined ? `${Icons.svg('obstacle')}<small class="seal-ttl">${ttl}</small>`
+            : age !== undefined ? `${3 - age}` : Icons.svg('obstacle');
         }
         else if (val === TILE.BOMB) {
           cls += 't-bomb';
@@ -186,6 +188,66 @@ const Renderer = {
     fill.style.width = pct + '%';
     fill.className = 'moves-fill' + (pct <= 30 ? ' danger' : '');
     document.getElementById('movesText').textContent = `${gs.movesLeft}/${gs.movesMax}`;
+    const hearts = document.getElementById('hudHearts');
+    const count = gs.run.hearts ?? 3;
+    hearts.setAttribute('aria-label', I18n.t('hud.hearts', { n:count }));
+    hearts.innerHTML = Array.from({ length:3 }, (_, i) => `<span class="hud-heart ${i < count ? 'full' : 'empty'} ${this._prevHearts !== undefined && i === count && count < this._prevHearts ? 'is-lost' : ''}">${Icons.svg('heart')}</span>`).join('');
+    this._prevHearts = count;
+    const fight = gs.room?.combat;
+    document.getElementById('invertTag').textContent = fight?.invertTurns ? I18n.t('hud.inverted', { n:fight.invertTurns }) : '';
+    document.querySelector('.grid-wrap').classList.toggle('is-inverted', !!fight?.invertTurns);
+    document.querySelectorAll('[data-dir]').forEach(btn => btn.classList.toggle('is-locked', !!fight && Combat.isLocked(fight, btn.dataset.dir)));
+  },
+
+  renderEnemy(first = false) {
+    const room = GameState.room, fight = room.combat, def = room.enemyDef;
+    const panel = document.getElementById('enemyPanel');
+    panel.classList.toggle('is-boss', def.kind === 'boss');
+    panel.classList.toggle('is-phase2', fight.phase === 2);
+    panel.classList.toggle('is-dead', fight.hp <= 0);
+    document.getElementById('enemyEmblem').innerHTML = Icons.svg('e-' + def.id);
+    document.getElementById('enemyEmblem').style.color = ROOM_DEFS[def.kind].color;
+    document.getElementById('enemyName').textContent = I18n.t(def.kind === 'boss' ? 'boss.name.' + def.floor : 'enemy.' + def.id);
+    document.getElementById('enemyHp').innerHTML = `${fight.hp} / ${fight.maxHp}` +
+      (fight.block ? ` <span class="enemy-block">${Icons.svg('i-shield')} ${fight.block}</span>` : '');
+    const width = `${fight.hp / fight.maxHp * 100}%`;
+    for (const id of ['enemyHpFill','enemyHpGhost']) {
+      const el = document.getElementById(id);
+      if (first) el.style.transition = 'none';
+      el.style.width = width;
+      if (first) requestAnimationFrame(() => { el.style.transition = ''; });
+    }
+    const intent = Combat.intent(fight), base = intent === 'seal2' ? 'seal' : intent;
+    const arrow = fight.intentDirection ? { left:'←', right:'→', up:'↑', down:'↓' }[fight.intentDirection] : '';
+    const chip = document.getElementById('enemyIntent');
+    chip.innerHTML = `${Icons.svg('i-' + base)} <span>${I18n.t('intent.' + base, { n:room.floorIdx === 2 ? 3 : 2, arrow })} · ${I18n.t('intent.in', { n:fight.intentIn })}</span>`;
+    chip.classList.toggle('is-imminent', fight.intentIn === 1);
+  },
+
+  enemyHit(damage) {
+    const panel = document.getElementById('enemyPanel');
+    panel.classList.remove('is-hit'); void panel.offsetWidth; panel.classList.add('is-hit');
+    const el = document.createElement('div');
+    el.className = 'fx-float enemy-damage'; el.textContent = `−${damage}`;
+    el.style.left = '50%'; el.style.top = '40%'; panel.appendChild(el);
+    setTimeout(() => el.remove(), 950);
+  },
+  intentFired() {
+    const chip = document.getElementById('enemyIntent');
+    chip.classList.remove('did-fire'); void chip.offsetWidth; chip.classList.add('did-fire');
+    setTimeout(() => chip.classList.remove('did-fire'), 400);
+  },
+  strike(n) {
+    const el = document.getElementById('movesText');
+    el.classList.remove('is-struck'); void el.offsetWidth; el.classList.add('is-struck');
+    const label = document.querySelector('.moves-label');
+    const fl = document.createElement('span'); fl.className = 'fx-float strike-float'; fl.textContent = `−${n}`;
+    label.appendChild(fl); setTimeout(() => fl.remove(), 950);
+  },
+  phaseBanner() {
+    const el = document.getElementById('phaseBanner');
+    el.textContent = I18n.t('combat.phase2');
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   },
 
   updateActiveRelics() {
@@ -212,10 +274,12 @@ const Renderer = {
     } else {
       icon.innerHTML = Icons.svg(mode === 'success' ? 'sparkle' : 'death');
       icon.style.color = mode === 'success' ? 'var(--gold)' : 'var(--red)';
-      title.textContent = mode === 'success' ? I18n.t('overlay.victory') : I18n.t('overlay.defeat');
+      title.textContent = mode === 'success' ? I18n.t('overlay.victory') :
+        GameState.overlayMode === 'retryBoss' || GameState.overlayMode === 'failedRoom' ? I18n.t('overlay.loseHeart') : I18n.t('overlay.defeat');
       title.style.color = mode === 'success' ? 'var(--gold)' : 'var(--red)';
       sub_el.textContent  = sub;
       btn.style.display = '';
+      btn.textContent = GameState.overlayMode === 'retryBoss' ? I18n.t('ui.btn.retryBoss') : I18n.t('ui.btn.continue');
     }
     document.getElementById('roomOverlay').classList.add('show');
   },
@@ -476,6 +540,15 @@ const Renderer = {
     shopCard.addEventListener('click', () => Controller.pickRestShop());
     container.appendChild(shopCard);
     this.animateRelicCard(shopCard, choices.length);
+
+    if ((GameState.run.hearts ?? 3) < 3) {
+      const healCard = document.createElement('div');
+      healCard.className = 'relic-card rest-heal-card';
+      healCard.innerHTML = `<div class="relic-card-header"><div class="relic-icon">${Icons.svg('heart')}</div><div class="relic-name">${I18n.t('rest.healName')}</div></div><div class="relic-desc">${I18n.t('rest.healDesc')}</div>`;
+      healCard.addEventListener('click', () => Controller.pickRestHeal());
+      container.appendChild(healCard);
+      this.animateRelicCard(healCard, choices.length + 1);
+    }
 
     // Hide skip button for rest (player must choose)
     document.getElementById('btnSkipRelic').style.display = 'none';

@@ -111,13 +111,18 @@ const Board = {
     return { row: result, score: totalScore, mergedAt };
   },
 
-  // Apply a move direction, returns { moved, score, merges:[{r,c,val}], newTilePos }
+  // Apply a move direction, returns score, merges, spawn and bomb positions.
   // mods: { useEntropy, forgedEntropyLvl, deepForgeChance }
   applyMove(board, dir, mods = {}) {
     const { useEntropy = false, forgedEntropyLvl = 0, deepForgeChance = 0 } = mods;
     let moved = false;
     let totalScore = 0;
     const merges = [];
+    const bombMoves = [];
+    const coordinate = (line, index) => ({
+      r: dir === 'up' ? index : dir === 'down' ? GRID_SIZE - 1 - index : line,
+      c: dir === 'left' ? index : dir === 'right' ? GRID_SIZE - 1 - index : line,
+    });
 
     const processLine = (getLine, setCell) => {
       for (let i = 0; i < GRID_SIZE; i++) {
@@ -125,12 +130,22 @@ const Board = {
         const { row, score, mergedAt } = this.slideRow(orig, deepForgeChance);
         if (row.some((v, j) => v !== orig[j])) moved = true;
         totalScore += score;
+        // Bombs preserve their order within each obstacle-delimited segment.
+        let start = 0;
+        for (let end = 0; end <= GRID_SIZE; end++) {
+          if (end !== GRID_SIZE && orig[end] !== TILE.OBSTACLE) continue;
+          const from = [], to = [];
+          for (let j = start; j < end; j++) {
+            if (orig[j] === TILE.BOMB) from.push(j);
+            if (row[j] === TILE.BOMB) to.push(j);
+          }
+          from.forEach((index, n) => bombMoves.push({ from:coordinate(i,index), to:coordinate(i,to[n]) }));
+          start = end + 1;
+        }
         row.forEach((v, j) => {
           setCell(i, j, v);
           if (v > 0 && mergedAt.includes(j)) {
-            const r = dir === 'up' ? j : dir === 'down' ? GRID_SIZE - 1 - j : i;
-            const c = dir === 'left' ? j : dir === 'right' ? GRID_SIZE - 1 - j : i;
-            merges.push({ r, c, val: v });
+            merges.push({ ...coordinate(i,j), val:v });
           }
         });
       }
@@ -144,7 +159,7 @@ const Board = {
     if (!moved) return null;
 
     const newTilePos = this.addRandom(board, useEntropy, forgedEntropyLvl);
-    return { score: totalScore, merges, newTilePos };
+    return { score: totalScore, merges, newTilePos, bombMoves };
   },
 
   canMove(board) {
@@ -167,60 +182,40 @@ const Board = {
         }
   },
 
-  // Tick all bombs, track their new positions after a move, explode at 0
-  tickBombs(board, timers) {
-    // Rebuild timer keys to match current bomb positions
-    const newTimers = {};
-    for (let r = 0; r < GRID_SIZE; r++)
-      for (let c = 0; c < GRID_SIZE; c++)
-        if (board[r][c] === TILE.BOMB) {
-          const key = `${r},${c}`;
-          // Find closest old timer (bomb may have moved)
-          let found = false;
-          for (const oldKey of Object.keys(timers)) {
-            if (!found) { newTimers[key] = timers[oldKey] - 1; delete timers[oldKey]; found = true; }
-          }
-          if (!found) newTimers[key] = 15; // fallback for new bombs
-        }
+  remapBombTimers(timers, bombMoves) {
+    const moved = {};
+    for (const { from, to } of bombMoves) {
+      const oldKey = `${from.r},${from.c}`;
+      moved[`${to.r},${to.c}`] = timers[oldKey] ?? 15;
+    }
+    Object.keys(timers).forEach(key => delete timers[key]);
+    Object.assign(timers, moved);
+  },
 
-    // Check for explosions
+  // Tick bombs after movement and defuses; return the number that exploded.
+  tickBombs(board, timers) {
     const exploded = [];
-    for (const [key, t] of Object.entries(newTimers)) {
-      if (t <= 0) {
+    for (const key of Object.keys(timers)) {
+      const [r, c] = key.split(',').map(Number);
+      if (board[r]?.[c] !== TILE.BOMB) { delete timers[key]; continue; }
+      if (--timers[key] <= 0) {
         const [r, c] = key.split(',').map(Number);
         exploded.push([r, c]);
-        delete newTimers[key];
+        delete timers[key];
       }
     }
 
-    // Apply explosions: destroy bomb + adjacent tiles
+    // Explosions halve adjacent numbered tiles; special tiles are untouched.
     for (const [br, bc] of exploded) {
-      board[br][bc] = 0; // remove bomb
+      board[br][bc] = 0;
       const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
       for (const [dr, dc] of dirs) {
         const nr = br + dr, nc = bc + dc;
-        if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
-          if (board[nr][nc] !== TILE.OBSTACLE) board[nr][nc] = 0; // obstacles survive explosions
-        }
+        if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE && board[nr][nc] > 0)
+          board[nr][nc] = Math.max(2, board[nr][nc] / 2);
       }
     }
-
-    // Update timers ref
-    Object.keys(timers).forEach(k => delete timers[k]);
-    Object.assign(timers, newTimers);
-
-    return exploded.length > 0;
+    return exploded.length;
   },
 
-  checkObjective(board, obj, score, mergeCount) {
-    if (obj.id === 'reach') {
-      for (let r = 0; r < GRID_SIZE; r++)
-        for (let c = 0; c < GRID_SIZE; c++)
-          if (board[r][c] >= obj.target) return true;
-      return false;
-    }
-    if (obj.id === 'score')  return score >= obj.target;
-    if (obj.id === 'merges') return mergeCount >= obj.target;
-    return false;
-  },
 };

@@ -80,8 +80,7 @@ function bindButtons() {
   // Title
   document.getElementById('btnContinueRun').addEventListener('click', () => {
     if (!GameState.run) return;
-    Renderer.renderMap();
-    showScreen('mapScreen');
+    Controller.resumeRun();
   });
   document.getElementById('btnStartRun').addEventListener('click',  () => Controller.startRun());
   document.getElementById('btnShowMeta').addEventListener('click',  () => { Renderer.renderMeta(); showScreen('metaScreen'); });
@@ -105,6 +104,10 @@ function bindButtons() {
 
   // Game overlay
   document.getElementById('overlayBtn').addEventListener('click', () => Controller.overlayAction());
+  document.querySelectorAll('[data-dir]').forEach(button => button.addEventListener('click', () => {
+    const haptic = Controller.move(button.dataset.dir);
+    if (haptic) Haptics.trigger(haptic);
+  }));
 
   // Relic screen
   document.getElementById('btnSkipRelic').addEventListener('click', () => Controller.skipRelic());
@@ -125,6 +128,7 @@ function bindButtons() {
     GameState.meta = Storage.defaultMeta();
     GameState.run   = null;
     Storage.save(GameState.meta);
+    Storage.clearRun();
     showScreen('titleScreen');
     Renderer.renderTitle();
   });
@@ -161,6 +165,12 @@ function bindButtons() {
 (function boot() {
   const saved = Storage.load();
   if (saved) GameState.meta = { ...Storage.defaultMeta(), ...saved, settings: { ...Storage.defaultMeta().settings, ...saved.settings } };
+  GameState.run = Storage.loadRun();
+  if (GameState.run) {
+    Rng._seed = GameState.run.seed >>> 0;
+    Rng._state = (GameState.run.rngState ?? GameState.run.seed) >>> 0;
+  }
+  RelicHooks.invalidate();
 
   Input.init();
   bindButtons();

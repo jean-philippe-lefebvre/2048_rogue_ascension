@@ -88,7 +88,8 @@ const Fx = {
   combo(count) {
     const el = document.getElementById('comboLabel');
     if (!el || this.reduced()) return;
-    el.textContent = I18n.t('hud.combo', { n: count });
+    const multiplier = (1 + 0.25 * (count - 1)).toLocaleString(I18n._lang === 'fr' ? 'fr-FR' : 'en-US', { maximumFractionDigits:2 });
+    el.textContent = I18n.t('hud.combo', { n: multiplier });
     el.classList.remove('show');
     void el.offsetWidth;
     el.classList.add('show');

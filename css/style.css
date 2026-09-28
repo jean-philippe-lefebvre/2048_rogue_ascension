@@ -260,19 +260,53 @@ body {
 .relic-tooltip-card .relic-tt-desc { font-size: 12px; color: var(--text-dim); line-height: 1.6; }
 
 /* ─── GAME SCREEN ─── */
-#gameScreen { gap: 10px; padding-top: 16px; justify-content: center; min-height: 100dvh; overflow: hidden; }
+#gameScreen { gap: 10px; padding-top: 16px; justify-content: flex-start; min-height: 100dvh; overflow-y: auto; }
 
-.game-header { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.game-header { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
 .room-name { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; }
-.room-objective-text { font-size: 12px; letter-spacing: 1px; color: var(--gold); text-transform: uppercase; font-weight: 700; }
+.room-info { flex: 1; min-width: 0; }
+.enemy-panel { position: relative; margin-top: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 88%, transparent); }
+.enemy-panel.is-boss { border-color: rgba(196,74,58,.45); }
+.enemy-row { display: flex; align-items: center; gap: 7px; }
+#enemyEmblem { display: inline-flex; width: 28px; height: 28px; flex: none; align-items: center; justify-content: center; }
+#enemyEmblem .ico { width: 28px; height: 28px; }
+#enemyName { font-family: 'Cinzel', serif; font-size: 15px; font-weight: 700; flex: 1; min-width: 0; }
+#enemyHp { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+.enemy-block { color: var(--blue); display: inline-flex; align-items: center; gap: 2px; }
+.enemy-block .ico { width: 14px; height: 14px; }
+.enemy-hp-track { position: relative; height: 8px; border-radius: 4px; margin-top: 7px; background: rgba(255,255,255,.06); overflow: hidden; }
+#enemyHpGhost, #enemyHpFill { position: absolute; inset: 0 auto 0 0; width: 100%; border-radius: 4px; }
+#enemyHpGhost { background: rgba(255,255,255,.35); transition: width 450ms ease-out 250ms; }
+#enemyHpFill { background: linear-gradient(90deg,#8a2a20,var(--red)); transition: width 160ms cubic-bezier(.2,.8,.2,1); }
+.enemy-panel.is-phase2 #enemyHpFill { background: linear-gradient(90deg,#c44a3a,#ff6a2a); box-shadow: 0 0 8px rgba(255,106,42,.45); }
+.enemy-intent { display: flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 12px; color: var(--text-dim); }
+.enemy-intent .ico { width: 16px; height: 16px; }
+.enemy-intent.is-imminent { color: var(--red); animation: intent-pulse 700ms ease-in-out infinite alternate; }
+@keyframes intent-pulse { to { transform: scale(1.05); } }
+.enemy-intent.did-fire { animation: intent-fire 400ms ease-out; }
+@keyframes intent-fire { from { background: rgba(196,74,58,.25); } to { background: transparent; } }
+.enemy-panel.is-hit { animation: enemy-hit 260ms ease-out; }
+@keyframes enemy-hit { 0% { filter: brightness(2.2) saturate(0); transform: translateX(0); } 30% { transform: translateX(4px); } 60% { transform: translateX(-3px); } 100% { filter: none; transform: none; } }
+.enemy-panel.is-dead { animation: enemy-death 300ms ease-out forwards; }
+@keyframes enemy-death { to { opacity: .35; transform: scale(.98); } }
+.enemy-damage { color: var(--red); }
+.hud-hearts { display: flex; align-items: center; gap: 2px; }
+.hud-heart { color: var(--red); display: inline-flex; width: 16px; height: 16px; }
+.hud-heart .ico { width: 16px; height: 16px; }
+.hud-heart.empty { color: var(--text-muted); opacity: .4; }
+.hud-heart.is-lost { animation: heart-loss 500ms ease-out; }
+@keyframes heart-loss { 50% { transform: scale(1.4); } 100% { transform: scale(.8); } }
 
-.hud-pills { display: flex; gap: 8px; }
+.hud-pills { display: flex; align-items: center; gap: 8px; }
 .hud-pill { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; text-align: center; min-width: 52px; }
 .hud-pill-val { font-family: 'Cinzel', serif; font-size: 16px; font-weight: 700; color: var(--gold); line-height: 1; }
 .hud-pill-label { font-size: 10px; letter-spacing: 1.5px; color: var(--text-dim); text-transform: uppercase; margin-top: 2px; }
 
 .moves-wrap { width: 100%; display: flex; flex-direction: column; gap: 4px; }
-.moves-label { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: 1px; color: var(--text-dim); text-transform: uppercase; }
+.moves-label { position: relative; display: flex; justify-content: space-between; font-size: 10px; letter-spacing: 1px; color: var(--text-dim); text-transform: uppercase; }
+#invertTag { color: #e04a8a; }
+#movesText.is-struck { animation: shake 300ms ease-out; }
+.strike-float { color: var(--red); right: 0; top: 0; left: auto; }
 #comboLabel { color:var(--gold); font-family:'Cinzel',serif; font-size:16px; font-weight:900; line-height:10px; opacity:0; pointer-events:none; transition:opacity 200ms; }
 #comboLabel.show { opacity:1; animation:combo-pop 300ms cubic-bezier(.34,1.56,.64,1); }
 @keyframes combo-pop { from{transform:scale(1.6)} to{transform:scale(1)} }
@@ -294,6 +328,26 @@ body {
   box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04);
   position: relative;
 }
+.grid-wrap.is-inverted { outline: 1px dashed rgba(224,74,138,.6); }
+#phaseBanner { position: absolute; z-index: 25; left: 0; right: 0; top: 48%; text-align: center; pointer-events: none; font-family: 'Cinzel', serif; font-size: 20px; font-weight: 700; color: var(--red); opacity: 0; }
+#phaseBanner.show { animation: phase-banner 1200ms ease-out; }
+@keyframes phase-banner { 0%,100% { opacity: 0; } 30%,65% { opacity: 1; } }
+/* One-row d-pad (← ↑ ↓ →) for players who prefer buttons to swipes: as wide as the grid, at the bottom, never below the fold. */
+.dpad {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  width: 100%; max-width: var(--grid-max, 440px); margin-top: auto; padding: 12px 0 max(12px, env(safe-area-inset-bottom));
+}
+.dpad button { height: 64px; }
+.dpad button {
+  display: grid; place-items: center; font-size: 28px; line-height: 1;
+  background: color-mix(in srgb, var(--surface) 90%, transparent); border: 1px solid var(--border); border-radius: 14px;
+  color: var(--text); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 2px 0 rgba(0,0,0,.35);
+  transition: transform 90ms ease-out, background-color 90ms ease-out, border-color 90ms ease-out;
+}
+.dpad button:active { transform: translateY(1px) scale(.95); background: var(--surface2); border-color: rgba(212,168,67,.45); }
+.dpad button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.dpad button.is-locked { opacity: .35; }
 
 #gameGrid {
   display: grid;
@@ -347,6 +401,8 @@ body {
 .t2048.is-merged .tile-face { animation:tile-merge 320ms cubic-bezier(.34,1.8,.5,1), tile-gold 1.5s ease-in-out infinite 320ms; }
 @keyframes tile-gold { 0%,100%{box-shadow:0 0 20px rgba(212,168,67,.3)} 50%{box-shadow:0 0 50px rgba(212,168,67,.6)} }
 .t-obstacle .tile-face {background:repeating-linear-gradient(45deg,#1d0d0d 0 7px,#150909 7px 14px);border:1px solid #4a1a1a;color:var(--obs-fg,#5a2a2a)}
+.seal-ttl { position: absolute; right: 5px; bottom: 4px; font: 700 11px 'Courier Prime', monospace; color: var(--text-dim); }
+.tile-face { position: relative; }
 .t-bomb .tile-face {background:var(--bomb-bg,#220c0a);color:var(--bomb-fg,#e04030);border:2px solid var(--bomb-bd,rgba(220,64,48,0.5));font-size:14px !important}
 .t-bomb.bomb-imminent .tile-face {animation:tile-bomb 0.5s ease-in-out infinite;border-color:rgba(255,40,20,0.8)}
 @keyframes tile-bomb { 0%,100%{box-shadow:0 0 8px rgba(196,74,58,0.4)} 50%{box-shadow:0 0 20px rgba(255,40,20,0.9)} }
@@ -529,14 +585,26 @@ body {
   .screen { max-width: 500px; padding: 24px 20px; }
 }
 
+/* Short phones (iPhone SE class): one row of wide buttons so the pad stays on screen. */
+@media (max-height: 740px) and (min-height: 501px) {
+  #gameScreen { gap: 6px; padding-top: 10px; }
+  .dpad { gap: 8px; padding-top: 8px; }
+  .dpad button { height: 56px; }
+}
+
 @media (orientation: landscape) and (max-height: 500px) {
   #gameScreen { padding-top: 8px; gap: 6px; min-height: auto; }
   .grid-wrap { max-width: 320px; margin: 0 auto; }
+  .dpad { max-width: 320px; gap: 6px; margin-top: 4px; padding: 4px 0; }
+  .dpad button { height: 44px; }
   .overlay-icon { font-size: 28px; }
   .overlay-title { font-size: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .enemy-intent.is-imminent, .enemy-intent.did-fire, .enemy-panel.is-hit, .hud-heart.is-lost, #movesText.is-struck { animation: none !important; }
+  .enemy-panel.is-dead { animation: reduced-death 150ms ease-out forwards; }
+  #phaseBanner.show { animation-duration: 150ms !important; }
   .scene-fog, .scene-dust i, .scene-motif.is-boss { animation: none !important; }
   .scene-dust { display: none; }
   .tile { transition: none !important; }
@@ -546,3 +614,4 @@ body {
   .t2048 .tile-face { animation: none !important; }
   .t-bomb.bomb-imminent { animation: none !important; }
 }
+@keyframes reduced-death { to { opacity: .35; } }

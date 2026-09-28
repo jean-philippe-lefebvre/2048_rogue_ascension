@@ -1,0 +1,128 @@
+'use strict';
+
+// Deterministic combat rules. Callers supply the board and the seeded Rng stream.
+const Combat = {
+  directions: ['left', 'right', 'up', 'down'],
+  opposite: { left:'right', right:'left', up:'down', down:'up' },
+  pick(floor, kind) {
+    const pool = ENEMIES.filter(e => e.floor === floor && e.kind === kind);
+    return pool[Rng.int(pool.length)];
+  },
+  create(def) {
+    const fight = { id:def.id, maxHp:def.hp, hp:def.hp, block:0, cadence:def.cadence,
+      pattern:def.pattern, patternIndex:0, intentIn:def.cadence, phase:1,
+      locked:null, lockTurns:0, invertTurns:0, seals:{}, intentDirection:null };
+    this.announce(fight);
+    return fight;
+  },
+  announce(fight) {
+    const intent = fight.pattern[fight.patternIndex % fight.pattern.length];
+    if (intent === 'lock') {
+      const choices = this.directions.filter(d => d !== fight.locked);
+      fight.intentDirection = choices[Rng.int(choices.length)];
+    } else fight.intentDirection = null;
+    return intent;
+  },
+  intent(fight) { return fight.pattern[fight.patternIndex % fight.pattern.length]; },
+  direction(fight, input) { return fight.invertTurns > 0 ? this.opposite[input] : input; },
+  isLocked(fight, input) { return fight.lockTurns > 0 && fight.locked === input; },
+  hasLegalMove(fight, board) {
+    for (const input of this.directions) {
+      if (this.isLocked(fight, input)) continue;
+      const dir = this.direction(fight, input);
+      for (let i = 0; i < GRID_SIZE; i++) {
+        const row = dir === 'left' ? board[i] : dir === 'right' ? [...board[i]].reverse()
+          : dir === 'up' ? board.map(r => r[i]) : board.map(r => r[i]).reverse();
+        const slid = Board.slideRow(row).row;
+        if (slid.some((value,j) => value !== row[j])) return true;
+      }
+    }
+    return false;
+  },
+  damage(fight, merges) {
+    const combo = 1 + 0.25 * Math.max(0, merges.length - 1);
+    const raw = Math.floor(merges.reduce((sum, merge) => sum + merge.val, 0) * combo * (fight.invertTurns > 0 ? 1.25 : 1));
+    const absorbed = Math.min(raw, fight.block);
+    fight.block -= absorbed;
+    fight.hp = Math.max(0, fight.hp - (raw - absorbed));
+    return { raw, dealt:raw - absorbed, absorbed, combo };
+  },
+  breakHazards(fight, board, merges, bombTimers) {
+    const broken = [];
+    for (const merge of merges) {
+      if (merge.val < 16) continue;
+      for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const r = merge.r + dr, c = merge.c + dc, key = `${r},${c}`;
+        if (key in fight.seals && board[r]?.[c] === TILE.OBSTACLE) {
+          board[r][c] = 0; delete fight.seals[key]; broken.push({ r,c,kind:'seal' });
+        } else if (board[r]?.[c] === TILE.BOMB) {
+          board[r][c] = 0; delete bombTimers[key]; broken.push({ r,c,kind:'bomb' });
+        }
+      }
+    }
+    return broken;
+  },
+  tick(fight, board, phaseChanged = false) {
+    for (const [key, ttl] of Object.entries(fight.seals)) {
+      if (--fight.seals[key] <= 0) {
+        const [r,c] = key.split(',').map(Number);
+        if (board[r][c] === TILE.OBSTACLE) board[r][c] = 0;
+        delete fight.seals[key];
+      }
+    }
+    if (fight.lockTurns > 0 && --fight.lockTurns === 0) fight.locked = null;
+    if (fight.invertTurns > 0) fight.invertTurns--;
+    if (!phaseChanged) fight.intentIn--;
+  },
+  phase(fight, def) {
+    if (fight.phase === 1 && def.phase2 && fight.hp > 0 && fight.hp <= fight.maxHp / 2) {
+      fight.phase = 2; fight.cadence = def.phase2.cadence; fight.pattern = def.phase2.pattern;
+      fight.patternIndex = 0; fight.intentIn = fight.cadence; this.announce(fight);
+      return true;
+    }
+    return false;
+  },
+  resolve(fight, board, bombTimers, floor) {
+    if (fight.intentIn > 0 || fight.hp <= 0) return null;
+    const intent = this.intent(fight);
+    const effect = { intent, cells:[], strike:0 };
+    // A shield only holds until the enemy's next action.
+    fight.block = 0;
+    if (intent === 'seal' || intent === 'seal2' || intent === 'bomb') {
+      const count = intent === 'seal2' ? 2 : 1;
+      for (let i = 0; i < count; i++) {
+        const empty = Board.getEmpty(board);
+        if (!empty.length) break;
+        const [r,c] = empty[Rng.int(empty.length)], key = `${r},${c}`;
+        board[r][c] = intent === 'bomb' ? TILE.BOMB : TILE.OBSTACLE;
+        if (intent === 'bomb') bombTimers[key] = 5;
+        else fight.seals[key] = fight.id === 'jailer' ? 8 : 6;
+        effect.cells.push([r,c]);
+      }
+    } else if (intent === 'gnaw') {
+      let best = 0, at = null;
+      for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++)
+        if (board[r][c] > best) { best = board[r][c]; at = [r,c]; }
+      if (at) { board[at[0]][at[1]] = Math.max(2, best / 2); effect.cells.push(at); }
+    } else if (intent === 'strike') {
+      effect.strike = floor === 2 ? 3 : 2;
+    } else if (intent === 'lock') {
+      fight.locked = fight.intentDirection; fight.lockTurns = 3;
+    } else if (intent === 'invert') {
+      fight.invertTurns = 2;
+    } else if (intent === 'heal') {
+      fight.hp = Math.min(fight.maxHp, fight.hp + Math.floor(fight.maxHp * 0.12));
+    } else if (intent === 'shield') {
+      fight.block = Math.floor(fight.maxHp * 0.08);
+    }
+    fight.patternIndex++;
+    fight.intentIn = fight.cadence;
+    this.announce(fight);
+    return effect;
+  },
+  bombExploded(fight) {
+    if (fight.id === 'smith') fight.hp = Math.min(fight.maxHp, fight.hp + Math.floor(fight.maxHp * 0.05));
+  },
+  loseHeart(run) { run.hearts = Math.max(0, (run.hearts ?? 3) - 1); return run.hearts === 0; },
+  leftoverGold(movesLeft) { return Math.floor(Math.max(0, movesLeft) / 2); },
+};

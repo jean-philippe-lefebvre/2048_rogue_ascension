@@ -12,44 +12,23 @@ const ROOM_DEFS = {
   boss:    { icon:'eye',      label:'BOSS',     color:'var(--red)' },
 };
 
-// Calibrated objectives per floor (index 0,1,2) and room type
-const OBJECTIVES = {
-  0: {
-    normal: [
-      { id:'merges', target:6,  label:'6 fusions' },
-      { id:'merges', target:8,  label:'8 fusions' },
-      { id:'reach',  target:32, label:'Atteindre 32' },
-      { id:'reach',  target:64, label:'Atteindre 64' },
-    ],
-    elite: [
-      { id:'reach',  target:64,  label:'Atteindre 64' },
-      { id:'merges', target:10,  label:'10 fusions' },
-    ],
-  },
-  1: {
-    normal: [
-      { id:'merges', target:12,  label:'12 fusions' },
-      { id:'merges', target:14,  label:'14 fusions' },
-      { id:'reach',  target:128, label:'Atteindre 128' },
-    ],
-    elite: [
-      { id:'reach',  target:128, label:'Atteindre 128' },
-      { id:'reach',  target:256, label:'Atteindre 256' },
-      { id:'merges', target:16,  label:'16 fusions' },
-    ],
-  },
-  2: {
-    normal: [
-      { id:'reach',  target:128, label:'Atteindre 128' },
-      { id:'reach',  target:256, label:'Atteindre 256' },
-      { id:'merges', target:16,  label:'16 fusions' },
-    ],
-    elite: [
-      { id:'reach',  target:256, label:'Atteindre 256' },
-      { id:'merges', target:20,  label:'20 fusions' },
-    ],
-  },
-};
+const ENEMIES = [
+  { id:'rat', floor:0, kind:'normal', hp:180, cadence:4, pattern:['gnaw','strike'] },
+  { id:'sentinel', floor:0, kind:'normal', hp:202, cadence:4, pattern:['seal','seal','strike'] },
+  { id:'ghoul', floor:0, kind:'normal', hp:186, cadence:4, pattern:['gnaw','gnaw','heal'] },
+  { id:'revenant', floor:0, kind:'elite', hp:211, cadence:3, pattern:['seal','strike','gnaw'] },
+  { id:'salamander', floor:1, kind:'normal', hp:176, cadence:4, pattern:['bomb','strike'] },
+  { id:'slag', floor:1, kind:'normal', hp:220, cadence:6, pattern:['shield','seal','seal'] },
+  { id:'apprentice', floor:1, kind:'normal', hp:240, cadence:4, pattern:['bomb','gnaw'] },
+  { id:'warden', floor:1, kind:'elite', hp:247, cadence:5, pattern:['shield','lock','bomb'] },
+  { id:'larva', floor:2, kind:'normal', hp:220, cadence:5, pattern:['gnaw','strike'] },
+  { id:'weaver', floor:2, kind:'normal', hp:285, cadence:3, pattern:['seal','lock','seal'] },
+  { id:'prophet', floor:2, kind:'normal', hp:223, cadence:3, pattern:['invert','gnaw','heal'] },
+  { id:'herald', floor:2, kind:'elite', hp:340, cadence:3, pattern:['invert','bomb','seal','gnaw'] },
+  { id:'jailer', floor:0, kind:'boss', hp:294, cadence:3, pattern:['seal','seal','strike'], phase2:{ cadence:3, pattern:['seal2','strike','seal2'] } },
+  { id:'smith', floor:1, kind:'boss', hp:338, cadence:5, pattern:['bomb','strike','shield'], phase2:{ cadence:4, pattern:['bomb','lock','bomb','strike'] } },
+  { id:'eye', floor:2, kind:'boss', hp:496, cadence:3, pattern:['invert','gnaw','seal'], phase2:{ cadence:2, pattern:['invert','gnaw','strike'] } },
+];
 
 // ── Relic Hook System ──
 const RelicHooks = {
@@ -81,8 +60,8 @@ const RELICS = [
     hooks: { onGoldCalc: ctx => { ctx.gold += ctx.merges.length; } } },
   { id:'haste',     icon:'haste', name:'Hâte',           rarity:'common', desc:'+5 coups dans toutes les salles.',                effect:'+5 coups max',
     hooks: { onMovesCalc: ctx => { ctx.bonus += 5; } } },
-  { id:'shield',    icon:'shield', name:'Bouclier',       rarity:'common', desc:'Les bombes sont neutralisées au début de chaque salle.', effect:'Bombes désactivées',
-    hooks: { onRoomStart: ctx => { for(let r=0;r<GRID_SIZE;r++) for(let c=0;c<GRID_SIZE;c++) if(ctx.board[r][c]===TILE.BOMB) ctx.board[r][c]=0; } } },
+  { id:'shield',    icon:'shield', name:'Bouclier',       rarity:'common', desc:'Les bombes ennemies sont neutralisées dès leur apparition.', effect:'Bombes désactivées',
+    hooks: { onEnemyIntent: ctx => { if(ctx.effect?.intent !== 'bomb') return; for(const [r,c] of ctx.effect.cells) { ctx.board[r][c]=0; delete ctx.bombTimers[`${r},${c}`]; } } } },
   { id:'sprout',    icon:'sprout', name:'Germination',    rarity:'common', desc:'+1 tuile de départ dans chaque salle.',           effect:'3 tuiles au départ',
     hooks: { onRoomStart: ctx => { Board.addRandom(ctx.board, false, 0); } } },
   { id:'collector', icon:'collector', name:'Collecteur',     rarity:'common', desc:'+3 or à chaque salle terminée.',                  effect:'+3 or/salle',
@@ -168,12 +147,6 @@ const META_DEFS = [
   // ── Ascension 3 ──
   { id:'singularity', icon:'singularity', name:'Singularité', maxLvl:1, costs:[500],        ascReq:3, desc:'1×/run : quand une tuile atteint 128+, tout le board double.', getEffect: _ => 'Doublement total à 128+' },
   { id:'mastery',     icon:'mastery', name:'Maîtrise',    maxLvl:3, costs:[150,300,500], ascReq:3, desc:'Coups bonus dans les salles boss.',                           getEffect: l => `+${l*10}% coups boss` },
-];
-
-const BOSS_OBJECTIVES = [
-  [{ id:'reach', target:128, label:'Atteindre 128' }],
-  [{ id:'reach', target:256, label:'Atteindre 256' }],
-  [{ id:'reach', target:512, label:'Atteindre 512' }],
 ];
 
 // Relic drop weights per rarity, indexed by floor (0, 1, 2)

@@ -6,6 +6,41 @@ const I18n = {
 
   _data: {
     fr: {
+      'hud.hearts': '{n} cœurs sur 3',
+      'hud.directions': 'Commandes directionnelles',
+      'hud.left': 'Gauche',
+      'hud.right': 'Droite',
+      'hud.up': 'Haut',
+      'hud.down': 'Bas',
+      'ui.btn.retryBoss': 'Recommencer le combat',
+      'hud.inverted': 'Commandes inversées ({n})',
+      'combat.phase2': 'Phase 2',
+      'overlay.loseHeart': 'Tu perds un cœur',
+      'overlay.noHearts': 'Tu perds un cœur',
+      'overlay.leftoverGold': 'Coups restants : +{n} or',
+      'rest.healName': 'Soin : +1 cœur',
+      'rest.healDesc': 'Récupère un cœur (maximum 3).',
+      'intent.in': 'dans {n}',
+      'enemy.rat': 'Rat des ossuaires',
+      'enemy.sentinel': 'Squelette sentinelle',
+      'enemy.ghoul': 'Goule affamée',
+      'enemy.revenant': 'Chevalier revenant',
+      'enemy.salamander': 'Salamandre',
+      'enemy.slag': 'Golem de scories',
+      'enemy.apprentice': 'Apprenti calciné',
+      'enemy.warden': 'Gardien d’airain',
+      'enemy.larva': 'Larve du vide',
+      'enemy.weaver': 'Tisseuse d’ombre',
+      'enemy.prophet': 'Prophète aveugle',
+      'enemy.herald': 'Héraut de l’Œil',
+      'intent.seal': 'Scelle une case',
+      'intent.gnaw': 'Ronge ta plus grosse tuile',
+      'intent.strike': 'Frappe : −{n} coups',
+      'intent.bomb': 'Pose une bombe',
+      'intent.lock': 'Bloque {arrow}',
+      'intent.invert': 'Inverse les commandes',
+      'intent.heal': 'Se soigne',
+      'intent.shield': 'Se protège',
       // UI static
       'ui.byline': 'Un jeu de',
       'ui.subtitle': 'Rogue Ascension',
@@ -103,9 +138,6 @@ const I18n = {
       'room.boss': 'BOSS',
 
       // Objectives
-      'objective.reach': 'Atteindre {n}',
-      'objective.merges': '{n} fusions',
-      'objective.score': 'Score : {n}',
 
       // Mystery events
       'mystery.goldSmall.title': 'Carte ancienne',
@@ -148,7 +180,7 @@ const I18n = {
       'relic.haste.desc': '+5 coups dans toutes les salles.',
       'relic.haste.effect': '+5 coups max',
       'relic.shield.name': 'Bouclier',
-      'relic.shield.desc': 'Les bombes sont neutralisées au début de la salle.',
+      'relic.shield.desc': 'Les bombes ennemies sont neutralisées dès leur apparition.',
       'relic.shield.effect': 'Bombes désactivées',
       'relic.sprout.name': 'Germe',
       'relic.sprout.desc': '+1 tuile initiale par salle.',
@@ -267,6 +299,41 @@ const I18n = {
     },
 
     en: {
+      'hud.hearts': '{n} hearts of 3',
+      'hud.directions': 'Direction controls',
+      'hud.left': 'Left',
+      'hud.right': 'Right',
+      'hud.up': 'Up',
+      'hud.down': 'Down',
+      'ui.btn.retryBoss': 'Restart fight',
+      'hud.inverted': 'Controls inverted ({n})',
+      'combat.phase2': 'Phase 2',
+      'overlay.loseHeart': 'You lose a heart',
+      'overlay.noHearts': 'You lose a heart',
+      'overlay.leftoverGold': 'Moves left: +{n} gold',
+      'rest.healName': 'Heal: +1 heart',
+      'rest.healDesc': 'Restore one heart (maximum 3).',
+      'intent.in': 'in {n}',
+      'enemy.rat': 'Ossuary Rat',
+      'enemy.sentinel': 'Skeleton Sentinel',
+      'enemy.ghoul': 'Starving Ghoul',
+      'enemy.revenant': 'Revenant Knight',
+      'enemy.salamander': 'Salamander',
+      'enemy.slag': 'Slag Golem',
+      'enemy.apprentice': 'Charred Apprentice',
+      'enemy.warden': 'Brass Warden',
+      'enemy.larva': 'Void Larva',
+      'enemy.weaver': 'Shadow Weaver',
+      'enemy.prophet': 'Blind Prophet',
+      'enemy.herald': 'Herald of the Eye',
+      'intent.seal': 'Seals a cell',
+      'intent.gnaw': 'Gnaws your biggest tile',
+      'intent.strike': 'Strike: −{n} moves',
+      'intent.bomb': 'Plants a bomb',
+      'intent.lock': 'Locks {arrow}',
+      'intent.invert': 'Inverts controls',
+      'intent.heal': 'Heals',
+      'intent.shield': 'Shields',
       // UI static
       'ui.byline': 'A game of',
       'ui.subtitle': 'Rogue Ascension',
@@ -364,9 +431,6 @@ const I18n = {
       'room.boss': 'BOSS',
 
       // Objectives
-      'objective.reach': 'Reach {n}',
-      'objective.merges': '{n} merges',
-      'objective.score': 'Score: {n}',
 
       // Mystery events
       'mystery.goldSmall.title': 'Ancient map',
@@ -409,7 +473,7 @@ const I18n = {
       'relic.haste.desc': '+5 moves in all rooms.',
       'relic.haste.effect': '+5 max moves',
       'relic.shield.name': 'Shield',
-      'relic.shield.desc': 'Bombs are neutralized at room start.',
+      'relic.shield.desc': 'Enemy bombs are neutralized as soon as they appear.',
       'relic.shield.effect': 'Bombs disabled',
       'relic.sprout.name': 'Sprout',
       'relic.sprout.desc': '+1 starting tile per room.',
@@ -553,6 +617,7 @@ const I18n = {
   },
 
   applyDOM() {
+    document.querySelectorAll('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', this.t(el.dataset.i18nAria)));
     const elements = document.querySelectorAll('[data-i18n]');
     for (const el of elements) {
       const key = el.getAttribute('data-i18n');
