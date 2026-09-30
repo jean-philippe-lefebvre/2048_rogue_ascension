@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 2048 Rogue: the board as a mark. Cut-gem tiles in the game's value colours (4, 8, 64) and the 2048 tile in gold. -->
+  <defs>
+    <linearGradient id="tl" x1=".1" y1="0" x2=".9" y2="1"><stop offset="0" stop-color="#b48cff" stop-opacity=".95"/><stop offset=".5" stop-color="#b48cff" stop-opacity=".6"/><stop offset="1" stop-color="#b48cff" stop-opacity=".3"/></linearGradient>
+    <linearGradient id="bl" x1=".1" y1="0" x2=".9" y2="1"><stop offset="0" stop-color="#5b8cff" stop-opacity=".95"/><stop offset=".5" stop-color="#5b8cff" stop-opacity=".6"/><stop offset="1" stop-color="#5b8cff" stop-opacity=".3"/></linearGradient>
+    <linearGradient id="br" x1=".1" y1="0" x2=".9" y2="1"><stop offset="0" stop-color="#ff5d6c" stop-opacity=".95"/><stop offset=".5" stop-color="#ff5d6c" stop-opacity=".6"/><stop offset="1" stop-color="#ff5d6c" stop-opacity=".3"/></linearGradient>
+    <linearGradient id="gold" x1=".1" y1="0" x2=".9" y2="1">
+      <stop offset="0" stop-color="#fff3c2"/><stop offset=".3" stop-color="#f7d266"/><stop offset=".68" stop-color="#e0aa3c"/><stop offset="1" stop-color="#b47a26"/>
+    </linearGradient>
+    <linearGradient id="goldRim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff6d6"/><stop offset=".5" stop-color="#c8902c"/><stop offset="1" stop-color="#8e5f1a"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="14"/></filter>
+  </defs>
+  <g>
+    <rect x="20" y="20" width="224" height="224" rx="52" fill="#0c0c18"/>
+    <rect x="20" y="20" width="224" height="224" rx="52" fill="url(#tl)"/>
+    <path d="M34 80 Q34 34 80 34 L170 34 L34 170 Z" fill="#fff" opacity="0.16"/>
+    <path d="M230 94 L230 184 Q230 230 184 230 L94 230 Z" fill="#000" opacity=".22"/>
+    <rect x="72" y="72" width="120" height="120" rx="22" fill="none" stroke="#fff" stroke-opacity="0.22" stroke-width="5"/>
+    <rect x="26" y="26" width="212" height="212" rx="46" fill="none" stroke="#b48cff" stroke-width="12"/>
+  </g>
+  <g>
+    <rect x="20" y="268" width="224" height="224" rx="52" fill="#0c0c18"/>
+    <rect x="20" y="268" width="224" height="224" rx="52" fill="url(#bl)"/>
+    <path d="M34 328 Q34 282 80 282 L170 282 L34 418 Z" fill="#fff" opacity="0.16"/>
+    <path d="M230 342 L230 432 Q230 478 184 478 L94 478 Z" fill="#000" opacity=".22"/>
+    <rect x="72" y="320" width="120" height="120" rx="22" fill="none" stroke="#fff" stroke-opacity="0.22" stroke-width="5"/>
+    <rect x="26" y="274" width="212" height="212" rx="46" fill="none" stroke="#5b8cff" stroke-width="12"/>
+  </g>
+  <g>
+    <rect x="268" y="268" width="224" height="224" rx="52" fill="#0c0c18"/>
+    <rect x="268" y="268" width="224" height="224" rx="52" fill="url(#br)"/>
+    <path d="M282 328 Q282 282 328 282 L418 282 L282 418 Z" fill="#fff" opacity="0.16"/>
+    <path d="M478 342 L478 432 Q478 478 432 478 L342 478 Z" fill="#000" opacity=".22"/>
+    <rect x="320" y="320" width="120" height="120" rx="22" fill="none" stroke="#fff" stroke-opacity="0.22" stroke-width="5"/>
+    <rect x="274" y="274" width="212" height="212" rx="46" fill="none" stroke="#ff5d6c" stroke-width="12"/>
+  </g>
+  <g>
+    <rect x="268" y="20" width="224" height="224" rx="52" fill="#ffc53a" opacity=".6" filter="url(#glow)"/>
+    <rect x="268" y="20" width="224" height="224" rx="52" fill="url(#gold)"/>
+    <path d="M282 80 Q282 34 328 34 L418 34 L282 170 Z" fill="#fff" opacity="0.3"/>
+    <path d="M478 94 L478 184 Q478 230 432 230 L342 230 Z" fill="#000" opacity=".22"/>
+    <rect x="320" y="72" width="120" height="120" rx="22" fill="none" stroke="#fff" stroke-opacity="0.42" stroke-width="5"/>
+    <rect x="274" y="26" width="212" height="212" rx="46" fill="none" stroke="url(#goldRim)" stroke-width="12"/>
+  </g>
+</svg>
