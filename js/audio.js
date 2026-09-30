@@ -44,7 +44,9 @@ const Audio2 = {
   },
   merges(merges) {
     merges.forEach((merge, i) => {
-      const semitone = this._penta[Math.min(10, Math.log2(merge.val) - 1)];
+      // Rank, not log2: Trinity tiles (3, 6, 12...) are not powers of two.
+      const step = Math.round(Board.rank(merge.val)) - 1;
+      const semitone = this._penta[Math.max(0, Math.min(10, step))] ?? 0;
       const frequency = 261.63 * 2 ** (semitone / 12);
       const delay = i * 0.055;
       this.tone(frequency, 0.28, 'triangle', 0.13, delay);
